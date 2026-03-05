@@ -1,12 +1,23 @@
 import requests
 import re
 import yaml
+from pathlib import Path
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
-# Load config
-with open("config.yaml", "r") as f:
-    config = yaml.safe_load(f)
+# Load config from configs/ first, then fallback to root.
+_root = Path(__file__).parent.parent
+_config_candidates = [
+    _root / "configs" / "config.yaml",
+    _root / "config.yaml",
+]
+for _config_path in _config_candidates:
+    if _config_path.exists():
+        with open(_config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        break
+else:
+    raise FileNotFoundError("No config.yaml found in configs/ or project root.")
 
 MODEL_NAME = config["model"]
 TEMPERATURE = config["temperature"]
@@ -47,7 +58,7 @@ Evaluate strictly and return JSON:
                     "temperature": TEMPERATURE
                 }
             },
-            timeout=60
+            timeout=120
         )
 
         raw_output = response.json()["response"]

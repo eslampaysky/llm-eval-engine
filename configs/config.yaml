@@ -1,0 +1,36 @@
+# AI Breaker Lab - config.yaml
+
+judge_providers:
+  - ollama
+  - gemini
+  - openai
+  - anthropic
+
+# Ollama - points to the ollama Docker container (NOT localhost)
+ollama_url:   http://host.docker.internal:11434
+ollama_model: llama3
+temperature:  0.0
+
+# OpenAI - add key to .env to activate
+openai_model: "gpt-4o-mini"
+
+# Anthropic - add key to .env to activate
+anthropic_model: claude-haiku-4-5-20251001
+
+# Gemini - free tier available, add key to .env to activate
+gemini_model: gemini-2.0-flash
+
+# Scoring weights
+correctness_weight: 0.6
+relevance_weight:   0.4
+toxicity_threshold: 0.1
+
+# Optional cost model (USD per 1K tokens)
+openai_input_cost_per_1k: 0.00015
+openai_output_cost_per_1k: 0.0006
+anthropic_input_cost_per_1k: 0.0008
+anthropic_output_cost_per_1k: 0.004
+gemini_input_cost_per_1k: 0.000075
+gemini_output_cost_per_1k: 0.0003
+
+model: llama3

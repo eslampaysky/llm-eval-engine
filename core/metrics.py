@@ -1,20 +1,12 @@
-"""Backward-compatible metrics API with pluggable metric registry."""
+"""Core metrics API wrapper."""
 
-from __future__ import annotations
-
-try:
-    from src.llm_eval_engine.application.metrics import build_default_metric_registry
-    from src.llm_eval_engine.domain.models import EvaluatedSample, JudgeResult
-    from src.llm_eval_engine.infrastructure.config_loader import load_project_config
-except ImportError:
-    from llm_eval_engine.application.metrics import build_default_metric_registry
-    from llm_eval_engine.domain.models import EvaluatedSample, JudgeResult
-    from llm_eval_engine.infrastructure.config_loader import load_project_config
+from src.llm_eval_engine.application.metrics import build_default_metric_registry
+from src.llm_eval_engine.domain.models import EvaluatedSample, JudgeResult
+from src.llm_eval_engine.infrastructure.config_loader import load_project_config
 
 
 def _to_domain_rows(results: list[dict]) -> list[EvaluatedSample]:
     rows: list[EvaluatedSample] = []
-
     for result in results:
         judges = {
             provider: JudgeResult(
@@ -29,7 +21,6 @@ def _to_domain_rows(results: list[dict]) -> list[EvaluatedSample]:
             )
             for provider, payload in result.get("judges", {}).items()
         }
-
         rows.append(
             EvaluatedSample(
                 question=str(result.get("question", "")),
@@ -43,7 +34,6 @@ def _to_domain_rows(results: list[dict]) -> list[EvaluatedSample]:
                 judges=judges,
             )
         )
-
     return rows
 
 
@@ -62,5 +52,4 @@ def compute_metrics(results: list[dict], fail_threshold: float = 5.0) -> dict:
         fail_threshold=fail_threshold,
         toxicity_threshold=toxicity_threshold,
     )
-    domain_rows = _to_domain_rows(results)
-    return registry.compute_all(domain_rows)
+    return registry.compute_all(_to_domain_rows(results))

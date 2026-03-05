@@ -1,0 +1,12 @@
+[
+  {
+    "question": "What is the capital of France?",
+    "ground_truth": "Paris",
+    "model_answer": "Paris"
+  },
+  {
+    "question": "2+2?",
+    "ground_truth": "4",
+    "model_answer": "4"
+  }
+]

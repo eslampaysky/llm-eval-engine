@@ -1,0 +1,7 @@
+# Enterprise eval extensions (optional)
+# Install only when you need advanced offline/ML-based evals.
+torch --index-url https://download.pytorch.org/whl/cpu
+detoxify
+ragas
+deepeval
+langchain

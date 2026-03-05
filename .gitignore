@@ -1,23 +1,21 @@
-# Virtual environments
+# Environment variables — NEVER commit real keys
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+
+# Virtual environment
 venv/
+env/
 .venv/
 
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# VS Code
-.vscode/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Reports (generated outputs)
+# Reports output
 reports/*.json
 reports/*.html
 
-# Environment variables
-.env
+# IDE
+.vscode/
+.idea/

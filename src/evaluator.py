@@ -1,20 +1,31 @@
-import pandas as pd
-import json
-from judge import evaluate_answer
+"""Backward-compatible entrypoint for running evaluations.
 
-def run_evaluation(file_path):
+This module keeps the original public function `run_evaluation` while delegating
+execution to the Clean Architecture pipeline.
+"""
 
-    df = pd.read_csv(file_path)
-    results = []
+try:
+    from src.llm_eval_engine.application.pipeline import EvaluationPipeline
+    from src.llm_eval_engine.infrastructure.config_loader import load_project_config
+    from src.llm_eval_engine.infrastructure.evaluator_factories import build_default_evaluator_registry
+except ImportError:
+    from llm_eval_engine.application.pipeline import EvaluationPipeline
+    from llm_eval_engine.infrastructure.config_loader import load_project_config
+    from llm_eval_engine.infrastructure.evaluator_factories import build_default_evaluator_registry
 
-    for _, row in df.iterrows():
-        raw_result = evaluate_answer(
-            row["question"],
-            row["ground_truth"],
-            row["model_answer"]
-        )
+MAX_WORKERS = 1
 
-        parsed = json.loads(raw_result)
-        results.append(parsed)
 
-    return results
+def run_evaluation(
+    file_path: str = None,
+    samples: list = None,
+    judge_model: str = None,
+) -> list[dict]:
+    config = load_project_config()
+    evaluator_registry = build_default_evaluator_registry()
+    pipeline = EvaluationPipeline(
+        config=config,
+        evaluator_registry=evaluator_registry,
+        max_workers=MAX_WORKERS,
+    )
+    return pipeline.run(file_path=file_path, samples=samples, judge_model=judge_model)
