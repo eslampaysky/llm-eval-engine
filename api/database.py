@@ -39,6 +39,20 @@ def init_db():
     )
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS evaluation_runs(
+        report_id TEXT PRIMARY KEY,
+        client_name TEXT,
+        dataset_id TEXT,
+        model_version TEXT,
+        timestamp TEXT NOT NULL,
+        correctness REAL,
+        relevance REAL,
+        hallucination REAL,
+        overall REAL
+    )
+    """)
+
     cur.execute("PRAGMA table_info(usage_logs)")
     existing_columns = {row[1] for row in cur.fetchall()}
     if "client_id" not in existing_columns:
@@ -214,3 +228,70 @@ def get_usage_summary(client_name: str | None = None) -> dict[str, Any]:
         "month": month,
         "overall": overall,
     }
+
+
+def log_evaluation_run(
+    report_id: str,
+    client_name: str,
+    dataset_id: str | None,
+    model_version: str | None,
+    summary: dict[str, Any],
+) -> None:
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT OR REPLACE INTO evaluation_runs(
+            report_id, client_name, dataset_id, model_version, timestamp,
+            correctness, relevance, hallucination, overall
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            report_id,
+            client_name,
+            dataset_id,
+            model_version,
+            datetime.now(timezone.utc).isoformat(),
+            float(summary.get("correctness", 0) or 0),
+            float(summary.get("relevance", 0) or 0),
+            float(summary.get("hallucination", 0) or 0),
+            float(summary.get("overall", 0) or 0),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_latest_regression_baseline(
+    client_name: str,
+    dataset_id: str | None,
+    current_model_version: str | None,
+) -> dict[str, Any] | None:
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    where = ["client_name = ?"]
+    params: list[Any] = [client_name]
+
+    if dataset_id:
+        where.append("dataset_id = ?")
+        params.append(dataset_id)
+
+    if current_model_version:
+        where.append("(model_version IS NULL OR model_version != ?)")
+        params.append(current_model_version)
+
+    sql = f"""
+        SELECT report_id, client_name, dataset_id, model_version, timestamp,
+               correctness, relevance, hallucination, overall
+        FROM evaluation_runs
+        WHERE {" AND ".join(where)}
+        ORDER BY timestamp DESC
+        LIMIT 1
+    """
+    cur.execute(sql, params)
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None

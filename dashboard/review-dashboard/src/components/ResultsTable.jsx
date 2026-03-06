@@ -16,17 +16,42 @@ function sortRows(rows, sort) {
 export default function ResultsTable({ rows = [] }) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState({ key: 'correctness', dir: 'desc' });
+  const [problemFilter, setProblemFilter] = useState('all');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const base = q
+    const searched = q
       ? rows.filter((row) =>
           String(row.question || '').toLowerCase().includes(q) ||
           String(row.model_answer || '').toLowerCase().includes(q)
         )
       : rows;
+
+    const base = searched.filter((row) => {
+      const isHallucination = Boolean(row.is_hallucination ?? row.hallucination);
+      const isLowRelevance = Boolean(row.is_low_relevance ?? Number(row.relevance || 0) < 7);
+      const isIncorrect = Boolean(row.is_incorrect ?? Number(row.correctness || 0) < 7);
+
+      if (problemFilter === 'hallucination') return isHallucination;
+      if (problemFilter === 'low_relevance') return isLowRelevance;
+      if (problemFilter === 'incorrect') return isIncorrect;
+      return true;
+    });
+
     return sortRows(base, sort);
-  }, [rows, query, sort]);
+  }, [rows, query, sort, problemFilter]);
+
+  const counts = useMemo(() => {
+    const hallucination = rows.filter((row) => Boolean(row.is_hallucination ?? row.hallucination)).length;
+    const lowRelevance = rows.filter((row) => Boolean(row.is_low_relevance ?? Number(row.relevance || 0) < 7)).length;
+    const incorrect = rows.filter((row) => Boolean(row.is_incorrect ?? Number(row.correctness || 0) < 7)).length;
+    return {
+      all: rows.length,
+      hallucination,
+      low_relevance: lowRelevance,
+      incorrect,
+    };
+  }, [rows]);
 
   const onSort = (key) => {
     setSort((prev) => ({ key, dir: prev.key === key && prev.dir === 'desc' ? 'asc' : 'desc' }));
@@ -57,6 +82,20 @@ export default function ResultsTable({ rows = [] }) {
           <button type="button" className="ghost-btn" onClick={exportCsv}>Export CSV</button>
         </div>
       </div>
+      <div className="problem-filters">
+        <button type="button" className={`filter-pill ${problemFilter === 'all' ? 'active' : ''}`} onClick={() => setProblemFilter('all')}>
+          All ({counts.all})
+        </button>
+        <button type="button" className={`filter-pill ${problemFilter === 'hallucination' ? 'active' : ''}`} onClick={() => setProblemFilter('hallucination')}>
+          Hallucinations ({counts.hallucination})
+        </button>
+        <button type="button" className={`filter-pill ${problemFilter === 'low_relevance' ? 'active' : ''}`} onClick={() => setProblemFilter('low_relevance')}>
+          Low Relevance ({counts.low_relevance})
+        </button>
+        <button type="button" className={`filter-pill ${problemFilter === 'incorrect' ? 'active' : ''}`} onClick={() => setProblemFilter('incorrect')}>
+          Incorrect ({counts.incorrect})
+        </button>
+      </div>
 
       <div className="table-wrap">
         <table>
@@ -66,6 +105,7 @@ export default function ResultsTable({ rows = [] }) {
               <th onClick={() => onSort('correctness')}>Correctness</th>
               <th onClick={() => onSort('relevance')}>Relevance</th>
               <th onClick={() => onSort('hallucination')}>Hallucination</th>
+              <th>Problem</th>
               <th>Reason</th>
             </tr>
           </thead>
@@ -76,12 +116,24 @@ export default function ResultsTable({ rows = [] }) {
                 <td>{row.correctness}</td>
                 <td>{row.relevance}</td>
                 <td>{String(row.hallucination)}</td>
+                <td>
+                  <div className="problem-badges">
+                    {Boolean(row.is_hallucination ?? row.hallucination) ? <span className="problem-badge hallucination">hallucination</span> : null}
+                    {Boolean(row.is_incorrect ?? Number(row.correctness || 0) < 7) ? <span className="problem-badge incorrect">incorrect</span> : null}
+                    {Boolean(row.is_low_relevance ?? Number(row.relevance || 0) < 7) ? <span className="problem-badge irrelevant">irrelevant</span> : null}
+                    {!Boolean(row.is_hallucination ?? row.hallucination) &&
+                    !Boolean(row.is_incorrect ?? Number(row.correctness || 0) < 7) &&
+                    !Boolean(row.is_low_relevance ?? Number(row.relevance || 0) < 7) ? (
+                      <span className="problem-badge clean">clean</span>
+                    ) : null}
+                  </div>
+                </td>
                 <td>{String(row.reason || '').slice(0, 120)}</td>
               </tr>
             ))}
             {!filtered.length ? (
               <tr>
-                <td colSpan={5} className="empty">No evaluation results yet.</td>
+                <td colSpan={6} className="empty">No evaluation results for current filters.</td>
               </tr>
             ) : null}
           </tbody>

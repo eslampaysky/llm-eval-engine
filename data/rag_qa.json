@@ -1,0 +1,32 @@
+[
+  {
+    "question": "According to the policy excerpt, what is the premium plan data retention period?",
+    "ground_truth": "180 days.",
+    "model_answer": "The premium plan retains logs for 180 days.",
+    "context": "Policy excerpt: Free plan retention is 30 days. Premium retention is 180 days. Enterprise retention is configurable."
+  },
+  {
+    "question": "What ports are required for the service based on the deployment note?",
+    "ground_truth": "HTTPS on 443 and health checks on 8080.",
+    "model_answer": "You only need port 80 because HTTPS is optional.",
+    "context": "Deployment note: External traffic must use HTTPS on 443. Internal health checks run on 8080."
+  },
+  {
+    "question": "From the incident report, what was the root cause?",
+    "ground_truth": "An expired TLS certificate on the API gateway.",
+    "model_answer": "The incident was caused by an expired TLS certificate on the gateway.",
+    "context": "Incident report summary: 42-minute outage. Root cause: expired TLS certificate on API gateway. Action: automate cert renewal alerts."
+  },
+  {
+    "question": "What is the documented maximum batch size for bulk import?",
+    "ground_truth": "500 records per request.",
+    "model_answer": "The docs specify a 500-record maximum batch size per request.",
+    "context": "API docs: Bulk import accepts up to 500 records/request; larger payloads return 413."
+  },
+  {
+    "question": "Which authentication methods are listed in the security note?",
+    "ground_truth": "API keys and OAuth 2.0 client credentials.",
+    "model_answer": "Authentication supports API keys and OAuth 2.0 client credentials.",
+    "context": "Security note: Supported methods include API key auth and OAuth 2.0 client credentials flow."
+  }
+]

@@ -1,4 +1,4 @@
-"""Domain models for the evaluation workflow."""
+"""Canonical domain dataclasses for the packaged architecture."""
 
 from dataclasses import dataclass
 from typing import Optional
@@ -35,3 +35,6 @@ class EvaluatedSample:
     hallucination: bool
     reason: str
     judges: dict[str, JudgeResult]
+
+
+__all__ = ["EvaluationSample", "EvaluatedSample", "JudgeResult"]

@@ -7,9 +7,9 @@ def build_default_evaluator_registry() -> EvaluatorRegistry:
     registry = EvaluatorRegistry()
 
     from evaluators.anthropic_evaluator import AnthropicEvaluator
-    from evaluators.gemini_evaluator import GeminiEvaluator
     from evaluators.ollama_evaluator import OllamaEvaluator
     from evaluators.openai_evaluator import OpenAIEvaluator
+    from src.evaluators.gemini import GeminiEvaluator
 
     registry.register(
         EvaluatorDefinition(

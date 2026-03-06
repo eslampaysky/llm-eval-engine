@@ -26,3 +26,4 @@ class EvaluationResponse(BaseModel):
     metrics: dict
     results: list
     report_url: str
+    report_share_url: Optional[str] = None

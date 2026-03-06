@@ -1,0 +1,27 @@
+[
+  {
+    "question": "What is the capital city of Japan?",
+    "ground_truth": "Tokyo.",
+    "model_answer": "Tokyo is the capital of Japan."
+  },
+  {
+    "question": "Which planet is known as the Red Planet?",
+    "ground_truth": "Mars.",
+    "model_answer": "Mars is known as the Red Planet."
+  },
+  {
+    "question": "Who wrote the play 'Hamlet'?",
+    "ground_truth": "William Shakespeare.",
+    "model_answer": "Hamlet was written by William Shakespeare."
+  },
+  {
+    "question": "What is the boiling point of water at sea level in Celsius?",
+    "ground_truth": "100 degrees Celsius.",
+    "model_answer": "Water boils at 90 degrees Celsius at sea level."
+  },
+  {
+    "question": "What is the largest ocean on Earth?",
+    "ground_truth": "The Pacific Ocean.",
+    "model_answer": "The Pacific Ocean is the largest ocean on Earth."
+  }
+]

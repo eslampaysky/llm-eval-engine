@@ -157,8 +157,27 @@ def generate_html_report(metrics: dict, results: list[dict], output_path: str = 
 * {{ box-sizing:border-box; }}
 body {{ font-family:Arial,sans-serif; background:#0f172a; color:#e2e8f0; margin:0; }}
 header {{ background:#020617; padding:28px 40px; border-bottom:1px solid #1e293b; }}
+header .header-row {{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }}
 header h1 {{ margin:0 0 6px; font-size:22px; }}
 header p {{ margin:0; opacity:.5; font-size:13px; }}
+.header-actions {{ display:flex; gap:8px; flex-wrap:wrap; }}
+.action-btn {{
+  background:#1e293b;
+  border:1px solid #334155;
+  color:#e2e8f0;
+  padding:7px 10px;
+  border-radius:8px;
+  font-size:12px;
+  cursor:pointer;
+}}
+.action-btn:hover {{ background:#334155; }}
+.action-toast {{
+  min-height:18px;
+  font-size:12px;
+  color:#a5b4fc;
+  opacity:.9;
+  padding-top:6px;
+}}
 .container {{ padding:30px 40px; }}
 .kpis {{ display:flex; gap:16px; flex-wrap:wrap; margin-bottom:30px; }}
 .card {{ background:#1e293b; padding:18px 22px; border-radius:10px; flex:1; min-width:160px; }}
@@ -176,12 +195,30 @@ tr:not(.flagged):hover {{ background:#1e293b44; }}
 .badge-fail {{ background:#7f1d1d; color:#fecaca; padding:3px 9px; border-radius:5px; font-size:11px; font-weight:bold; }}
 .badge-na {{ background:#334155; color:#94a3b8; padding:3px 9px; border-radius:5px; font-size:11px; font-weight:bold; }}
 .table-wrap {{ overflow-x:auto; border-radius:10px; border:1px solid #1e293b; }}
+@media print {{
+  body {{ background:#ffffff; color:#0f172a; }}
+  header, .card, .chart-box, th, td, .table-wrap {{ border-color:#d1d5db !important; }}
+  header {{ background:#ffffff; }}
+  .container {{ padding:12px; }}
+  .action-bar {{ display:none !important; }}
+  .action-toast {{ display:none !important; }}
+  .section-title {{ color:#334155; }}
+}}
 </style>
 </head>
 <body>
 <header>
-  <h1>AI Breaker Lab - Multi-Model Comparison</h1>
-  <p>Generated: {generated}</p>
+  <div class="header-row">
+    <div>
+      <h1>AI Breaker Lab - Multi-Model Comparison</h1>
+      <p>Generated: {generated}</p>
+    </div>
+    <div class="header-actions action-bar">
+      <button class="action-btn" onclick="window.print()">Print / Save PDF</button>
+      <button class="action-btn" onclick="copyShareLink()">Copy Share Link</button>
+    </div>
+  </div>
+  <div id="shareToast" class="action-toast"></div>
 </header>
 <div class="container">
 
@@ -268,6 +305,29 @@ new Chart(document.getElementById('providerChart'), {{
   data: {{ labels: providerLabels, datasets: [{{ label: 'Avg Score', data: providerScores, backgroundColor: providerLabels.map((_, i) => providerAvailable[i] ? providerColors[i] : '#334155'), borderRadius: 4 }}] }},
   options: {{ plugins: {{ legend: {{ display: false }}, title: {{ display: true, text: 'Average Score by Judge', color: '#94a3b8' }} }}, scales: {{ x: {{ ticks: {{ color: '#64748b' }}, grid: {{ color: '#1e293b' }} }}, y: {{ beginAtZero: true, max: 10, ticks: {{ color: '#64748b' }}, grid: {{ color: '#1e293b' }} }} }} }}
 }});
+
+function _showShareToast(message, isError=false) {{
+  const toast = document.getElementById('shareToast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.style.color = isError ? '#fca5a5' : '#a5b4fc';
+  window.setTimeout(() => {{
+    if (toast.textContent === message) toast.textContent = '';
+  }}, 2500);
+}}
+
+async function copyShareLink() {{
+  const link = window.location.href;
+  try {{
+    if (navigator.clipboard && navigator.clipboard.writeText) {{
+      await navigator.clipboard.writeText(link);
+      _showShareToast('Share link copied');
+      return;
+    }}
+  }} catch (_err) {{
+  }}
+  _showShareToast('Clipboard unavailable. Copy this URL: ' + link, true);
+}}
 </script>
 </body>
 </html>"""

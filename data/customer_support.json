@@ -1,0 +1,32 @@
+[
+  {
+    "question": "I was charged twice for order #A1029. Can you refund the duplicate charge?",
+    "ground_truth": "Yes, we can refund duplicate charges after verification. Please share the order ID and transaction IDs; refunds typically appear in 5-10 business days.",
+    "model_answer": "We can help with that. Please share order #A1029 and both transaction references so we can verify and issue a duplicate-charge refund. Once approved, the refund usually posts within 5-10 business days.",
+    "context": "Support policy: duplicate charges are refundable after payment verification."
+  },
+  {
+    "question": "How do I reset my account password?",
+    "ground_truth": "Use the 'Forgot password' link on the login page, verify your email, then create a new password.",
+    "model_answer": "Go to the login page, click 'Forgot password', confirm via email, and set a new password.",
+    "context": "Account recovery flow requires email verification."
+  },
+  {
+    "question": "Can I cancel my shipment after it has already shipped?",
+    "ground_truth": "Once shipped, cancellation is not guaranteed; you can refuse delivery or request a return after arrival.",
+    "model_answer": "Yes, you can always cancel any shipment instantly, even after delivery, and get a full refund with no conditions.",
+    "context": "Shipping policy: cancellations after dispatch are limited and may require returns."
+  },
+  {
+    "question": "Do you offer weekend support hours?",
+    "ground_truth": "Yes, weekend live chat is available from 10:00 to 16:00 UTC.",
+    "model_answer": "Weekend support is available via live chat from 10:00 to 16:00 UTC.",
+    "context": "Support schedule: weekdays full hours, weekends reduced hours."
+  },
+  {
+    "question": "My package says delivered but I didn't receive it. What should I do?",
+    "ground_truth": "Check with neighbors/building desk, wait up to 24 hours, then contact support to open a carrier investigation.",
+    "model_answer": "Please check nearby locations or with neighbors, wait up to 24 hours for delayed scans, then contact us and we will open a carrier investigation.",
+    "context": "Lost-package workflow starts after short wait and local check."
+  }
+]
