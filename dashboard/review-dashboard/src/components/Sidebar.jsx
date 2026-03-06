@@ -1,4 +1,5 @@
 const NAV_ITEMS = [
+  { key: 'home', label: 'Home' },
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'evaluate', label: 'Run Evaluation' },
   { key: 'review', label: 'Review' },

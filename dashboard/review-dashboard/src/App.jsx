@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import Sidebar from './components/Sidebar';
 import DashboardPage from './pages/dashboard';
+import HomePage from './pages/home';
 import EvaluatePage from './pages/evaluate';
 import ReviewPage from './pages/review';
 import ReportsPage from './pages/reports';
@@ -15,7 +16,7 @@ function normalizeError(err) {
 }
 
 export default function App() {
-  const [page, setPage] = useState('dashboard');
+  const [page, setPage] = useState('home');
   const [providers, setProviders] = useState([]);
   const [latestEvaluation, setLatestEvaluation] = useState(null);
 
@@ -87,6 +88,13 @@ export default function App() {
   const onEvaluate = async (payload) => {
     const data = await api.evaluate(payload);
     setPage('dashboard');
+    setLatestEvaluation(data);
+    return data;
+  };
+
+  const onRunDemo = async (payload) => {
+    const data = await api.evaluate(payload);
+    setLatestEvaluation(data);
     return data;
   };
 
@@ -113,6 +121,13 @@ export default function App() {
       <Sidebar page={page} setPage={setPage} />
 
       <main className="content-shell">
+        {page === 'home' ? (
+          <HomePage
+            latestEvaluation={latestEvaluation}
+            onRunDemo={onRunDemo}
+            setPage={setPage}
+          />
+        ) : null}
         {page === 'dashboard' ? <DashboardPage latestEvaluation={latestEvaluation} /> : null}
         {page === 'evaluate' ? (
           <EvaluatePage
