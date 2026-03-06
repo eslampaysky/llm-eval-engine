@@ -1,17 +1,25 @@
 # AI Breaker Lab
 
-AI Breaker Lab is an AI testing, breaking, and observability platform with Clean Architecture, pluggable evaluators, and extensible metrics.
+AI Breaker Lab is an AI evaluation and observability platform for testing LLM outputs across correctness, relevance, hallucination, safety, and cost. It includes:
+
+- FastAPI backend with API-key auth and usage tracking
+- Multi-provider evaluator pipeline (Ollama, Gemini, OpenAI, Anthropic)
+- Human review workflow and retrained review rules
+- HTML report generation
+- React/Vite dashboard for running and reviewing evaluations
 
 ## Project structure
 
 ```text
-ai-breaker-lab/
+llm-eval-engine-legacy/
 |
 |-- api/
 |   |-- auth.py
 |   |-- database.py
+|   |-- main.py
 |   |-- models.py
-|   `-- rate_limit.py
+|   |-- rate_limit.py
+|   `-- routes.py
 |
 |-- core/
 |   |-- evaluator.py
@@ -27,74 +35,143 @@ ai-breaker-lab/
 |   `-- ollama_evaluator.py
 |
 |-- src/
-|   `-- llm_eval_engine/
-|       |-- domain/
-|       |   |-- contracts.py
-|       |   `-- models.py
-|       |-- application/
-|       |   |-- pipeline.py
-|       |   |-- registry.py
-|       |   `-- metrics.py
-|       `-- infrastructure/
-|           |-- config_loader.py
-|           `-- evaluator_factories.py
+|   |-- llm_eval_engine/            # clean-architecture implementation
+|   |   |-- application/
+|   |   |-- domain/
+|   |   `-- infrastructure/
+|   |-- domain/
+|   |-- evaluators/
+|   `-- use_cases/
 |
 |-- reports/
 |   |-- report_generator.py
-|   `-- (generated reports)
+|   `-- report_*.html               # generated reports
 |
 |-- dashboard/
-|   |-- review_dashboard.jsx
-|   `-- review-dashboard/
+|   `-- review-dashboard/           # Vite React frontend
 |
 |-- configs/
-|   `-- config.yaml
+|   |-- config.yaml
+|   `-- review_rules.json           # created/updated after human review
 |
 |-- data/
 |   `-- sample_dataset.csv
 |
-|-- tests/
-|   `-- .gitkeep
+|-- scripts/
+|   `-- quality_gate.py
 |
-|-- main.py
-`-- requirements.txt
+|-- tests/
+|
+|-- Dockerfile
+|-- docker-compose.yml
+|-- main.py                         # current runtime entrypoint in Docker
+|-- railway.toml                    # Railway deployment config
+|-- requirements.txt
+`-- usage.db
 ```
 
-## Notes
+## Runtime entrypoints
 
-- API runtime entrypoint: `main.py`
-- Core service API used by `main.py`: `core/`
-- Provider adapters are isolated in `evaluators/` for easy plug-in extension.
-- Config is loaded from `configs/config.yaml` (with root fallback in loader).
+- Current deployment entrypoint: `main.py` (used by Dockerfile)
+- Modular API entrypoint: `api/main.py` (uses `api/routes.py`)
 
-## Enterprise QA metrics included
+Both expose:
 
-- Hallucination score: `1 - (unsupported_claims / total_claims)` with overlap heuristic baseline.
-- Toxicity and safety: `toxicity`, `safe` (supports `detoxify`, Perspective API via `PERSPECTIVE_API_KEY`).
-- Faithfulness for RAG: `faithfulness`, `context_precision`, `context_recall` (uses `context` field when provided).
-- Runtime and cost: `latency_ms`, `tokens_used`, `estimated_cost_usd` aggregated across judges.
+- `GET /health` -> `{"status":"ok","version":"1.0.0"}`
 
-`Sample` now supports optional `context` in `/evaluate` payload for RAG faithfulness metrics.
+## Features
+
+- API-key authentication via `X-API-KEY`
+- Usage logging and per-client history
+- Background evaluation for larger datasets
+- Human review endpoint with persisted review rules
+- Metrics:
+  - correctness
+  - relevance
+  - hallucination score
+  - toxicity/safety
+  - latency/tokens/cost analysis
+- Report export as HTML files under `reports/`
+
+## Environment variables
+
+Create `.env` in project root:
+
+```env
+# Provider keys (enable whichever providers you use)
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+GEMINI_API_KEY=
+
+# API keys used by your clients to call this backend
+# Format supports:
+# API_KEYS=plain_key_1,plain_key_2
+# or named keys:
+# API_KEYS=acme:client_key,globex:another_key
+API_KEYS=client_key
+
+# Optional overrides
+OLLAMA_URL=http://host.docker.internal:11434
+PERSPECTIVE_API_KEY=
+```
+
+## Local development
+
+### Backend
+
+```bash
+python -m venv .venv
+# Windows PowerShell
+. .venv/Scripts/Activate.ps1
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+Docs: `http://127.0.0.1:8000/docs`
+
+### Dashboard (Vite React)
+
+```bash
+cd dashboard/review-dashboard
+npm install
+npm run dev
+```
+
+Dashboard: `http://127.0.0.1:5173`
+
+Set frontend API base URL:
+
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+### Docker compose
+
+```bash
+docker compose up --build
+```
+
+Starts:
+
+- API on `:8000`
+- Dashboard on `:5173`
+- Ollama on `:11434`
 
 ## API usage
 
 ### Authentication
 
-- Header: `X-API-KEY: client_key`
-- Keys are validated against `clients` table in `usage.db`.
-- Billing/usage tracking is written to `usage_logs` with `client_id`, `report_id`, and `sample_count`.
+All protected endpoints require:
 
-You can bootstrap clients from `.env`:
-
-```env
-API_KEYS=acme:client_key,globex:another_key
+```http
+X-API-KEY: <your_key>
 ```
 
-### Evaluate endpoint
+### Evaluate
 
 `POST /evaluate`
 
-Request body:
+Request:
 
 ```json
 {
@@ -104,76 +181,78 @@ Request body:
     {
       "question": "What is the capital of France?",
       "ground_truth": "Paris",
-      "model_answer": "The capital of France is Paris."
+      "model_answer": "The capital of France is Paris.",
+      "context": "France is a country in Europe."
     }
   ]
 }
 ```
 
-Response includes enterprise summary:
+Notes:
 
-```json
-{
-  "summary": {
-    "correctness": 0.92,
-    "relevance": 0.88,
-    "hallucination": 0.97,
-    "toxicity": 0.01,
-    "overall": 0.91
-  },
-  "model_comparison": [
-    {
-      "model": "gpt-4",
-      "correctness": 0.93,
-      "relevance": 0.91,
-      "hallucination": 0.96,
-      "overall": 0.93
-    }
-  ],
-  "best_model": {
-    "model": "gpt-4",
-    "overall": 0.93
-  }
-}
+- `samples` is supported as backward-compatible alias of `dataset`.
+- `judge_model` can be provided to force a specific evaluator model.
+
+### Main endpoints
+
+- `GET /health`
+- `POST /evaluate`
+- `GET /providers`
+- `GET /reports`
+- `GET /report/{report_id}`
+- `POST /report/{report_id}/human-review`
+- `GET /history`
+- `GET /usage/summary`
+- `GET /review/rules`
+
+## Deployment
+
+### Backend on Railway
+
+`railway.toml` is already configured in repo root.
+
+Commands:
+
+```bash
+npm i -g @railway/cli
+railway login
+railway init
+railway up
 ```
 
-Backward compatibility: `samples` is still accepted in place of `dataset`.
+Set env vars from local `.env` (PowerShell):
 
-Dataset versioning metadata is stored per run:
+```powershell
+Get-Content .env |
+  Where-Object { $_ -match '^\s*[^#].+=.+' } |
+  ForEach-Object { railway variable set --skip-deploys $_ }
 
-- `dataset_id`
-- `model_version`
-- `evaluation_date`
+railway up
+```
 
-This is returned in `/history` for regression detection workflows.
+### Dashboard on Vercel (separate from API)
 
-Additional dashboard endpoints:
+```bash
+cd dashboard/review-dashboard
+npm i -g vercel
+vercel
+```
 
-- `GET /providers` -> configured model providers.
-- `GET /reports` -> generated HTML report index.
-- `GET /reports/{file_name}` -> serve a specific HTML report file.
-- `GET /history` -> evaluation usage history.
-- `GET /usage/summary` -> requests/samples summary for authenticated client.
+Then add env variable in Vercel:
 
-Human-in-the-loop review:
+- `VITE_API_BASE_URL=https://<your-railway-service>.up.railway.app`
 
-- `POST /report/{report_id}/human-review` supports reviewer labels:
-  - `verdict`: `correct` or `incorrect`
-  - `hallucinated`: boolean
-  - `feedback`: free text
-- Retrained rule outputs are persisted in `configs/review_rules.json`.
-- `GET /review/rules` returns latest retrained thresholds.
+CLI option:
 
-Cost analysis:
+```bash
+vercel env add VITE_API_BASE_URL production
+vercel env add VITE_API_BASE_URL preview
+vercel --prod
+```
 
-- Metrics include `cost_analysis` rows:
-  - `model`
-  - `avg_tokens`
-  - `avg_cost_usd`
-  - `cost_per_1000_requests_usd`
-
-CI quality gate:
+## CI quality gate
 
 - Script: `scripts/quality_gate.py`
 - Workflow: `.github/workflows/ai-quality-gate.yml`
-- Pipeline fails when correctness is below threshold (`--min-correctness`).
+- Fails pipeline when configured correctness threshold is not met.
+
