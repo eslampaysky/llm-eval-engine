@@ -9,14 +9,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, Depends, BackgroundTasks, HTTPException
+from fastapi import FastAPI, Depends, BackgroundTasks, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from api.models import EvaluationRequest
 from api.auth import validate_api_key, bootstrap_clients_from_env
-from api.database import init_db, log_usage, get_usage_history, get_usage_summary
+from api.database import (
+    init_db,
+    log_usage,
+    get_usage_history,
+    get_usage_summary,
+    log_evaluation_run,
+    get_latest_regression_baseline,
+)
 
 from core.evaluator import run_evaluation
 from core.metrics import compute_metrics
@@ -52,6 +59,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -62,6 +70,9 @@ bootstrap_clients_from_env()
 REPORT_DIR = "reports"
 os.makedirs(REPORT_DIR, exist_ok=True)
 RULES_PATH = Path("configs/review_rules.json")
+INCORRECT_THRESHOLD = 7.0
+LOW_RELEVANCE_THRESHOLD = 7.0
+REGRESSION_DROP_THRESHOLD = 0.02
 
 
 def _retrain_evaluation_rules(reviewed_items: List[ReviewedItem]) -> dict:
@@ -143,7 +154,7 @@ def favicon_ico():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "ai-breaker-lab"}
+    return {"status": "ok", "version": "1.0.0"}
 
 
 def _report_record_from_path(path: Path) -> dict:
@@ -243,6 +254,71 @@ def _build_summary(results: list[dict], metrics: dict) -> dict:
     }
 
 
+def _annotate_failure_flags(results: list[dict]) -> list[dict]:
+    annotated = []
+    for row in results:
+        correctness = float(row.get("correctness", 0) or 0)
+        relevance = float(row.get("relevance", 0) or 0)
+        is_hallucination = bool(row.get("hallucination", False))
+        is_incorrect = correctness < INCORRECT_THRESHOLD
+        is_low_relevance = relevance < LOW_RELEVANCE_THRESHOLD
+
+        tags = []
+        if is_hallucination:
+            tags.append("hallucination")
+        if is_incorrect:
+            tags.append("incorrect")
+        if is_low_relevance:
+            tags.append("irrelevant")
+
+        annotated.append({
+            **row,
+            "is_hallucination": is_hallucination,
+            "is_incorrect": is_incorrect,
+            "is_low_relevance": is_low_relevance,
+            "failure_tags": tags,
+            "primary_problem": tags[0] if tags else None,
+        })
+    return annotated
+
+
+def _build_regression_signal(current_summary: dict, baseline: dict | None) -> dict:
+    if not baseline:
+        return {
+            "available": False,
+            "detected": False,
+            "reason": "No baseline found for regression comparison.",
+        }
+
+    current_correctness = float(current_summary.get("correctness", 0) or 0)
+    baseline_correctness = float(baseline.get("correctness", 0) or 0)
+    delta = current_correctness - baseline_correctness
+    drop = max(0.0, -delta)
+    detected = drop >= REGRESSION_DROP_THRESHOLD
+
+    if detected:
+        message = f"Regression detected: correctness dropped by {round(drop * 100, 2)}%."
+    else:
+        message = f"No regression detected: correctness delta {round(delta * 100, 2)}%."
+
+    return {
+        "available": True,
+        "detected": detected,
+        "threshold": REGRESSION_DROP_THRESHOLD,
+        "metric": "correctness",
+        "current": round(current_correctness, 4),
+        "baseline": round(baseline_correctness, 4),
+        "delta": round(delta, 4),
+        "drop": round(drop, 4),
+        "drop_percent": round(drop * 100, 2),
+        "message": message,
+        "baseline_report_id": baseline.get("report_id"),
+        "baseline_model_version": baseline.get("model_version"),
+        "baseline_dataset_id": baseline.get("dataset_id"),
+        "baseline_timestamp": baseline.get("timestamp"),
+    }
+
+
 def process_evaluation(
     report_id: str,
     samples: list,
@@ -251,9 +327,16 @@ def process_evaluation(
     dataset_id: str | None = None,
     model_version: str | None = None,
 ):
-    results = run_evaluation(samples=samples, judge_model=judge_model)
-    metrics = compute_metrics(results)
+    raw_results = run_evaluation(samples=samples, judge_model=judge_model)
+    metrics = compute_metrics(raw_results)
+    results = _annotate_failure_flags(raw_results)
     summary = _build_summary(results, metrics)
+    baseline = get_latest_regression_baseline(
+        client_name=auth_ctx["client"]["name"],
+        dataset_id=dataset_id,
+        current_model_version=model_version,
+    )
+    regression = _build_regression_signal(summary, baseline)
     evaluation_date = datetime.now(timezone.utc).date().isoformat()
     generate_html_report(
         metrics=metrics,
@@ -269,50 +352,68 @@ def process_evaluation(
         model_version=model_version,
         evaluation_date=evaluation_date,
     )
-    return results, metrics, summary
+    log_evaluation_run(
+        report_id=report_id,
+        client_name=auth_ctx["client"]["name"],
+        dataset_id=dataset_id,
+        model_version=model_version,
+        summary=summary,
+    )
+    return results, metrics, summary, regression
 
 
 @app.post("/evaluate")
 def evaluate(
-    request: EvaluationRequest,
+    payload: EvaluationRequest,
+    http_request: Request,
     background_tasks: BackgroundTasks,
     auth_ctx: dict = Depends(validate_api_key),
 ):
     report_id = str(uuid.uuid4())
-    samples = [s.dict() for s in request.get_samples()]
+    samples = [s.dict() for s in payload.get_samples()]
     if not samples:
         raise HTTPException(status_code=422, detail="Request must include non-empty 'dataset' or 'samples'.")
+    report_path = f"/report/{report_id}"
+    report_share_url = f"{str(http_request.base_url).rstrip('/')}{report_path}"
 
     if len(samples) > 50:
         background_tasks.add_task(
             process_evaluation,
-            report_id, samples, request.judge_model, auth_ctx, request.dataset_id, request.model_version
+            report_id, samples, payload.judge_model, auth_ctx, payload.dataset_id, payload.model_version
         )
         return {
             "report_id":  report_id,
             "status":     "processing",
-            "dataset_id": request.dataset_id,
-            "model_version": request.model_version,
+            "dataset_id": payload.dataset_id,
+            "model_version": payload.model_version,
             "evaluation_date": datetime.now(timezone.utc).date().isoformat(),
-            "report_url": f"/report/{report_id}",
+            "regression": {
+                "available": False,
+                "detected": False,
+                "reason": "Regression check will be available when processing completes.",
+            },
+            "report_url": report_path,
+            "report_share_url": report_share_url,
         }
 
-    results, metrics, summary = process_evaluation(
-        report_id, samples, request.judge_model, auth_ctx, request.dataset_id, request.model_version
+    results, metrics, summary, regression = process_evaluation(
+        report_id, samples, payload.judge_model, auth_ctx, payload.dataset_id, payload.model_version
     )
     return {
         "report_id":  report_id,
         "status":     "done",
-        "dataset_id": request.dataset_id,
-        "model_version": request.model_version,
+        "dataset_id": payload.dataset_id,
+        "model_version": payload.model_version,
         "evaluation_date": datetime.now(timezone.utc).date().isoformat(),
         "summary":    summary,
         "model_comparison": metrics.get("model_comparison", []),
         "best_model": metrics.get("model_comparison_best"),
         "cost_analysis": metrics.get("cost_analysis", []),
         "metrics":    metrics,
+        "regression": regression,
         "results":    results,
-        "report_url": f"/report/{report_id}",
+        "report_url": report_path,
+        "report_share_url": report_share_url,
     }
 
 
