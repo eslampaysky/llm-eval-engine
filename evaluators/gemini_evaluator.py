@@ -9,25 +9,29 @@ Setup:
 
 import json
 import os
+import random
 import re
 import threading
 import time
 
 from evaluators.base_evaluator import BaseEvaluator
 
-MAX_RETRIES = 3
+DEFAULT_MAX_RETRIES = 5
+DEFAULT_MIN_GAP_SECONDS = 6.0
+DEFAULT_BASE_BACKOFF_SECONDS = 2.0
+DEFAULT_MAX_BACKOFF_SECONDS = 60.0
+DEFAULT_BACKOFF_JITTER_SECONDS = 0.75
 
 _GEMINI_LOCK = threading.Lock()
-_GEMINI_MIN_GAP = 4.0
 _gemini_last_call = 0.0
 _gemini_daily_cap_hit = False
 
 
-def _acquire_gemini_slot():
+def _acquire_gemini_slot(min_gap_seconds: float):
     global _gemini_last_call
     with _GEMINI_LOCK:
         now = time.monotonic()
-        wait = _GEMINI_MIN_GAP - (now - _gemini_last_call)
+        wait = min_gap_seconds - (now - _gemini_last_call)
         if wait > 0:
             time.sleep(wait)
         _gemini_last_call = time.monotonic()
@@ -40,6 +44,9 @@ def _is_daily_cap(exc) -> bool:
 
 def _parse_retry_delay(exc) -> float | None:
     msg = str(exc)
+    header_match = re.search(r"retry-after[:=\s]+(\d+)", msg, re.IGNORECASE)
+    if header_match:
+        return float(header_match.group(1)) + 1.0
     match = re.search(r"retry_delay\s*\{\s*seconds:\s*(\d+)", msg)
     if match:
         return float(match.group(1)) + 1.0
@@ -53,6 +60,19 @@ class GeminiEvaluator(BaseEvaluator):
     """Calls Google Gemini via the generativeai SDK."""
 
     def __init__(self, config: dict):
+        self.mock_mode = bool(config.get("gemini_mock_mode", False))
+        if self.mock_mode:
+            self.temperature = float(config.get("temperature", 0.0))
+            self.max_retries = int(config.get("gemini_max_retries", DEFAULT_MAX_RETRIES))
+            self.min_gap_seconds = float(config.get("gemini_min_gap_seconds", DEFAULT_MIN_GAP_SECONDS))
+            self.base_backoff_seconds = float(config.get("gemini_backoff_base_seconds", DEFAULT_BASE_BACKOFF_SECONDS))
+            self.max_backoff_seconds = float(config.get("gemini_backoff_max_seconds", DEFAULT_MAX_BACKOFF_SECONDS))
+            self.backoff_jitter_seconds = float(config.get("gemini_backoff_jitter_seconds", DEFAULT_BACKOFF_JITTER_SECONDS))
+            self.input_cost_per_1k = float(config.get("gemini_input_cost_per_1k", 0.000075))
+            self.output_cost_per_1k = float(config.get("gemini_output_cost_per_1k", 0.0003))
+            self.model = None
+            return
+
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             raise EnvironmentError(
@@ -73,6 +93,11 @@ class GeminiEvaluator(BaseEvaluator):
             temperature=self.temperature,
             response_mime_type="application/json",
         )
+        self.max_retries = int(config.get("gemini_max_retries", DEFAULT_MAX_RETRIES))
+        self.min_gap_seconds = float(config.get("gemini_min_gap_seconds", DEFAULT_MIN_GAP_SECONDS))
+        self.base_backoff_seconds = float(config.get("gemini_backoff_base_seconds", DEFAULT_BASE_BACKOFF_SECONDS))
+        self.max_backoff_seconds = float(config.get("gemini_backoff_max_seconds", DEFAULT_MAX_BACKOFF_SECONDS))
+        self.backoff_jitter_seconds = float(config.get("gemini_backoff_jitter_seconds", DEFAULT_BACKOFF_JITTER_SECONDS))
         self.input_cost_per_1k = float(config.get("gemini_input_cost_per_1k", 0.000075))
         self.output_cost_per_1k = float(config.get("gemini_output_cost_per_1k", 0.0003))
         self.model = genai.GenerativeModel(
@@ -87,6 +112,21 @@ class GeminiEvaluator(BaseEvaluator):
     def evaluate_answer(self, question: str, ground_truth: str, model_answer: str) -> dict:
         global _gemini_daily_cap_hit
 
+        if self.mock_mode:
+            # Offline-safe deterministic response for local integration tests.
+            started = time.perf_counter()
+            passed = str(ground_truth or "").strip().lower() == str(model_answer or "").strip().lower()
+            result = {
+                "correctness": 10 if passed else 5,
+                "relevance": 10 if passed else 6,
+                "hallucination": not passed,
+                "reason": "Gemini mock mode result (no API call).",
+                "latency_ms": round((time.perf_counter() - started) * 1000.0, 2),
+                "tokens_used": 0,
+                "cost_estimate_usd": 0.0,
+            }
+            return result
+
         if _gemini_daily_cap_hit:
             result = dict(self.FALLBACK_RESULT)
             result["reason"] = "Gemini daily quota exhausted - skipped for remainder of run. Try again tomorrow."
@@ -98,8 +138,8 @@ class GeminiEvaluator(BaseEvaluator):
         prompt = self.build_prompt(question, ground_truth, model_answer)
         started = time.perf_counter()
 
-        for attempt in range(1, MAX_RETRIES + 1):
-            _acquire_gemini_slot()
+        for attempt in range(1, self.max_retries + 1):
+            _acquire_gemini_slot(self.min_gap_seconds)
 
             try:
                 response = self.model.generate_content(prompt)
@@ -128,9 +168,15 @@ class GeminiEvaluator(BaseEvaluator):
                         result["cost_estimate_usd"] = None
                         return result
 
-                    if attempt < MAX_RETRIES:
-                        extra = _parse_retry_delay(exc) or (15.0 * attempt)
-                        time.sleep(extra)
+                    if attempt < self.max_retries:
+                        parsed_delay = _parse_retry_delay(exc)
+                        if parsed_delay is not None:
+                            sleep_seconds = min(parsed_delay, self.max_backoff_seconds)
+                        else:
+                            backoff = self.base_backoff_seconds * (2 ** (attempt - 1))
+                            jitter = random.uniform(0.0, self.backoff_jitter_seconds)
+                            sleep_seconds = min(backoff + jitter, self.max_backoff_seconds)
+                        time.sleep(max(0.0, sleep_seconds))
                         continue
 
                 result = dict(self.FALLBACK_RESULT)

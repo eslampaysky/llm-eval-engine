@@ -1,0 +1,15 @@
+target:
+  type: openai
+  base_url: https://their-api.com
+  api_key: ${TARGET_API_KEY}
+  model_name: their-model
+
+test_suite:
+  domain: customer support
+  model_description: "Arabic customer support bot for an e-commerce store"
+  num_tests: 20
+
+judge:
+  provider: groq
+  model: llama-3.3-70b-versatile
+  api_key: ${GROQ_API_KEY}

@@ -6,7 +6,7 @@ from uuid import UUID
 class Sample(BaseModel):
     question: str
     ground_truth: str
-    model_answer: str
+    model_answer: Optional[str] = None
     context: Optional[str] = None
 
 

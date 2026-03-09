@@ -34,3 +34,10 @@ gemini_input_cost_per_1k: 0.000075
 gemini_output_cost_per_1k: 0.0003
 
 model: llama3
+
+# Target model under test (AUT) adapter config
+target_model:
+  type: openai # openai | huggingface | webhook
+  base_url: https://api.openai.com
+  api_key: ""
+  model_name: gpt-4o-mini

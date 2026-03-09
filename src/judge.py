@@ -1,9 +1,12 @@
-import requests
+import json
+import os
 import re
-import yaml
 from pathlib import Path
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
+import requests
+import yaml
+
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # Load config from configs/ first, then fallback to root.
 _root = Path(__file__).parent.parent
@@ -19,8 +22,9 @@ for _config_path in _config_candidates:
 else:
     raise FileNotFoundError("No config.yaml found in configs/ or project root.")
 
-MODEL_NAME = config["model"]
+MODEL_NAME = config.get("groq_model") or config.get("model", "llama-3.1-8b-instant")
 TEMPERATURE = config["temperature"]
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 
 
 def extract_json(text):
@@ -47,27 +51,43 @@ Evaluate strictly and return JSON:
 }}
 """
 
+    if not GROQ_API_KEY:
+        return '{"correctness":0,"relevance":0,"hallucination":true,"reason":"Missing GROQ_API_KEY"}'
+
     try:
         response = requests.post(
-            OLLAMA_URL,
+            GROQ_URL,
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            },
             json={
                 "model": MODEL_NAME,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": TEMPERATURE
-                }
+                "temperature": TEMPERATURE,
+                "messages": [
+                    {"role": "system", "content": "You are a strict evaluator that returns valid JSON only."},
+                    {"role": "user", "content": prompt},
+                ],
             },
-            timeout=120
+            timeout=120,
         )
+        response.raise_for_status()
 
-        raw_output = response.json()["response"]
+        payload = response.json()
+        raw_output = payload["choices"][0]["message"]["content"]
         json_output = extract_json(raw_output)
 
         if json_output is None:
             return '{"correctness":0,"relevance":0,"hallucination":true,"reason":"Invalid format"}'
 
-        return json_output
+        # Ensure normalized JSON string output.
+        parsed = json.loads(json_output)
+        return json.dumps({
+            "correctness": int(parsed.get("correctness", 0)),
+            "relevance": int(parsed.get("relevance", 0)),
+            "hallucination": bool(parsed.get("hallucination", True)),
+            "reason": str(parsed.get("reason", "Invalid format")),
+        })
 
     except Exception:
         return '{"correctness":0,"relevance":0,"hallucination":true,"reason":"Evaluation failed"}'

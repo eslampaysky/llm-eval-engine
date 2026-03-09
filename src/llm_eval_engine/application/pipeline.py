@@ -11,6 +11,10 @@ import pandas as pd
 
 from .registry import EvaluatorRegistry
 from ..domain.models import EvaluatedSample, EvaluationSample, JudgeResult
+try:
+    from src.target_adapter import AdapterFactory, BaseTargetAdapter
+except ImportError:
+    from target_adapter import AdapterFactory, BaseTargetAdapter
 
 PLACEHOLDER_PATTERNS = [
     "your_key_here",
@@ -39,6 +43,13 @@ class EvaluationPipeline:
         self._config = config
         self._evaluator_registry = evaluator_registry
         self._max_workers = max_workers
+        self._target_adapter = self._build_target_adapter(config)
+
+    def _build_target_adapter(self, config: dict) -> BaseTargetAdapter:
+        target_config = config.get("target_model")
+        if not isinstance(target_config, dict):
+            raise ValueError("Missing 'target_model' config. Add target adapter settings in config.yaml.")
+        return AdapterFactory.from_config(target_config)
 
     def run(
         self,
@@ -113,7 +124,7 @@ class EvaluationPipeline:
                 EvaluationSample(
                     question=str(sample["question"]),
                     ground_truth=str(sample["ground_truth"]),
-                    model_answer=str(sample["model_answer"]),
+                    model_answer=str(sample.get("model_answer", "")),
                     context=str(sample.get("context")) if sample.get("context") is not None else None,
                 )
                 for sample in samples
@@ -121,7 +132,7 @@ class EvaluationPipeline:
 
         if file_path:
             frame = pd.read_csv(file_path)
-            required_columns = {"question", "ground_truth", "model_answer"}
+            required_columns = {"question", "ground_truth"}
             missing = required_columns - set(frame.columns)
             if missing:
                 raise ValueError(f"CSV missing columns: {missing}")
@@ -129,7 +140,7 @@ class EvaluationPipeline:
                 EvaluationSample(
                     question=str(row["question"]),
                     ground_truth=str(row["ground_truth"]),
-                    model_answer=str(row["model_answer"]),
+                    model_answer=str(row.get("model_answer", "")),
                     context=str(row["context"]) if row.get("context") is not None else None,
                 )
                 for row in frame.to_dict(orient="records")
@@ -138,6 +149,32 @@ class EvaluationPipeline:
         raise ValueError("Provide either file_path or samples")
 
     def _evaluate_single_sample(self, sample, evaluators: dict, skipped: list[tuple[str, str]]) -> EvaluatedSample:
+        try:
+            target_answer = self._target_adapter.call(sample.question)
+        except Exception as exc:
+            failure_reason = f"Target adapter error: {exc}"
+            unavailable = {
+                provider: JudgeResult(
+                    correctness=None,
+                    relevance=None,
+                    hallucination=None,
+                    reason=failure_reason,
+                    available=False,
+                )
+                for provider in set(list(evaluators.keys()) + [provider for provider, _ in skipped])
+            }
+            return EvaluatedSample(
+                question=sample.question,
+                ground_truth=sample.ground_truth,
+                model_answer="",
+                context=sample.context,
+                correctness=0.0,
+                relevance=0.0,
+                hallucination=True,
+                reason=failure_reason,
+                judges=unavailable,
+            )
+
         judge_results: dict[str, JudgeResult] = {
             provider: JudgeResult(
                 correctness=None,
@@ -155,7 +192,7 @@ class EvaluationPipeline:
                 raw = evaluator.evaluate_answer(
                     question=sample.question,
                     ground_truth=sample.ground_truth,
-                    model_answer=sample.model_answer,
+                    model_answer=target_answer,
                 )
                 latency_ms = raw.get("latency_ms")
                 if latency_ms is None:
@@ -207,7 +244,7 @@ class EvaluationPipeline:
         return EvaluatedSample(
             question=sample.question,
             ground_truth=sample.ground_truth,
-            model_answer=sample.model_answer,
+            model_answer=target_answer,
             context=sample.context,
             correctness=avg_correctness,
             relevance=avg_relevance,
