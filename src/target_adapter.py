@@ -24,7 +24,13 @@ class OpenAICompatibleAdapter(BaseTargetAdapter):
         if not self._model_name:
             raise ValueError("OpenAI-compatible adapter requires 'model_name'.")
 
-        if self._base_url.endswith("/v1"):
+        # Smart endpoint building:
+        # - already ends with /chat/completions → use as-is
+        # - ends with /v1 → append /chat/completions
+        # - anything else → append /v1/chat/completions
+        if self._base_url.endswith("/chat/completions"):
+            endpoint = self._base_url
+        elif self._base_url.endswith("/v1"):
             endpoint = f"{self._base_url}/chat/completions"
         else:
             endpoint = f"{self._base_url}/v1/chat/completions"
