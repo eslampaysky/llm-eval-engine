@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import uuid
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Any
@@ -341,13 +342,23 @@ def _score_answers(
     tests: list[dict],
     target_adapter: Any,
     judge: Any,
+    call_delay_seconds: float = 5.0,
 ) -> list[dict]:
-    """Call the target model on each test, score with Groq judge, return rows."""
+    """Call the target model on each test, score with Groq judge, return rows.
+    
+    call_delay_seconds: pause between target calls to respect rate limits.
+    5s = 12 req/min, safely under Gemini free tier (15 req/min).
+    Set to 0 for OpenAI/Groq which have higher limits.
+    """
     rows: list[dict] = []
-    for test in tests:
+    for i, test in enumerate(tests):
         question = str(test.get("question", ""))
         ground_truth = str(test.get("ground_truth", ""))
         test_type = str(test.get("test_type", "factual"))
+
+        # Rate limit delay — skip on first call
+        if i > 0 and call_delay_seconds > 0:
+            time.sleep(call_delay_seconds)
 
         try:
             model_answer = target_adapter.call(question)
