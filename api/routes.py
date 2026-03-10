@@ -20,12 +20,14 @@ from api.database import (
     register_client,
 )
 from api.models import EvaluationRequest
-from reports.report_generator import generate_html_report
+from reports.report_generator import ReportGenerator, generate_html_report
 from src.llm_eval_engine.infrastructure.config_loader import load_project_config
 from src.llm_eval_engine.infrastructure.evaluator_factories import (
     build_default_evaluator_registry,
 )
 from src.metrics import compute_metrics
+from src.target_adapter import AdapterFactory
+from src.test_generator import GroqJudgeClient, TestSuiteGenerator
 from src.use_cases.run_evaluation import EvaluationPipeline
 
 load_dotenv()
@@ -34,6 +36,11 @@ router = APIRouter()
 REPORT_DIR = Path("reports")
 REVIEW_RULES_PATH = Path("configs/review_rules.json")
 
+GROQ_JUDGE_MODEL = "llama-3.3-70b-versatile"
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+
+# ── Pydantic models ───────────────────────────────────────────────────────────
 
 class HumanReviewItem(BaseModel):
     index: int
@@ -45,6 +52,27 @@ class HumanReviewItem(BaseModel):
 class HumanReviewRequest(BaseModel):
     reviews: list[HumanReviewItem] = Field(default_factory=list)
 
+
+class BreakTarget(BaseModel):
+    type: str  # "openai" | "huggingface" | "webhook"
+    base_url: str | None = None
+    api_key: str | None = None
+    model_name: str | None = None
+    repo_id: str | None = None
+    api_token: str | None = None
+    endpoint_url: str | None = None
+    headers: dict | None = None
+    payload_template: str | None = None
+
+
+class BreakRequest(BaseModel):
+    target: BreakTarget
+    description: str = Field(..., min_length=5)
+    num_tests: int = Field(default=20, ge=6, le=50)
+    groq_api_key: str | None = None
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -128,7 +156,6 @@ def validate_api_key(
     key_map = _api_keys_from_env()
     if not key_map:
         raise HTTPException(status_code=500, detail="API_KEYS is not configured in .env")
-
     if x_api_key not in key_map:
         raise HTTPException(status_code=401, detail="Invalid API Key")
 
@@ -308,6 +335,154 @@ def _update_review_rules(reviews: list[HumanReviewItem]) -> dict[str, Any]:
     return rules
 
 
+# ── /break background job ─────────────────────────────────────────────────────
+
+def _score_answers(
+    tests: list[dict],
+    target_adapter: Any,
+    judge: Any,
+) -> list[dict]:
+    """Call the target model on each test, score with Groq judge, return rows."""
+    rows: list[dict] = []
+    for test in tests:
+        question = str(test.get("question", ""))
+        ground_truth = str(test.get("ground_truth", ""))
+        test_type = str(test.get("test_type", "factual"))
+
+        try:
+            model_answer = target_adapter.call(question)
+        except Exception as exc:
+            model_answer = ""
+            scored = {
+                "correctness": 0.0,
+                "relevance": 0.0,
+                "hallucination": True,
+                "reason": f"Target call failed: {exc}",
+            }
+        else:
+            try:
+                scored = judge.score(question, ground_truth, model_answer)
+            except Exception as exc:
+                scored = {
+                    "correctness": 0.0,
+                    "relevance": 0.0,
+                    "hallucination": True,
+                    "reason": f"Judge failed: {exc}",
+                }
+
+        rows.append({
+            "question": question,
+            "ground_truth": ground_truth,
+            "model_answer": model_answer,
+            "test_type": test_type,
+            "correctness": scored["correctness"],
+            "relevance": scored["relevance"],
+            "hallucination": scored["hallucination"],
+            "reason": scored["reason"],
+            "judges": {
+                "groq": {
+                    "correctness": scored["correctness"],
+                    "relevance": scored["relevance"],
+                    "hallucination": scored["hallucination"],
+                    "reason": scored["reason"],
+                    "available": True,
+                }
+            },
+        })
+    return rows
+
+
+class _GroqAnswerJudge:
+    """Score a model answer against ground truth using Groq."""
+
+    def __init__(self, api_key: str, model: str = GROQ_JUDGE_MODEL) -> None:
+        self._client = GroqJudgeClient(
+            api_key=api_key,
+            base_url=GROQ_BASE_URL,
+            model=model,
+            timeout_seconds=120,
+        )
+
+    def score(self, question: str, ground_truth: str, model_answer: str) -> dict:
+        prompt = (
+            f"You are a strict evaluator for AI Breaker Lab.\n\n"
+            f"Question: {question}\n"
+            f"Ground Truth: {ground_truth}\n"
+            f"Model Answer: {model_answer}\n\n"
+            f"Return JSON only:\n"
+            f'{{"correctness":0-10,"relevance":0-10,"hallucination":true/false,"reason":"short explanation"}}'
+        )
+        raw = self._client.generate(prompt)
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            start, end = raw.find("{"), raw.rfind("}")
+            if start == -1 or end == -1:
+                return {"correctness": 0.0, "relevance": 0.0, "hallucination": True, "reason": "Invalid JSON from judge"}
+            payload = json.loads(raw[start: end + 1])
+
+        return {
+            "correctness": float(payload.get("correctness", 0) or 0),
+            "relevance": float(payload.get("relevance", 0) or 0),
+            "hallucination": bool(payload.get("hallucination", True)),
+            "reason": str(payload.get("reason", "")).strip() or "No reason provided",
+        }
+
+
+def _process_break_job(
+    report_id: str,
+    target_cfg: dict,
+    description: str,
+    num_tests: int,
+    groq_api_key: str,
+) -> None:
+    try:
+        # 1. Generate adversarial test suite from description
+        judge_client = GroqJudgeClient(
+            api_key=groq_api_key,
+            base_url=GROQ_BASE_URL,
+            model=GROQ_JUDGE_MODEL,
+        )
+        generator = TestSuiteGenerator(judge_client=judge_client)
+        tests = generator.generate_from_description(
+            description=description,
+            num_tests=num_tests,
+        )
+
+        # 2. Call target model + score each answer
+        target_adapter = AdapterFactory.from_config(target_cfg)
+        judge = _GroqAnswerJudge(api_key=groq_api_key)
+        results = _score_answers(tests, target_adapter, judge)
+
+        # 3. Compute metrics
+        metrics = compute_metrics(results)
+
+        # 4. Generate Breaker HTML report
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        html_path = str(REPORT_DIR / f"report_{report_id}.html")
+        ReportGenerator().generate(
+            metrics=metrics,
+            results=results,
+            output_path=html_path,
+            metadata={
+                "target_type": target_cfg.get("type", "unknown"),
+                "judge_model": GROQ_JUDGE_MODEL,
+            },
+        )
+
+        _finalize_report_success(
+            report_id=report_id,
+            results=results,
+            metrics=metrics,
+            html_path=html_path,
+        )
+
+    except Exception as exc:
+        _finalize_report_failure(report_id=report_id, error_message=str(exc))
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+
 @router.post("/evaluate")
 def evaluate(
     payload: EvaluationRequest,
@@ -354,6 +529,71 @@ def evaluate(
         raise HTTPException(status_code=500, detail=f"Evaluation failed: {exc}")
 
 
+@router.post("/break")
+def break_model(
+    payload: BreakRequest,
+    background_tasks: BackgroundTasks,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    """
+    New core endpoint. Accepts a target model config + plain-text description,
+    auto-generates adversarial tests, calls the target, scores everything,
+    and returns a Breaker Report.
+
+    Poll GET /report/{report_id} until status == "done".
+    """
+    groq_api_key = (payload.groq_api_key or os.getenv("GROQ_API_KEY", "")).strip()
+    if not groq_api_key:
+        raise HTTPException(
+            status_code=422,
+            detail="groq_api_key is required (or set GROQ_API_KEY env var on the server)",
+        )
+
+    target_cfg = payload.target.model_dump(exclude_none=True)
+    report_id = str(uuid.uuid4())
+    model_version = (
+        target_cfg.get("model_name")
+        or target_cfg.get("repo_id")
+        or target_cfg.get("endpoint_url")
+        or "unknown"
+    )
+
+    _insert_report(
+        report_id=report_id,
+        auth_ctx=auth_ctx,
+        sample_count=payload.num_tests,
+        judge_model=f"groq/{GROQ_JUDGE_MODEL}",
+        dataset_id=None,
+        model_version=model_version,
+        status="processing",
+    )
+    log_usage(
+        report_id=report_id,
+        api_key=auth_ctx["api_key"],
+        sample_count=payload.num_tests,
+        client=auth_ctx.get("client"),
+        dataset_id=None,
+        model_version=model_version,
+        evaluation_date=datetime.now(timezone.utc).date().isoformat(),
+    )
+
+    background_tasks.add_task(
+        _process_break_job,
+        report_id,
+        target_cfg,
+        payload.description,
+        payload.num_tests,
+        groq_api_key,
+    )
+
+    return {
+        "report_id": report_id,
+        "status": "processing",
+        "num_tests": payload.num_tests,
+        "message": f"Generating {payload.num_tests} adversarial tests and breaking your model. Poll GET /report/{report_id} for results.",
+    }
+
+
 @router.get("/reports")
 def list_reports(auth_ctx: dict[str, Any] = Depends(validate_api_key)) -> list[dict[str, Any]]:
     client_name = auth_ctx.get("client_name")
@@ -381,7 +621,6 @@ def get_report(report_id: str, auth_ctx: dict[str, Any] = Depends(validate_api_k
     row = _get_report_row(report_id)
     if not row:
         raise HTTPException(status_code=404, detail="Report not found")
-
     if row["client_name"] != auth_ctx.get("client_name"):
         raise HTTPException(status_code=403, detail="Not allowed to access this report")
 
