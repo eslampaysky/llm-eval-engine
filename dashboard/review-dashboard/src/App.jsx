@@ -734,7 +734,19 @@ function BreakPage({ onReportReady }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         {/* Left — target */}
         <div className="card">
-          <div className="card-title">01 — Target Model</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            01 — Target Model
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 10 }} disabled={busy}
+                onClick={() => { setTargetType('openai'); set('base_url', 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'); set('model_name', 'gemini-3-flash-preview'); }}>
+                ✦ Gemini
+              </button>
+              <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 10 }} disabled={busy}
+                onClick={() => { setTargetType('openai'); set('base_url', 'https://api.openai.com'); set('model_name', 'gpt-4o-mini'); }}>
+                ✦ OpenAI
+              </button>
+            </div>
+          </div>
 
           <div className="field">
             <label className="label">Adapter type</label>
@@ -873,7 +885,13 @@ function ReportPage({ report }) {
     <div className="page">
       <div className="page-header">
         <div className="page-tag">// last run · {fmtDate(report.created_at)}</div>
-        <div className="page-title">Breaker Report</div>
+        <div className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          Breaker Report
+          <button className="btn btn-ghost" style={{ fontSize: 10, padding: '3px 10px', fontFamily: 'var(--font-mono)' }}
+            onClick={() => navigator.clipboard.writeText(report.report_id)}>
+            copy id
+          </button>
+        </div>
         <div className="page-desc">Model: {report.model_version || '—'} · {results.length} tests · Judge: {report.judge_model || 'groq'}</div>
       </div>
 
@@ -896,12 +914,12 @@ function ReportPage({ report }) {
       <div className="kpi-grid">
         <div className="kpi kpi-acid">
           <div className="kpi-label">Avg Correctness</div>
-          <div className="kpi-value">{(+(metrics.correctness || 0)).toFixed(1)}</div>
+          <div className="kpi-value">{(+(metrics.judges?.groq?.avg_correctness || 0)).toFixed(1)}</div>
           <div className="kpi-sub">out of 10</div>
         </div>
         <div className="kpi kpi-teal">
           <div className="kpi-label">Avg Relevance</div>
-          <div className="kpi-value">{(+(metrics.relevance || 0)).toFixed(1)}</div>
+          <div className="kpi-value">{(+(metrics.judges?.groq?.avg_relevance || 0)).toFixed(1)}</div>
           <div className="kpi-sub">out of 10</div>
         </div>
         <div className="kpi kpi-red">
