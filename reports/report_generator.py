@@ -1,5 +1,11 @@
 """Generate a self-contained HTML report with multi-model comparison."""
 
+from __future__ import annotations
+
+import html
+import json
+from pathlib import Path
+
 import os
 from datetime import datetime, timezone
 from html import escape
@@ -564,11 +570,6 @@ AI Breaker Lab — report_generator.py
 Generates a premium self-contained HTML evaluation report.
 """
 
-from __future__ import annotations
-
-import html
-import json
-from pathlib import Path
 
 
 class ReportGenerator:
