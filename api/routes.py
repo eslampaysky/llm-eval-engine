@@ -103,11 +103,17 @@ def _create_extra_tables() -> None:
             results_json TEXT,
             metrics_json TEXT,
             html_path TEXT,
+            html_content TEXT,
             total_tokens INTEGER,
             total_cost_usd REAL,
             error TEXT
         )
     """)
+    # Migrate: add html_content column if it doesn't exist yet
+    try:
+        cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
+    except Exception:
+        pass
     cur.execute("""
         CREATE TABLE IF NOT EXISTS human_reviews(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -191,15 +197,23 @@ def _aggregate_usage(results):
 
 def _finalize_report_success(report_id, results, metrics, html_path):
     total_tokens, total_cost = _aggregate_usage(results)
+    # Read HTML content from file if it exists
+    html_content = None
+    try:
+        if html_path and Path(html_path).exists():
+            html_content = Path(html_path).read_text(encoding="utf-8")
+    except Exception:
+        pass
     conn = _connect()
     cur = conn.cursor()
     cur.execute("""
         UPDATE evaluation_reports
         SET status=?, updated_at=?, results_json=?, metrics_json=?,
-            html_path=?, total_tokens=?, total_cost_usd=?, error=NULL
+            html_path=?, html_content=?, total_tokens=?, total_cost_usd=?, error=NULL
         WHERE report_id=?
     """, ("done", _utc_now_iso(), json.dumps(results, ensure_ascii=False),
-          json.dumps(metrics, ensure_ascii=False), html_path, total_tokens, total_cost, report_id))
+          json.dumps(metrics, ensure_ascii=False), html_path, html_content,
+          total_tokens, total_cost, report_id))
     conn.commit()
     conn.close()
 
@@ -446,9 +460,39 @@ def get_report(report_id: str, auth_ctx: dict[str, Any] = Depends(validate_api_k
         "results": json.loads(row["results_json"]) if row["results_json"] else [],
         "metrics": json.loads(row["metrics_json"]) if row["metrics_json"] else {},
         "report_url": f"/report/{row['report_id']}",
-        "html_report_url": f"/reports/report_{row['report_id']}.html" if row["html_path"] else None,
+        "html_report_url": f"/report/{row['report_id']}/html" if row["html_path"] else None,
         "error": row["error"],
     }
+
+
+@router.get("/report/{report_id}/html", response_class=None)
+def get_report_html(report_id: str, auth_ctx: dict[str, Any] = Depends(validate_api_key)):
+    from fastapi.responses import HTMLResponse
+    row = _get_report_row(report_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if row["client_name"] != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=403, detail="Not allowed")
+    html_content = row["html_content"] if "html_content" in row.keys() else None
+    if not html_content:
+        # Fallback: regenerate from stored results/metrics
+        results = json.loads(row["results_json"]) if row["results_json"] else []
+        metrics = json.loads(row["metrics_json"]) if row["metrics_json"] else {}
+        if not results:
+            raise HTTPException(status_code=404, detail="HTML report not available")
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w") as f:
+            tmp_path = f.name
+        try:
+            ReportGenerator().generate(metrics=metrics, results=results, output_path=tmp_path,
+                metadata={"target_type": "unknown", "judge_model": row["judge_model"] or GROQ_JUDGE_MODEL})
+            html_content = Path(tmp_path).read_text(encoding="utf-8")
+        finally:
+            try: os.unlink(tmp_path)
+            except: pass
+        if not html_content:
+            raise HTTPException(status_code=404, detail="Could not generate HTML report")
+    return HTMLResponse(content=html_content)
 
 
 @router.post("/report/{report_id}/human-review")

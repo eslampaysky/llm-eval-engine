@@ -956,9 +956,20 @@ function ReportPage({ report }) {
             <Breakdown results={results} />
           </div>
           {report.html_report_url && (
-            <a href={`${API_BASE}${report.html_report_url}`} target="_blank" rel="noreferrer" className="btn btn-ghost">
+            <button className="btn btn-ghost" onClick={async () => {
+              try {
+                const res = await fetch(`${API_BASE}${report.html_report_url}`, {
+                  headers: { 'X-API-KEY': getApiKey() }
+                });
+                if (!res.ok) throw new Error('Failed to load report');
+                const html = await res.text();
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank');
+              } catch(e) { alert('Could not load HTML report: ' + e.message); }
+            }}>
               ↗ View Full HTML Report
-            </a>
+            </button>
           )}
         </>
       )}
