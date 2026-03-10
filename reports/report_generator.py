@@ -559,3 +559,732 @@ class ReportGenerator:
             f.write(html)
 
         return output_path
+"""
+AI Breaker Lab — report_generator.py
+Generates a premium self-contained HTML evaluation report.
+"""
+
+from __future__ import annotations
+
+import html
+import json
+from pathlib import Path
+
+
+class ReportGenerator:
+    def generate(
+        self,
+        metrics: dict,
+        results: list[dict],
+        output_path: str,
+        metadata: dict | None = None,
+    ) -> str:
+        metadata = metadata or {}
+        report_html = _build_html(metrics, results, metadata)
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(report_html, encoding="utf-8")
+        return str(path)
+
+
+def _e(text: str) -> str:
+    """HTML-escape a string."""
+    return html.escape(str(text or ""), quote=True)
+
+
+def _score_color(score: float) -> str:
+    if score >= 8:
+        return "#10b981"
+    if score >= 6:
+        return "#f59e0b"
+    return "#ef4444"
+
+
+def _score_label(score: float) -> str:
+    if score >= 8:
+        return "PASS"
+    if score >= 6:
+        return "WARN"
+    return "FAIL"
+
+
+def _build_breakdown_rows(breakdown: dict) -> str:
+    type_icons = {
+        "factual": "📋",
+        "adversarial": "⚔️",
+        "hallucination_bait": "🎣",
+        "consistency": "🔄",
+        "refusal": "🛑",
+        "jailbreak_lite": "🔓",
+    }
+    rows = ""
+    for t, data in sorted(breakdown.items()):
+        icon = type_icons.get(t, "🧪")
+        avg = data.get("avg_score", 0)
+        color = _score_color(avg)
+        label = _score_label(avg)
+        fail_rate = data.get("fail_rate", 0)
+        rows += f"""
+        <tr>
+          <td><span class="type-icon">{icon}</span> {_e(t.replace('_', ' ').title())}</td>
+          <td class="center">{data.get('count', 0)}</td>
+          <td class="center"><span class="score-badge" style="color:{color};border-color:{color}">{avg}</span></td>
+          <td class="center">{data.get('failures', 0)}</td>
+          <td class="center"><span class="rate-pill {'rate-danger' if fail_rate > 30 else 'rate-ok'}">{fail_rate}%</span></td>
+          <td class="center"><span class="label-badge label-{label.lower()}">{label}</span></td>
+        </tr>"""
+    return rows
+
+
+def _build_results_rows(results: list[dict]) -> str:
+    rows = ""
+    for i, r in enumerate(results):
+        score = float(r.get("correctness", 0) or 0) * 0.6 + float(r.get("relevance", 0) or 0) * 0.4
+        hallucination = bool(r.get("hallucination", False))
+        test_type = str(r.get("test_type", "unknown"))
+        color = _score_color(score)
+        label = _score_label(score)
+        hall_badge = '<span class="hall-yes">⚠ YES</span>' if hallucination else '<span class="hall-no">✓ NO</span>'
+        rows += f"""
+        <tr class="result-row {'row-flagged' if label == 'FAIL' or hallucination else ''}">
+          <td class="center muted">{i+1}</td>
+          <td><span class="type-tag type-{_e(test_type)}">{_e(test_type.replace('_',' '))}</span></td>
+          <td class="question-cell">{_e(r.get('question',''))}</td>
+          <td class="answer-cell muted">{_e(r.get('model_answer','')[:120])}{'…' if len(str(r.get('model_answer',''))) > 120 else ''}</td>
+          <td class="center"><span style="color:{color};font-weight:700">{round(score,1)}</span></td>
+          <td class="center">{hall_badge}</td>
+          <td class="reason-cell muted">{_e(r.get('reason',''))}</td>
+        </tr>"""
+    return rows
+
+
+def _build_red_flags(red_flags: list[str]) -> str:
+    if not red_flags:
+        return '<div class="no-flags">✓ No critical issues detected</div>'
+    items = "".join(f'<div class="flag-item">⚠ {_e(f)}</div>' for f in red_flags)
+    return items
+
+
+def _build_judge_cards(judges: dict) -> str:
+    if not judges:
+        return ""
+    cards = ""
+    for name, data in judges.items():
+        cards += f"""
+        <div class="judge-card">
+          <div class="judge-name">{_e(name.upper())}</div>
+          <div class="judge-stat">Correctness <span>{data.get('avg_correctness', 0)}/10</span></div>
+          <div class="judge-stat">Relevance <span>{data.get('avg_relevance', 0)}/10</span></div>
+          <div class="judge-stat">Hallucinations <span class="{'stat-danger' if data.get('hallucinations',0) > 0 else ''}">{data.get('hallucinations', 0)}</span></div>
+          <div class="judge-stat">Evaluated <span>{data.get('count', 0)} samples</span></div>
+        </div>"""
+    return cards
+
+
+def _build_html(metrics: dict, results: list[dict], metadata: dict) -> str:
+    overall = metrics.get("average_score", 0)
+    consistency = metrics.get("consistency_score", 0)
+    total = metrics.get("total_samples", 0)
+    failed = metrics.get("low_quality_answers", 0)
+    hallucinations = metrics.get("hallucinations_detected", 0)
+    red_flags = metrics.get("red_flags", [])
+    breakdown = metrics.get("breakdown_by_type", {})
+    judges = metrics.get("judges", {})
+
+    overall_color = _score_color(overall)
+    consistency_color = _score_color(consistency) if consistency > 0 else "#4a6080"
+
+    target_type = _e(metadata.get("target_type", "unknown"))
+    judge_model = _e(metadata.get("judge_model", "unknown"))
+
+    breakdown_rows = _build_breakdown_rows(breakdown)
+    results_rows = _build_results_rows(results)
+    red_flags_html = _build_red_flags(red_flags)
+    judge_cards_html = _build_judge_cards(judges)
+
+    # Score arc SVG — visual gauge
+    def arc_svg(score: float, color: str, size: int = 80) -> str:
+        pct = min(max(score / 10.0, 0), 1)
+        r = 30
+        circ = 2 * 3.14159 * r
+        dash = pct * circ * 0.75
+        gap = circ - dash
+        return f"""<svg width="{size}" height="{size}" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="{r}" fill="none" stroke="#1a2332" stroke-width="8"
+            stroke-dasharray="{circ*0.75:.1f} {circ*0.25:.1f}"
+            stroke-dashoffset="-{circ*0.125:.1f}" stroke-linecap="round"/>
+          <circle cx="40" cy="40" r="{r}" fill="none" stroke="{color}" stroke-width="8"
+            stroke-dasharray="{dash:.1f} {gap:.1f}"
+            stroke-dashoffset="-{circ*0.125:.1f}" stroke-linecap="round"
+            style="transition:stroke-dasharray 1s ease"/>
+          <text x="40" y="44" text-anchor="middle" fill="{color}"
+            font-size="16" font-weight="800" font-family="'JetBrains Mono',monospace">{score}</text>
+        </svg>"""
+
+    overall_arc = arc_svg(overall, overall_color)
+    consistency_arc = arc_svg(consistency, consistency_color)
+
+    # Breakdown chart bars
+    chart_bars = ""
+    for t, data in sorted(breakdown.items()):
+        avg = data.get("avg_score", 0)
+        pct = avg / 10 * 100
+        color = _score_color(avg)
+        chart_bars += f"""
+        <div class="bar-row">
+          <div class="bar-label">{t.replace('_',' ')}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:{pct}%;background:{color}"></div>
+          </div>
+          <div class="bar-val" style="color:{color}">{avg}</div>
+        </div>"""
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Breaker Lab — Evaluation Report</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {{
+  --bg: #060a0f;
+  --surface: #0d1117;
+  --card: #111820;
+  --border: #1a2636;
+  --border2: #243448;
+  --text: #c9d8eb;
+  --muted: #4a6080;
+  --green: #10b981;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --blue: #3b82f6;
+  --purple: #8b5cf6;
+}}
+
+* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+
+body {{
+  font-family: 'Syne', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 0;
+}}
+
+body::before {{
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 10% 0%, #0c1f3a33 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 90% 100%, #0a1f1033 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}}
+
+.page {{ position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 48px 32px 80px; }}
+
+/* ── Header ── */
+.header {{
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 48px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border);
+}}
+
+.header-left {{ }}
+
+.brand {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--blue);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}}
+
+.header h1 {{
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.2;
+  margin-bottom: 12px;
+}}
+
+.header-meta {{
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}}
+
+.meta-tag {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 4px 12px;
+  border-radius: 4px;
+}}
+
+.header-right {{
+  text-align: right;
+}}
+
+.overall-score-wrap {{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}}
+
+.score-label-sm {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}}
+
+/* ── KPI Grid ── */
+.kpi-grid {{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}}
+
+.kpi-card {{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  position: relative;
+  overflow: hidden;
+}}
+
+.kpi-card::before {{
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent, var(--border2));
+}}
+
+.kpi-label {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}}
+
+.kpi-value {{
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--accent, #fff);
+  line-height: 1;
+  margin-bottom: 4px;
+}}
+
+.kpi-sub {{
+  font-size: 12px;
+  color: var(--muted);
+}}
+
+.kpi-arc {{
+  position: absolute;
+  top: 16px; right: 16px;
+  opacity: 0.15;
+}}
+
+/* ── Red flags ── */
+.flags-section {{
+  background: #1a060633;
+  border: 1px solid #7f1d1d55;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 40px;
+}}
+
+.section-title {{
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--red);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}}
+
+.flag-item {{
+  font-size: 13px;
+  color: #fca5a5;
+  padding: 6px 0;
+  border-bottom: 1px solid #7f1d1d22;
+  line-height: 1.5;
+}}
+
+.flag-item:last-child {{ border-bottom: none; }}
+
+.no-flags {{
+  font-size: 13px;
+  color: var(--green);
+}}
+
+/* ── Two-col layout ── */
+.two-col {{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 40px;
+}}
+
+@media (max-width: 700px) {{ .two-col {{ grid-template-columns: 1fr; }} }}
+
+/* ── Section card ── */
+.section-card {{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+}}
+
+.section-card-title {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}}
+
+/* ── Bar chart ── */
+.bar-row {{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}}
+
+.bar-label {{
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 130px;
+  text-transform: capitalize;
+}}
+
+.bar-track {{
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}}
+
+.bar-fill {{
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.8s ease;
+}}
+
+.bar-val {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 28px;
+  text-align: right;
+}}
+
+/* ── Judge cards ── */
+.judge-cards {{ display: flex; flex-direction: column; gap: 10px; }}
+
+.judge-card {{
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
+}}
+
+.judge-name {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--blue);
+  font-weight: 600;
+  margin-bottom: 10px;
+  letter-spacing: 0.1em;
+}}
+
+.judge-stat {{
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 3px 0;
+}}
+
+.judge-stat span {{ color: var(--text); font-weight: 600; }}
+.judge-stat .stat-danger {{ color: var(--red); }}
+
+/* ── Breakdown table ── */
+.table-wrap {{ overflow-x: auto; margin-bottom: 40px; }}
+
+table {{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}}
+
+thead th {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}}
+
+thead th.center {{ text-align: center; }}
+
+tbody tr {{
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}}
+
+tbody tr:hover {{ background: #ffffff05; }}
+
+tbody td {{
+  padding: 12px 14px;
+  color: var(--text);
+  vertical-align: top;
+}}
+
+tbody td.center {{ text-align: center; }}
+tbody td.muted {{ color: var(--muted); font-size: 12px; }}
+tbody td.question-cell {{ max-width: 220px; font-size: 12px; }}
+tbody td.answer-cell {{ max-width: 200px; font-size: 12px; }}
+tbody td.reason-cell {{ max-width: 180px; font-size: 11px; }}
+
+.row-flagged {{ background: #ef444408; }}
+.row-flagged:hover {{ background: #ef444412; }}
+
+/* ── Badges ── */
+.score-badge {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid;
+  padding: 2px 8px;
+  border-radius: 4px;
+}}
+
+.label-badge {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}}
+
+.label-pass {{ background: #064e3b; color: var(--green); }}
+.label-warn {{ background: #451a03; color: var(--amber); }}
+.label-fail {{ background: #450a0a; color: var(--red); }}
+
+.rate-pill {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}}
+
+.rate-ok {{ background: #064e3b44; color: var(--green); }}
+.rate-danger {{ background: #450a0a44; color: var(--red); }}
+
+.type-icon {{ font-size: 14px; }}
+
+.type-tag {{
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}}
+
+.hall-yes {{ color: var(--red); font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }}
+.hall-no {{ color: var(--green); font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }}
+
+/* ── Footer ── */
+.footer {{
+  margin-top: 60px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}}
+
+.footer-brand {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+}}
+
+.footer-brand span {{ color: var(--blue); }}
+
+.print-btn {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  background: var(--card);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 8px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}}
+
+.print-btn:hover {{ background: var(--border2); }}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="brand">// AI BREAKER LAB — EVALUATION REPORT</div>
+      <h1>Model Test Results</h1>
+      <div class="header-meta">
+        <span class="meta-tag">target: {target_type}</span>
+        <span class="meta-tag">judge: {judge_model}</span>
+        <span class="meta-tag">samples: {total}</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="overall-score-wrap">
+        {arc_svg(overall, overall_color, 100)}
+        <div class="score-label-sm">overall score</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card" style="--accent:{overall_color}">
+      <div class="kpi-label">Overall Score</div>
+      <div class="kpi-value" style="color:{overall_color}">{overall}</div>
+      <div class="kpi-sub">weighted avg (0–10)</div>
+    </div>
+    <div class="kpi-card" style="--accent:{consistency_color}">
+      <div class="kpi-label">Consistency</div>
+      <div class="kpi-value" style="color:{consistency_color}">{consistency if consistency > 0 else "—"}</div>
+      <div class="kpi-sub">across rephrased prompts</div>
+    </div>
+    <div class="kpi-card" style="--accent:{'#ef4444' if hallucinations > 0 else '#10b981'}">
+      <div class="kpi-label">Hallucinations</div>
+      <div class="kpi-value" style="color:{'#ef4444' if hallucinations > 0 else '#10b981'}">{hallucinations}</div>
+      <div class="kpi-sub">of {total} responses</div>
+    </div>
+    <div class="kpi-card" style="--accent:{'#ef4444' if failed > 0 else '#10b981'}">
+      <div class="kpi-label">Failed Tests</div>
+      <div class="kpi-value" style="color:{'#ef4444' if failed > 0 else '#10b981'}">{failed}</div>
+      <div class="kpi-sub">below threshold</div>
+    </div>
+    <div class="kpi-card" style="--accent:var(--blue)">
+      <div class="kpi-label">Min / Max</div>
+      <div class="kpi-value" style="color:var(--blue);font-size:22px">{metrics.get('min_score', 0)} / {metrics.get('max_score', 0)}</div>
+      <div class="kpi-sub">score range</div>
+    </div>
+  </div>
+
+  <!-- Red flags -->
+  <div class="flags-section">
+    <div class="section-title">⚠ Red Flags</div>
+    {red_flags_html}
+  </div>
+
+  <!-- Two col: chart + judges -->
+  <div class="two-col">
+    <div class="section-card">
+      <div class="section-card-title">Score by Test Type</div>
+      {chart_bars}
+    </div>
+    <div class="section-card">
+      <div class="section-card-title">Judge Models</div>
+      <div class="judge-cards">
+        {judge_cards_html}
+      </div>
+    </div>
+  </div>
+
+  <!-- Breakdown table -->
+  <div class="section-card" style="margin-bottom:40px">
+    <div class="section-card-title">Breakdown by Test Type</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Test Type</th>
+            <th class="center">Count</th>
+            <th class="center">Avg Score</th>
+            <th class="center">Failures</th>
+            <th class="center">Fail Rate</th>
+            <th class="center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {breakdown_rows}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Full results -->
+  <div class="section-card">
+    <div class="section-card-title">All Test Results</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="center">#</th>
+            <th>Type</th>
+            <th>Question</th>
+            <th>Model Answer</th>
+            <th class="center">Score</th>
+            <th class="center">Hallucination</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          {results_rows}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-brand"><span>AI Breaker Lab</span> — automated model testing</div>
+    <button class="print-btn" onclick="window.print()">⬇ Export / Print</button>
+  </div>
+
+</div>
+</body>
+</html>"""

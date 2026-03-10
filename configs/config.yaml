@@ -39,5 +39,11 @@ model: llama3
 target_model:
   type: openai # openai | huggingface | webhook
   base_url: https://api.openai.com
-  api_key: ""
+  api_key: ${GROQ_API_KEY}
   model_name: gpt-4o-mini
+
+# Test suite config - ADD THIS
+test_suite:
+  domain: general assistant
+  model_description: "A general purpose AI assistant"
+  num_tests: 10

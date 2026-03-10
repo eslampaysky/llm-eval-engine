@@ -1,15 +1,17 @@
-target:
-  type: openai
-  base_url: https://their-api.com
-  api_key: ${TARGET_API_KEY}
-  model_name: their-model
-
-test_suite:
-  domain: customer support
-  model_description: "Arabic customer support bot for an e-commerce store"
-  num_tests: 20
-
+# Judge - scores the answers (uses Groq free tier)
 judge:
   provider: groq
-  model: llama-3.3-70b-versatile
   api_key: ${GROQ_API_KEY}
+  model: llama-3.3-70b-versatile
+
+# Test suite - what to generate
+test_suite:
+  model_description: "A general purpose AI assistant"
+  num_tests: 10
+
+# Target - the model we're testing (also Groq, free)
+target:
+  type: openai
+  base_url: https://api.groq.com/openai/v1
+  api_key: ${TARGET_API_KEY}
+  model_name: their-model

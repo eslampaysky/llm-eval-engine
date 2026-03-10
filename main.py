@@ -203,15 +203,20 @@ def run(config_path: str | None) -> dict:
     results, metrics = _run_eval(tests, target_cfg=target_cfg, judge_cfg=judge_cfg)
     report_path = reports_dir / f"report_{timestamp}_{run_id[:8]}.html"
     ReportGenerator().generate(
-        metrics=metrics,
-        results=results,
-        output_path=str(report_path),
-        metadata={
-            "target_type": str(target_cfg.get("type", "unknown")),
-            "judge_model": str(judge_cfg.get("model", "llama-3.3-70b-versatile")),
-        },
-    )
-
+    metrics=metrics,
+    results=results,
+    output_path=str(report_path),
+    metadata={
+        "target_type": str(
+            target_cfg.get("model_name")
+            or target_cfg.get("repo_id")
+            or target_cfg.get("endpoint_url")
+            or target_cfg.get("type")
+            or "unknown"
+        ),
+        "judge_model": str(judge_cfg.get("model", "llama-3.3-70b-versatile")),
+    },
+)
     results_path = reports_dir / f"run_{timestamp}_{run_id[:8]}.json"
     _save_json(
         results_path,
