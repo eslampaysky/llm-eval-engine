@@ -34,8 +34,12 @@ from src.use_cases.run_evaluation import EvaluationPipeline
 load_dotenv()
 
 router = APIRouter()
-REPORT_DIR = Path("reports")
-REVIEW_RULES_PATH = Path("configs/review_rules.json")
+
+# ── Persistent paths — point to Railway Volume when DATA_DIR is set ───────────
+_DATA_DIR = Path(os.getenv("DATA_DIR", "/app/data"))
+REPORT_DIR = _DATA_DIR / "reports"
+REVIEW_RULES_PATH = _DATA_DIR / "review_rules.json"
+REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 GROQ_JUDGE_MODEL = "llama-3.3-70b-versatile"
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
