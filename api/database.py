@@ -488,6 +488,24 @@ def get_report_row(report_id: str) -> dict | None:
         return _row_to_dict(cur.fetchone())
 
 
+def list_reports_for_client(client_name: str) -> list[dict]:
+    """List report records for a client, newest first."""
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            SELECT report_id, status, judge_model, sample_count, dataset_id,
+                   model_version, created_at, updated_at, html_path,
+                   total_tokens, total_cost_usd, error
+            FROM evaluation_reports
+            WHERE client_name = {_P}
+            ORDER BY created_at DESC
+            """,
+            (client_name,),
+        )
+        return [_row_to_dict(r) for r in cur.fetchall()]
+
+
 def get_history_for_client(client_name: str, limit: int = 50) -> list[dict]:
     with _get_conn() as conn:
         cur = conn.cursor()
