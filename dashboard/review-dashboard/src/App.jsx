@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 // ── API ───────────────────────────────────────────────────────────────────────
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://llm-eval-engine-production.up.railway.app';
@@ -18,92 +18,89 @@ async function apiFetch(path, opts = {}) {
 }
 
 const api = {
-  breakModel: (p)  => apiFetch('/break', { method: 'POST', body: JSON.stringify(p) }),
-  getReport:  (id) => apiFetch(`/report/${id}`),
-  getHistory: ()   => apiFetch('/history?limit=100'),
-  getUsage:   ()   => apiFetch('/usage/summary'),
-  health:     ()   => apiFetch('/health'),
+  breakModel:   (p)  => apiFetch('/break',          { method: 'POST', body: JSON.stringify(p) }),
+  getReport:    (id) => apiFetch(`/report/${id}`),
+  getHistory:   ()   => apiFetch('/history?limit=100'),
+  getUsage:     ()   => apiFetch('/usage/summary'),
+  health:       ()   => apiFetch('/health'),
   deleteReport: (id) => fetch(`${API_BASE}/report/${id}`, {
     method: 'DELETE',
     headers: { 'X-API-KEY': getApiKey() },
   }),
 };
 
-// ── Global poll store — lives outside React, survives tab switches ────────────
-const POLL = {
-  timerId:   null,
-  reportId:  null,
-  attempts:  0,
-  callbacks: new Set(),
-};
+// ── Poll store — survives tab switches ────────────────────────────────────────
+const POLL = { timerId: null, reportId: null, attempts: 0, callbacks: new Set() };
 
-function pollSubscribe(cb) {
-  POLL.callbacks.add(cb);
-  return () => POLL.callbacks.delete(cb);
-}
-function pollNotify(event) {
-  POLL.callbacks.forEach(cb => cb(event));
+function pollSubscribe(cb) { POLL.callbacks.add(cb); return () => POLL.callbacks.delete(cb); }
+function pollNotify(ev)    { POLL.callbacks.forEach(cb => cb(ev)); }
+function pollIsActive()    { return !!POLL.timerId; }
+
+// Stage progression based on elapsed ticks
+// Backend flow: ~3-8s generate tests → ~(5s*N) call model → scoring → done
+const STAGES = [
+  { id: 'init',     label: 'Initialising',         icon: '⬡' },
+  { id: 'generate', label: 'Generating test suite', icon: '◈' },
+  { id: 'calling',  label: 'Calling target model',  icon: '⟳' },
+  { id: 'scoring',  label: 'Scoring with Groq',     icon: '◎' },
+  { id: 'report',   label: 'Building report',       icon: '▣' },
+];
+
+function stageFromAttempts(attempts, numTests) {
+  // Each attempt = 3s poll tick
+  const secs = attempts * 3;
+  if (secs < 5)                            return 0;
+  if (secs < 12)                           return 1;
+  if (secs < 12 + numTests * 5 * 0.5)     return 2; // midpoint of calling phase
+  if (secs < 12 + numTests * 5 * 0.9)     return 3;
+  return 4;
 }
 
-function pollStart(reportId) {
+function pollStart(reportId, numTests) {
   if (POLL.timerId) clearInterval(POLL.timerId);
-  POLL.reportId = reportId;
-  POLL.attempts = 0;
-  POLL.timerId  = setInterval(async () => {
+  POLL.reportId = reportId; POLL.attempts = 0;
+  POLL.timerId = setInterval(async () => {
     POLL.attempts++;
     try {
       const r = await api.getReport(reportId);
       if (r.status === 'done') {
-        clearInterval(POLL.timerId);
-        POLL.timerId  = null;
-        POLL.reportId = null;
+        clearInterval(POLL.timerId); POLL.timerId = null; POLL.reportId = null;
         pollNotify({ type: 'done', report: r });
       } else if (r.status === 'failed') {
-        clearInterval(POLL.timerId);
-        POLL.timerId  = null;
-        POLL.reportId = null;
+        clearInterval(POLL.timerId); POLL.timerId = null; POLL.reportId = null;
         pollNotify({ type: 'failed', error: r.error || 'Evaluation failed' });
       } else {
-        pollNotify({ type: 'tick', attempts: POLL.attempts });
+        const stage = stageFromAttempts(POLL.attempts, numTests || 20);
+        // estimate progress: 0-95% while running (never hit 100 until done)
+        const totalExpected = 12 + (numTests || 20) * 5;
+        const pct = Math.min(95, Math.round((POLL.attempts * 3 / totalExpected) * 100));
+        pollNotify({ type: 'tick', attempts: POLL.attempts, stage, pct });
       }
     } catch (e) {
       pollNotify({ type: 'error', error: e.message });
     }
-    if (POLL.attempts >= 120) {
-      clearInterval(POLL.timerId);
-      POLL.timerId  = null;
-      POLL.reportId = null;
+    if (POLL.attempts >= 140) {
+      clearInterval(POLL.timerId); POLL.timerId = null; POLL.reportId = null;
       pollNotify({ type: 'timeout' });
     }
   }, 3000);
 }
 
-function pollIsActive() { return !!POLL.timerId; }
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function scoreClass(s) {
-  if (s == null) return 'score-mid';
-  if (s >= 7)    return 'score-high';
-  if (s >= 4.5)  return 'score-mid';
-  return 'score-low';
-}
 function grade(s) {
-  if (s >= 8)   return 'A';
-  if (s >= 6.5) return 'B';
-  if (s >= 5)   return 'C';
-  if (s >= 3)   return 'D';
-  return 'F';
+  if (s >= 8) return 'A'; if (s >= 6.5) return 'B'; if (s >= 5) return 'C';
+  if (s >= 3) return 'D'; return 'F';
 }
 function weighted(row) { return (+row.correctness || 0) * 0.6 + (+row.relevance || 0) * 0.4; }
-function barColor(s) {
-  if (s >= 7)   return 'var(--teal)';
-  if (s >= 4.5) return 'var(--amber)';
-  return 'var(--red)';
-}
 function ts() { return new Date().toLocaleTimeString('en', { hour12: false }); }
 function fmtDate(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' +
+         d.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+function scoreColor(s) {
+  if (s >= 7) return 'var(--teal)'; if (s >= 5) return 'var(--amber)'; return 'var(--red)';
 }
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
@@ -134,6 +131,7 @@ const css = `
     --r2:    14px;
     --head:  'Syne', sans-serif;
     --mono:  'JetBrains Mono', monospace;
+    --sidebar-w: 236px;
   }
 
   html, body, #root { height: 100%; }
@@ -150,9 +148,52 @@ const css = `
   /* ── Shell ── */
   .shell {
     display: grid;
-    grid-template-columns: 236px 1fr;
+    grid-template-columns: var(--sidebar-w) 1fr;
     min-height: 100vh;
   }
+
+  /* ── Mobile header ── */
+  .mobile-header {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 200;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--line);
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 52px;
+  }
+  .mobile-logo {
+    font-family: var(--head);
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--hi);
+    letter-spacing: -.03em;
+  }
+  .mobile-logo span { color: var(--acid); }
+  .hamburger {
+    background: none;
+    border: 1px solid var(--line2);
+    border-radius: 6px;
+    color: var(--mid);
+    cursor: pointer;
+    padding: 7px 9px;
+    display: flex; flex-direction: column; gap: 4px; align-items: center;
+    transition: all .14s;
+  }
+  .hamburger:hover { border-color: var(--mid); color: var(--text); }
+  .hamburger span {
+    display: block;
+    width: 16px; height: 1.5px;
+    background: currentColor;
+    border-radius: 1px;
+    transition: all .2s;
+  }
+  .hamburger.open span:nth-child(1) { transform: translateY(5.5px) rotate(45deg); }
+  .hamburger.open span:nth-child(2) { opacity: 0; }
+  .hamburger.open span:nth-child(3) { transform: translateY(-5.5px) rotate(-45deg); }
 
   /* ── Sidebar ── */
   .sidebar {
@@ -164,149 +205,75 @@ const css = `
     top: 0;
     height: 100vh;
     overflow: hidden;
+    transition: transform .24s ease;
+    z-index: 100;
+  }
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: 99;
   }
 
   /* logo */
-  .logo {
-    padding: 24px 20px 20px;
-    border-bottom: 1px solid var(--line);
-  }
+  .logo { padding: 22px 20px 18px; border-bottom: 1px solid var(--line); }
   .logo-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(184,255,0,.08);
-    border: 1px solid rgba(184,255,0,.2);
-    border-radius: 4px;
-    padding: 2px 8px;
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: .15em;
-    text-transform: uppercase;
-    color: var(--acid);
-    margin-bottom: 10px;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(184,255,0,.08); border: 1px solid rgba(184,255,0,.2);
+    border-radius: 4px; padding: 2px 8px;
+    font-size: 9px; font-weight: 600; letter-spacing: .15em;
+    text-transform: uppercase; color: var(--acid); margin-bottom: 10px;
   }
   .logo-pulse {
-    width: 6px; height: 6px;
-    background: var(--acid);
-    border-radius: 50%;
-    animation: pulse 2.2s ease-in-out infinite;
-    flex-shrink: 0;
-  }
-  @keyframes pulse {
-    0%,100% { opacity:1; transform:scale(1); }
-    50%      { opacity:.25; transform:scale(.55); }
+    width: 6px; height: 6px; background: var(--acid);
+    border-radius: 50%; animation: pulse 2.2s ease-in-out infinite; flex-shrink: 0;
   }
   .logo-name {
-    font-family: var(--head);
-    font-size: 19px;
-    font-weight: 800;
-    color: var(--hi);
-    letter-spacing: -.03em;
-    line-height: 1;
+    font-family: var(--head); font-size: 19px; font-weight: 800;
+    color: var(--hi); letter-spacing: -.03em; line-height: 1;
   }
-  .logo-sub {
-    font-size: 10px;
-    color: var(--mute);
-    margin-top: 4px;
-    letter-spacing: .03em;
-  }
+  .logo-sub { font-size: 10px; color: var(--mute); margin-top: 4px; letter-spacing: .03em; }
 
   /* nav */
   .nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
   .nav-group-label {
-    font-size: 9px;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    color: var(--mute);
-    padding: 10px 10px 4px;
+    font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--mute); padding: 10px 10px 4px;
   }
   .nav-btn {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    width: 100%;
-    padding: 9px 10px;
-    border: 1px solid transparent;
-    border-radius: var(--r);
-    background: transparent;
-    color: var(--mid);
-    font-family: var(--mono);
-    font-size: 12px;
-    cursor: pointer;
-    text-align: left;
-    transition: all .14s;
+    display: flex; align-items: center; gap: 9px;
+    width: 100%; padding: 9px 10px;
+    border: 1px solid transparent; border-radius: var(--r);
+    background: transparent; color: var(--mid);
+    font-family: var(--mono); font-size: 12px;
+    cursor: pointer; text-align: left; transition: all .14s;
   }
   .nav-btn:hover { background: var(--bg3); color: var(--text); }
-  .nav-btn.active {
-    background: rgba(184,255,0,.07);
-    color: var(--acid);
-    border-color: rgba(184,255,0,.18);
-  }
+  .nav-btn.active { background: rgba(184,255,0,.07); color: var(--acid); border-color: rgba(184,255,0,.18); }
   .nav-icon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
   .nav-badge {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 9px;
-    color: var(--amber);
-    letter-spacing: .06em;
-    flex-shrink: 0;
+    margin-left: auto; display: flex; align-items: center; gap: 4px;
+    font-size: 9px; color: var(--amber); letter-spacing: .06em; flex-shrink: 0;
   }
-  .nav-badge-dot {
-    width: 5px; height: 5px;
-    border-radius: 50%;
-    background: var(--amber);
-    animation: pulse 1s ease-in-out infinite;
-  }
-  .nav-dot-acid {
-    margin-left: auto;
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--acid);
-    flex-shrink: 0;
-  }
+  .nav-badge-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--amber); animation: pulse 1s ease-in-out infinite; }
+  .nav-dot-acid { margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--acid); flex-shrink: 0; }
 
   /* sidebar footer */
-  .sidebar-footer {
-    padding: 14px 16px;
-    border-top: 1px solid var(--line);
-  }
-  .key-label {
-    font-size: 9px;
-    color: var(--mute);
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-  }
+  .sidebar-footer { padding: 14px 16px; border-top: 1px solid var(--line); }
+  .key-label { font-size: 9px; color: var(--mute); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 6px; }
   .key-row { display: flex; align-items: center; gap: 6px; }
   .key-input {
-    flex: 1;
-    background: var(--bg3);
-    border: 1px solid var(--line2);
-    border-radius: var(--r);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 7px 10px;
-    outline: none;
-    transition: border-color .14s;
-    min-width: 0;
+    flex: 1; background: var(--bg3); border: 1px solid var(--line2);
+    border-radius: var(--r); color: var(--text); font-family: var(--mono);
+    font-size: 11px; padding: 7px 10px; outline: none;
+    transition: border-color .14s; min-width: 0;
   }
   .key-input:focus { border-color: var(--acid); }
   .eye-btn {
-    background: var(--bg3);
-    border: 1px solid var(--line2);
-    border-radius: var(--r);
-    color: var(--mute);
-    cursor: pointer;
-    padding: 6px 8px;
-    font-size: 13px;
-    line-height: 1;
-    transition: all .14s;
-    flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
+    background: var(--bg3); border: 1px solid var(--line2); border-radius: var(--r);
+    color: var(--mute); cursor: pointer; padding: 6px 8px; font-size: 13px; line-height: 1;
+    transition: all .14s; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
   }
   .eye-btn:hover { color: var(--text); background: var(--bg4); border-color: var(--mid); }
 
@@ -316,82 +283,45 @@ const css = `
 
   /* ── Page header ── */
   .page-header { margin-bottom: 28px; }
-  .page-tag {
-    font-size: 10px;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: var(--acid);
-    margin-bottom: 6px;
-  }
+  .page-tag { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--acid); margin-bottom: 6px; }
   .page-title {
-    font-family: var(--head);
-    font-size: 30px;
-    font-weight: 800;
-    color: var(--hi);
-    letter-spacing: -.035em;
-    line-height: 1.05;
+    font-family: var(--head); font-size: 30px; font-weight: 800;
+    color: var(--hi); letter-spacing: -.035em; line-height: 1.05;
   }
   .page-desc { color: var(--mid); font-size: 13px; margin-top: 7px; line-height: 1.5; }
 
   /* ── Cards ── */
-  .card {
-    background: var(--bg2);
-    border: 1px solid var(--line);
-    border-radius: var(--r2);
-    padding: 22px;
-  }
+  .card { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r2); padding: 22px; }
   .card-title {
-    font-family: var(--head);
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--hi);
-    letter-spacing: -.01em;
-    margin-bottom: 16px;
+    font-family: var(--head); font-size: 13px; font-weight: 700;
+    color: var(--hi); letter-spacing: -.01em; margin-bottom: 16px;
   }
 
   /* ── Forms ── */
   .field { margin-bottom: 14px; }
   .label {
-    display: block;
-    font-size: 10px;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    color: var(--mid);
-    margin-bottom: 5px;
+    display: block; font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--mid); margin-bottom: 5px;
   }
   .input, .select, .textarea {
-    width: 100%;
-    background: var(--bg3);
-    border: 1px solid var(--line2);
-    border-radius: var(--r);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 13px;
-    padding: 10px 12px;
-    outline: none;
+    width: 100%; background: var(--bg3); border: 1px solid var(--line2);
+    border-radius: var(--r); color: var(--text); font-family: var(--mono);
+    font-size: 13px; padding: 10px 12px; outline: none;
     transition: border-color .14s, box-shadow .14s;
   }
   .input:focus, .select:focus, .textarea:focus {
-    border-color: var(--acid);
-    box-shadow: 0 0 0 3px rgba(184,255,0,.07);
+    border-color: var(--acid); box-shadow: 0 0 0 3px rgba(184,255,0,.07);
   }
   .select option { background: var(--bg2); }
   .textarea { resize: vertical; min-height: 90px; }
 
-  /* password field with inline eye toggle */
   .pw-field { position: relative; }
   .pw-field .input { padding-right: 40px; }
   .pw-toggle {
-    position: absolute;
-    right: 0; top: 0; bottom: 0;
-    width: 38px;
-    background: none;
-    border: none;
-    color: var(--mute);
-    cursor: pointer;
+    position: absolute; right: 0; top: 0; bottom: 0; width: 38px;
+    background: none; border: none; color: var(--mute); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    font-size: 14px;
-    transition: color .14s;
+    font-size: 14px; transition: color .14s;
   }
   .pw-toggle:hover { color: var(--text); }
 
@@ -400,19 +330,10 @@ const css = `
 
   /* ── Buttons ── */
   .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 9px 18px;
-    border-radius: var(--r);
-    border: none;
-    font-family: var(--mono);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .14s;
-    letter-spacing: .02em;
-    white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px; border-radius: var(--r); border: none;
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .14s; letter-spacing: .02em; white-space: nowrap;
   }
   .btn-primary { background: var(--acid); color: var(--bg); }
   .btn-primary:hover { background: var(--acid2); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(184,255,0,.22); }
@@ -423,53 +344,79 @@ const css = `
   .btn-danger:hover { background: rgba(255,64,96,.08); }
   .btn-lg { padding: 13px 28px; font-size: 14px; border-radius: 12px; }
 
-  /* ── Quick-fill presets ── */
+  /* ── Presets ── */
   .presets { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
   .presets-label { font-size: 9px; color: var(--mute); letter-spacing: .08em; text-transform: uppercase; }
   .preset-chip {
-    background: var(--bg3);
-    border: 1px solid var(--line2);
-    border-radius: 5px;
-    color: var(--mid);
-    font-family: var(--mono);
-    font-size: 10px;
-    font-weight: 600;
-    padding: 3px 10px;
-    cursor: pointer;
-    transition: all .14s;
-    letter-spacing: .04em;
+    background: var(--bg3); border: 1px solid var(--line2); border-radius: 5px;
+    color: var(--mid); font-family: var(--mono); font-size: 10px; font-weight: 600;
+    padding: 3px 10px; cursor: pointer; transition: all .14s; letter-spacing: .04em;
   }
   .preset-chip:hover { color: var(--acid); border-color: rgba(184,255,0,.3); background: rgba(184,255,0,.04); }
   .preset-chip:disabled { opacity: .4; cursor: not-allowed; }
 
-  /* ── Run banner ── */
-  .run-banner {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: rgba(255,172,0,.05);
-    border: 1px solid rgba(255,172,0,.2);
-    border-radius: var(--r);
-    padding: 11px 16px;
+  /* ── Progress panel ── */
+  .progress-panel {
+    background: var(--bg2);
+    border: 1px solid rgba(184,255,0,.18);
+    border-radius: var(--r2);
+    padding: 20px 22px;
     margin-bottom: 18px;
-    font-size: 12px;
-    color: var(--amber);
+    animation: fadeIn .3s ease;
   }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+  .progress-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .progress-title { font-family: var(--head); font-size: 13px; font-weight: 700; color: var(--hi); display: flex; align-items: center; gap: 8px; }
+  .progress-pct { font-size: 12px; color: var(--acid); font-weight: 600; }
+
+  .progress-bar-wrap { height: 4px; background: var(--line2); border-radius: 2px; overflow: hidden; margin-bottom: 18px; }
+  .progress-bar-fill {
+    height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--acid2), var(--acid));
+    transition: width .6s ease;
+    box-shadow: 0 0 8px rgba(184,255,0,.4);
+  }
+
+  .stages { display: flex; gap: 0; }
+  .stage-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    gap: 6px; position: relative; opacity: .3; transition: opacity .3s;
+  }
+  .stage-item.active { opacity: 1; }
+  .stage-item.done   { opacity: .6; }
+  .stage-item:not(:last-child)::after {
+    content: ''; position: absolute; top: 13px; left: 50%; right: -50%;
+    height: 1px; background: var(--line2); z-index: 0;
+  }
+  .stage-item.done:not(:last-child)::after { background: rgba(184,255,0,.3); }
+  .stage-icon {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--bg3); border: 1px solid var(--line2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; position: relative; z-index: 1; transition: all .3s;
+  }
+  .stage-item.active .stage-icon {
+    background: rgba(184,255,0,.1); border-color: rgba(184,255,0,.4);
+    color: var(--acid); box-shadow: 0 0 10px rgba(184,255,0,.2);
+    animation: stagePulse 1.4s ease-in-out infinite;
+  }
+  .stage-item.done .stage-icon { background: rgba(0,212,168,.1); border-color: rgba(0,212,168,.3); color: var(--teal); }
+  @keyframes stagePulse {
+    0%,100% { box-shadow: 0 0 10px rgba(184,255,0,.2); }
+    50%      { box-shadow: 0 0 20px rgba(184,255,0,.5); }
+  }
+  .stage-label { font-size: 9px; color: var(--mute); text-align: center; letter-spacing: .04em; }
+  .stage-item.active .stage-label { color: var(--acid); }
+  .stage-item.done   .stage-label { color: var(--teal); }
 
   /* ── Log ── */
   .run-log {
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: var(--r2);
-    padding: 14px 16px;
-    font-size: 11.5px;
-    max-height: 220px;
-    overflow-y: auto;
-    margin-top: 16px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--line2) transparent;
+    background: var(--bg); border: 1px solid var(--line); border-radius: var(--r2);
+    padding: 14px 16px; font-size: 11.5px; max-height: 200px; overflow-y: auto;
+    margin-top: 14px; scrollbar-width: thin; scrollbar-color: var(--line2) transparent;
   }
-  .log-line { padding: 3px 0; color: var(--mid); }
+  .log-line { padding: 2px 0; color: var(--mid); }
   .log-line.ok   { color: var(--teal); }
   .log-line.err  { color: var(--red); }
   .log-line.info { color: var(--acid); }
@@ -477,22 +424,20 @@ const css = `
 
   /* ── Spinner ── */
   .spinner {
-    width: 14px; height: 14px;
-    border: 2px solid var(--line2);
-    border-top-color: var(--acid);
-    border-radius: 50%;
-    animation: spin .65s linear infinite;
-    flex-shrink: 0;
+    width: 14px; height: 14px; border: 2px solid var(--line2);
+    border-top-color: var(--acid); border-radius: 50%;
+    animation: spin .65s linear infinite; flex-shrink: 0;
   }
+  .spinner-sm { width: 10px; height: 10px; border-width: 1.5px; }
   .spinner-amber { border-top-color: var(--amber); }
   @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.25; transform:scale(.55); } }
 
   /* ── Badges ── */
   .badge {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 2px 9px; border-radius: 999px;
-    font-size: 10px; font-weight: 600;
-    letter-spacing: .06em; text-transform: uppercase;
+    font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
   }
   .badge-processing { background: rgba(255,172,0,.1);  color: var(--amber); border: 1px solid rgba(255,172,0,.22); }
   .badge-done       { background: rgba(0,212,168,.09); color: var(--teal);  border: 1px solid rgba(0,212,168,.2); }
@@ -503,32 +448,20 @@ const css = `
   /* ── KPI grid ── */
   .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 20px; }
   .kpi {
-    background: var(--bg2);
-    border: 1px solid var(--line);
-    border-radius: var(--r2);
-    padding: 18px 16px;
-    position: relative;
-    overflow: hidden;
+    background: var(--bg2); border: 1px solid var(--line);
+    border-radius: var(--r2); padding: 18px 16px;
+    position: relative; overflow: hidden;
   }
   .kpi::after {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: var(--kpi-accent, var(--line));
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; background: var(--kpi-accent, var(--line));
   }
   .kpi-acid  { --kpi-accent: var(--acid); }
   .kpi-teal  { --kpi-accent: var(--teal); }
   .kpi-red   { --kpi-accent: var(--red); }
   .kpi-amber { --kpi-accent: var(--amber); }
   .kpi-label { font-size: 9px; color: var(--mute); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 8px; }
-  .kpi-value {
-    font-family: var(--head);
-    font-size: 28px;
-    font-weight: 800;
-    color: var(--hi);
-    line-height: 1;
-  }
+  .kpi-value { font-family: var(--head); font-size: 28px; font-weight: 800; color: var(--hi); line-height: 1; }
   .kpi-acid  .kpi-value { color: var(--acid); }
   .kpi-teal  .kpi-value { color: var(--teal); }
   .kpi-red   .kpi-value { color: var(--red); }
@@ -548,13 +481,12 @@ const css = `
   .grade-D, .grade-F { background: rgba(255,64,96,.1); color: var(--red); border: 2px solid rgba(255,64,96,.25); }
 
   /* ── Tables ── */
-  .table-wrap { overflow-x: auto; }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   table { width: 100%; border-collapse: collapse; }
   th {
-    text-align: left;
-    font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
-    color: var(--mute); padding: 10px 12px;
-    border-bottom: 1px solid var(--line); font-weight: 600;
+    text-align: left; font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--mute); padding: 10px 12px; border-bottom: 1px solid var(--line); font-weight: 600;
+    white-space: nowrap;
   }
   td { padding: 11px 12px; font-size: 12px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--text); }
   tr:last-child td { border-bottom: none; }
@@ -562,17 +494,24 @@ const css = `
   .td-muted  { color: var(--mute); }
   .td-bright { color: var(--hi); font-weight: 600; }
 
-  /* ── Delete button for history rows ── */
+  /* expandable result row */
+  .result-row { cursor: pointer; }
+  .result-row:hover td { background: rgba(184,255,0,.025); }
+  .result-expand {
+    background: var(--bg3) !important;
+    animation: fadeIn .15s ease;
+  }
+  .result-expand td { padding: 14px 16px; }
+  .expand-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .expand-section { }
+  .expand-label { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); margin-bottom: 6px; }
+  .expand-value { font-size: 12px; color: var(--text); line-height: 1.5; }
+
+  /* ── Delete button ── */
   .del-btn {
-    background: none;
-    border: 1px solid transparent;
-    border-radius: 5px;
-    color: var(--mute);
-    cursor: pointer;
-    padding: 4px 7px;
-    font-size: 12px;
-    line-height: 1;
-    transition: all .14s;
+    background: none; border: 1px solid transparent; border-radius: 5px;
+    color: var(--mute); cursor: pointer; padding: 4px 7px; font-size: 12px;
+    line-height: 1; transition: all .14s; display: inline-flex; align-items: center;
   }
   .del-btn:hover { color: var(--red); background: rgba(255,64,96,.08); border-color: rgba(255,64,96,.25); }
   .del-btn:disabled { opacity: .4; cursor: not-allowed; }
@@ -580,7 +519,7 @@ const css = `
   /* ── Chips ── */
   .chip {
     display: inline-block; padding: 2px 7px; border-radius: 4px;
-    font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
   }
   .chip-factual            { background: rgba(77,158,255,.1);   color: var(--blue); }
   .chip-adversarial        { background: rgba(255,172,0,.1);    color: var(--amber); }
@@ -593,8 +532,7 @@ const css = `
   /* ── Score pill ── */
   .score-pill {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 36px; height: 22px; border-radius: 6px;
-    font-size: 11px; font-weight: 700;
+    width: 36px; height: 22px; border-radius: 6px; font-size: 11px; font-weight: 700;
   }
   .score-high { background: rgba(0,212,168,.13);  color: var(--teal); }
   .score-mid  { background: rgba(255,172,0,.13);  color: var(--amber); }
@@ -602,10 +540,8 @@ const css = `
 
   /* ── Red flags ── */
   .red-flags {
-    background: rgba(255,64,96,.04);
-    border: 1px solid rgba(255,64,96,.18);
-    border-radius: var(--r2);
-    padding: 14px 18px; margin-bottom: 18px;
+    background: rgba(255,64,96,.04); border: 1px solid rgba(255,64,96,.18);
+    border-radius: var(--r2); padding: 14px 18px; margin-bottom: 18px;
   }
   .red-flag-title {
     font-family: var(--head); font-size: 11px; font-weight: 700;
@@ -621,20 +557,19 @@ const css = `
   .red-flag-item::before { content:'⚑'; color: var(--red); flex-shrink: 0; margin-top:1px; }
 
   /* ── Tabs ── */
-  .tabs { display: flex; gap: 2px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .tabs { display: flex; gap: 2px; margin-bottom: 18px; border-bottom: 1px solid var(--line); overflow-x: auto; }
   .tab {
     padding: 9px 16px; font-family: var(--mono); font-size: 12px;
     background: transparent; border: none; border-bottom: 2px solid transparent;
-    color: var(--mid); cursor: pointer; margin-bottom: -1px; transition: all .14s;
+    color: var(--mid); cursor: pointer; margin-bottom: -1px; transition: all .14s; white-space: nowrap;
   }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--acid); border-bottom-color: var(--acid); }
 
   /* ── Section head ── */
   .section-head {
-    font-family: var(--head); font-size: 12px; font-weight: 700;
-    color: var(--hi); letter-spacing: -.01em;
-    margin: 22px 0 12px;
+    font-family: var(--head); font-size: 12px; font-weight: 700; color: var(--hi);
+    letter-spacing: -.01em; margin: 22px 0 12px;
     display: flex; align-items: center; gap: 10px;
   }
   .section-head::after { content:''; flex:1; height:1px; background: var(--line); }
@@ -654,114 +589,180 @@ const css = `
     color: #ffaab8; font-size: 12px; margin-bottom: 14px;
   }
   .empty { text-align: center; padding: 48px; color: var(--mute); }
+  .empty-icon { font-size: 28px; margin-bottom: 10px; opacity: .4; }
+
+  /* ── Health dot ── */
+  .health-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .health-ok   { background: var(--teal); box-shadow: 0 0 6px rgba(0,212,168,.5); }
+  .health-fail { background: var(--red); }
+  .health-idle { background: var(--mute); }
+
+  /* ── Mobile bottom nav ── */
+  .bottom-nav {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg2); border-top: 1px solid var(--line);
+    padding: 6px 0 max(6px, env(safe-area-inset-bottom));
+    z-index: 200;
+  }
+  .bottom-nav-inner { display: flex; justify-content: space-around; }
+  .bottom-nav-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: none; border: none; cursor: pointer;
+    color: var(--mute); font-family: var(--mono); font-size: 9px;
+    padding: 4px 0; transition: color .14s; position: relative;
+  }
+  .bottom-nav-btn.active { color: var(--acid); }
+  .bottom-nav-btn .bnav-icon { font-size: 16px; }
+  .bnav-badge {
+    position: absolute; top: 2px; right: calc(50% - 16px);
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--amber); animation: pulse 1s ease-in-out infinite;
+  }
 
   /* ── Responsive ── */
-  @media (max-width: 860px) {
-    .shell { grid-template-columns: 1fr; }
-    .sidebar { height: auto; position: static; }
+  @media (max-width: 768px) {
+    .mobile-header { display: flex; }
+    .bottom-nav { display: block; }
+    .sidebar-overlay.open { display: block; }
+
+    .shell {
+      grid-template-columns: 1fr;
+      padding-top: 52px;
+      padding-bottom: 64px;
+    }
+    .sidebar {
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      width: var(--sidebar-w);
+      transform: translateX(-100%);
+    }
+    .sidebar.open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,.5); }
+
+    .main { grid-column: 1; }
+    .page { padding: 20px 16px; }
+
     .kpi-grid { grid-template-columns: 1fr 1fr; }
     .input-row, .input-row-3 { grid-template-columns: 1fr; }
-    .page { padding: 22px 20px; }
+
+    .break-grid { grid-template-columns: 1fr !important; }
+
+    .stages { flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .stage-item { flex: 0 0 auto; width: calc(33% - 6px); }
+    .stage-item::after { display: none !important; }
+
+    .expand-grid { grid-template-columns: 1fr; }
+
+    .page-title { font-size: 24px; }
+    .grade-circle { width: 54px; height: 54px; font-size: 22px; }
+  }
+
+  @media (max-width: 480px) {
+    .kpi-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .kpi { padding: 14px 12px; }
+    .kpi-value { font-size: 22px; }
+    table { font-size: 11px; }
+    th, td { padding: 8px 10px; }
   }
 `;
 
-// ── Eye-toggle password input ─────────────────────────────────────────────────
+// ── Sub-components ────────────────────────────────────────────────────────────
+
 function PwInput({ value, onChange, placeholder, disabled, autoComplete }) {
   const [show, setShow] = useState(false);
   return (
     <div className="pw-field">
       <input
-        className="input"
         type={show ? 'text' : 'password'}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        disabled={disabled}
-        autoComplete={autoComplete || 'off'}
+        className="input"
+        value={value} onChange={onChange} placeholder={placeholder}
+        disabled={disabled} autoComplete={autoComplete || 'off'}
       />
-      <button type="button" className="pw-toggle" onClick={() => setShow(v => !v)} tabIndex={-1}>
-        {show ? (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-            <line x1="1" y1="1" x2="23" y2="23"/>
-          </svg>
-        ) : (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        )}
+      <button type="button" className="pw-toggle" onClick={() => setShow(s => !s)}>
+        {show ? '○' : '●'}
       </button>
     </div>
   );
 }
 
-// ── Sidebar eye toggle ────────────────────────────────────────────────────────
 function SidebarKeyInput({ value, onChange }) {
   const [show, setShow] = useState(false);
   return (
     <div className="key-row">
       <input
-        className="key-input"
         type={show ? 'text' : 'password'}
-        value={value}
-        placeholder="client_key"
-        onChange={onChange}
-        autoComplete="off"
+        className="key-input"
+        value={value} onChange={onChange} placeholder="client_key"
+        autoComplete="off" spellCheck={false}
       />
-      <button className="eye-btn" onClick={() => setShow(v => !v)} tabIndex={-1}>
-        {show ? (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-            <line x1="1" y1="1" x2="23" y2="23"/>
-          </svg>
-        ) : (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        )}
+      <button className="eye-btn" onClick={() => setShow(s => !s)} title={show ? 'Hide' : 'Show'}>
+        {show ? '○' : '●'}
       </button>
     </div>
   );
 }
 
-// ── TypeChip ──────────────────────────────────────────────────────────────────
 function TypeChip({ type }) {
-  return <span className={`chip chip-${type || 'unknown'}`}>{type || '—'}</span>;
+  return <span className={`chip chip-${(type || 'unknown').replace(/\s/g, '_')}`}>{type || 'unknown'}</span>;
 }
 
-// ── ScorePill ─────────────────────────────────────────────────────────────────
 function ScorePill({ value }) {
-  const v = value != null ? (+value).toFixed(1) : '—';
-  return <span className={`score-pill ${scoreClass(value)}`}>{v}</span>;
+  const v = +value;
+  const cls = v >= 7 ? 'score-high' : v >= 5 ? 'score-mid' : 'score-low';
+  return <span className={`score-pill ${cls}`}>{v.toFixed(1)}</span>;
 }
 
-// ── Breakdown ─────────────────────────────────────────────────────────────────
 function Breakdown({ results }) {
-  const groups = {};
-  results.forEach(r => {
-    const t = r.test_type || 'unknown';
-    if (!groups[t]) groups[t] = { scores: [], fails: 0 };
-    const s = weighted(r);
-    groups[t].scores.push(s);
-    if (s < 5 || r.hallucination) groups[t].fails++;
-  });
+  const types = [...new Set(results.map(r => r.test_type || 'unknown'))];
   return (
     <div>
-      {Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0])).map(([type, g]) => {
-        const avg = g.scores.reduce((a, b) => a + b, 0) / g.scores.length;
+      {types.map(t => {
+        const rows = results.filter(r => (r.test_type || 'unknown') === t);
+        const avg  = rows.reduce((s, r) => s + weighted(r), 0) / rows.length;
         return (
-          <div className="breakdown-row" key={type}>
-            <div className="breakdown-label"><TypeChip type={type} /></div>
+          <div key={t} className="breakdown-row">
+            <div className="breakdown-label"><TypeChip type={t} /></div>
             <div className="breakdown-bar">
-              <div className="breakdown-fill" style={{ width: `${(avg / 10) * 100}%`, background: barColor(avg) }} />
+              <div className="breakdown-fill" style={{ width: `${avg * 10}%`, background: scoreColor(avg) }} />
             </div>
             <div className="breakdown-score">{avg.toFixed(1)}</div>
-            <div className="breakdown-count">{g.fails}/{g.scores.length} fail</div>
+            <div className="breakdown-count">{rows.length} tests</div>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ── Progress Panel ────────────────────────────────────────────────────────────
+function ProgressPanel({ stage, pct, numTests }) {
+  return (
+    <div className="progress-panel">
+      <div className="progress-header">
+        <div className="progress-title">
+          <div className="spinner spinner-amber" />
+          Breaking your model…
+        </div>
+        <div className="progress-pct">{pct}%</div>
+      </div>
+
+      <div className="progress-bar-wrap">
+        <div className="progress-bar-fill" style={{ width: `${pct}%` }} />
+      </div>
+
+      <div className="stages">
+        {STAGES.map((s, i) => (
+          <div
+            key={s.id}
+            className={`stage-item ${i === stage ? 'active' : i < stage ? 'done' : ''}`}
+          >
+            <div className="stage-icon">
+              {i < stage ? '✓' : s.icon}
+            </div>
+            <div className="stage-label">{s.label}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -775,30 +776,32 @@ function BreakPage({ onReportReady }) {
     endpoint_url: '', payload_template: '{"input":"{question}"}',
     description: '', num_tests: 20, groq_api_key: '',
   });
-  const [loading, setLoading] = useState(false);
-  const [polling, setPolling] = useState(pollIsActive());
-  const [error,   setError]   = useState('');
-  const [logs,    setLogs]    = useState([]);
+  const [loading,  setLoading]  = useState(false);
+  const [polling,  setPolling]  = useState(pollIsActive());
+  const [stage,    setStage]    = useState(0);
+  const [pct,      setPct]      = useState(0);
+  const [error,    setError]    = useState('');
+  const [logs,     setLogs]     = useState([]);
   const logRef = useRef(null);
 
   useEffect(() => {
     const unsub = pollSubscribe((ev) => {
       if (ev.type === 'done') {
-        setPolling(false);
-        addLog(`✓ Done! ${ev.report.results?.length || 0} tests evaluated.`, 'ok');
-        onReportReady(ev.report);
+        setPolling(false); setStage(0); setPct(100);
+        addLog(`✓ Done! ${ev.report.results?.length || 0} tests completed.`, 'ok');
+        setTimeout(() => onReportReady(ev.report), 400);
       } else if (ev.type === 'failed') {
-        setPolling(false);
-        setError(ev.error);
-        addLog(`✗ Failed: ${ev.error}`, 'err');
+        setPolling(false); setStage(0);
+        setError(ev.error); addLog(`✗ Failed: ${ev.error}`, 'err');
       } else if (ev.type === 'timeout') {
-        setPolling(false);
-        setError('Timed out after 10 minutes');
-        addLog('✗ Timed out after 10 min', 'err');
+        setPolling(false); setStage(0);
+        setError('Timed out after 7 minutes'); addLog('✗ Timed out', 'err');
       } else if (ev.type === 'error') {
         addLog(`⚠ Poll error: ${ev.error}`, 'err');
       } else if (ev.type === 'tick') {
-        if (ev.attempts % 4 === 0) addLog(`Still running… (${ev.attempts * 3}s elapsed)`, 'info');
+        setStage(ev.stage ?? 0);
+        setPct(ev.pct ?? 0);
+        if (ev.attempts % 5 === 0) addLog(`${STAGES[ev.stage ?? 0].label}… (${ev.attempts * 3}s)`, 'info');
       }
     });
     return unsub;
@@ -806,15 +809,13 @@ function BreakPage({ onReportReady }) {
 
   function addLog(msg, type = 'info') {
     setLogs(prev => [...prev, { msg, type, t: ts() }]);
-    setTimeout(() => {
-      if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-    }, 40);
+    setTimeout(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, 40);
   }
 
   function set(k, v) { setForm(p => ({ ...p, [k]: v })); }
 
   async function handleSubmit() {
-    setError(''); setLogs([]); setLoading(true);
+    setError(''); setLogs([]); setLoading(true); setStage(0); setPct(0);
     const target = targetType === 'openai'
       ? { type: 'openai', base_url: form.base_url || 'https://api.openai.com', api_key: form.api_key, model_name: form.model_name }
       : targetType === 'huggingface'
@@ -822,8 +823,7 @@ function BreakPage({ onReportReady }) {
       : { type: 'webhook', endpoint_url: form.endpoint_url, payload_template: form.payload_template };
 
     const payload = {
-      target,
-      description: form.description,
+      target, description: form.description,
       num_tests: +form.num_tests,
       ...(form.groq_api_key ? { groq_api_key: form.groq_api_key } : {}),
     };
@@ -831,10 +831,10 @@ function BreakPage({ onReportReady }) {
     try {
       addLog('Submitting break request…', 'info');
       const res = await api.breakModel(payload);
-      addLog(`Report ID: ${res.report_id}`, 'ok');
-      addLog(`Generating ${form.num_tests} adversarial tests, calling your model…`, 'info');
+      addLog(`Job queued · ID: ${res.report_id}`, 'ok');
+      addLog(`Generating ${form.num_tests} adversarial tests…`, 'info');
       setPolling(true);
-      pollStart(res.report_id);
+      pollStart(res.report_id, +form.num_tests);
     } catch (e) {
       setError(e.message);
       addLog(`✗ ${e.message}`, 'err');
@@ -846,7 +846,7 @@ function BreakPage({ onReportReady }) {
   const busy = loading || polling;
 
   const PRESETS = [
-    { label: '✦ Gemini',     url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model: 'gemini-3-flash-preview' },
+    { label: '✦ Gemini',     url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model: 'gemini-2.0-flash' },
     { label: '✦ GPT-4o mini', url: 'https://api.openai.com', model: 'gpt-4o-mini' },
     { label: '✦ Groq Llama', url: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile' },
   ];
@@ -859,16 +859,10 @@ function BreakPage({ onReportReady }) {
         <div className="page-desc">Connect your model endpoint. We generate adversarial tests and try to break it.</div>
       </div>
 
-      {polling && (
-        <div className="run-banner">
-          <div className="spinner spinner-amber" />
-          Test run in progress — switching tabs won't stop it.
-        </div>
-      )}
-
+      {polling && <ProgressPanel stage={stage} pct={pct} numTests={+form.num_tests} />}
       {error && <div className="error-box">⚠ {error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="break-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         {/* Target */}
         <div className="card">
           <div className="card-title">01 — Target Model</div>
@@ -956,16 +950,16 @@ function BreakPage({ onReportReady }) {
             </div>
             <div className="field">
               <label className="label">Groq API Key <span style={{ color: 'var(--mute)' }}>(judge)</span></label>
-              <PwInput placeholder="gsk_… (or set in .env)" value={form.groq_api_key} onChange={e => set('groq_api_key', e.target.value)} disabled={busy} />
+              <PwInput placeholder="gsk_… (or set GROQ_API_KEY in .env)" value={form.groq_api_key} onChange={e => set('groq_api_key', e.target.value)} disabled={busy} />
             </div>
           </div>
 
           <div style={{ marginTop: 6 }}>
-            <div style={{ fontSize: 10, color: 'var(--mute)', marginBottom: 12 }}>
-              Test types: factual · adversarial · hallucination_bait · consistency · refusal · jailbreak_lite
+            <div style={{ fontSize: 10, color: 'var(--mute)', marginBottom: 12, lineHeight: 1.7 }}>
+              Test types: <span style={{ color: 'var(--blue)' }}>factual</span> · <span style={{ color: 'var(--amber)' }}>adversarial</span> · <span style={{ color: 'var(--red)' }}>hallucination_bait</span> · <span style={{ color: 'var(--teal)' }}>consistency</span> · <span style={{ color: 'var(--acid)' }}>refusal</span> · <span style={{ color: 'var(--plum)' }}>jailbreak_lite</span>
             </div>
             <button className="btn btn-primary btn-lg" onClick={handleSubmit} disabled={busy || !form.description.trim()}>
-              {busy ? <><div className="spinner" /> Running…</> : '⚡ Break It'}
+              {loading ? <><div className="spinner" /> Submitting…</> : polling ? <><div className="spinner" /> Running…</> : '⚡ Break It'}
             </button>
           </div>
         </div>
@@ -978,12 +972,6 @@ function BreakPage({ onReportReady }) {
               <span className="log-ts">{l.t}</span>{l.msg}
             </div>
           ))}
-          {polling && (
-            <div className="log-line info" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div className="spinner" />
-              <span className="log-ts">{ts()}</span>Polling for results…
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -992,8 +980,17 @@ function BreakPage({ onReportReady }) {
 
 // ── Report Page ───────────────────────────────────────────────────────────────
 function ReportPage({ report }) {
-  const [tab, setTab]       = useState('overview');
-  const [copied, setCopied] = useState(false);
+  const [tab,      setTab]      = useState('overview');
+  const [copied,   setCopied]   = useState(false);
+  const [expanded, setExpanded] = useState(new Set());
+
+  function toggleRow(i) {
+    setExpanded(prev => {
+      const s = new Set(prev);
+      s.has(i) ? s.delete(i) : s.add(i);
+      return s;
+    });
+  }
 
   if (!report) return (
     <div className="page">
@@ -1001,7 +998,10 @@ function ReportPage({ report }) {
         <div className="page-tag">// last run</div>
         <div className="page-title">Breaker Report</div>
       </div>
-      <div className="empty">No report yet — run a break test to see results here.</div>
+      <div className="empty">
+        <div className="empty-icon">📊</div>
+        No report yet — run a break test to see results here.
+      </div>
     </div>
   );
 
@@ -1016,15 +1016,72 @@ function ReportPage({ report }) {
 
   function copyId() {
     navigator.clipboard.writeText(report.report_id);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
+    setCopied(true); setTimeout(() => setCopied(false), 1800);
+  }
+
+  function ResultTable({ rows }) {
+    return (
+      <div className="card table-wrap">
+        {rows.length === 0
+          ? <div className="empty"><div className="empty-icon">🎉</div>No failures detected</div>
+          : <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Question</th>
+                  <th>Score</th>
+                  <th>Halluc.</th>
+                  <th style={{ width: 24 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const globalIdx = results.indexOf(r);
+                  const isOpen    = expanded.has(globalIdx);
+                  return [
+                    <tr key={`r${i}`} className="result-row" onClick={() => toggleRow(globalIdx)}>
+                      <td><TypeChip type={r.test_type} /></td>
+                      <td style={{ maxWidth: 280, fontSize: 11 }}>{r.question}</td>
+                      <td><ScorePill value={weighted(r)} /></td>
+                      <td style={{ color: r.hallucination ? 'var(--red)' : 'var(--teal)', fontSize: 11, whiteSpace: 'nowrap' }}>
+                        {r.hallucination ? '⚠ Yes' : '✓ No'}
+                      </td>
+                      <td style={{ color: 'var(--mute)', fontSize: 11 }}>{isOpen ? '▲' : '▼'}</td>
+                    </tr>,
+                    isOpen && (
+                      <tr key={`e${i}`} className="result-expand">
+                        <td colSpan={5}>
+                          <div className="expand-grid">
+                            <div className="expand-section">
+                              <div className="expand-label">Ground Truth</div>
+                              <div className="expand-value">{r.ground_truth || <span style={{ color: 'var(--mute)' }}>—</span>}</div>
+                            </div>
+                            <div className="expand-section">
+                              <div className="expand-label">Model Answer</div>
+                              <div className="expand-value">{r.model_answer || <span style={{ color: 'var(--mute)' }}>—</span>}</div>
+                            </div>
+                            <div className="expand-section" style={{ gridColumn: '1 / -1' }}>
+                              <div className="expand-label">Judge Reasoning</div>
+                              <div className="expand-value" style={{ color: 'var(--mid)' }}>{r.reason || '—'}</div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ),
+                  ];
+                })}
+              </tbody>
+            </table>
+        }
+      </div>
+    );
   }
 
   return (
     <div className="page">
       <div className="page-header">
         <div className="page-tag">// last run · {fmtDate(report.created_at)}</div>
-        <div className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           Breaker Report
           <button className="btn btn-ghost" style={{ fontSize: 10, padding: '3px 10px' }} onClick={copyId}>
             {copied ? '✓ copied' : 'copy id'}
@@ -1065,7 +1122,7 @@ function ReportPage({ report }) {
         <div className="kpi kpi-red">
           <div className="kpi-label">Hallucination Rate</div>
           <div className="kpi-value">{hallucRate}%</div>
-          <div className="kpi-sub">{hallucCount} / {results.length} tests</div>
+          <div className="kpi-sub">{hallucCount} / {results.length}</div>
         </div>
         <div className={`kpi ${failures.length > results.length * 0.3 ? 'kpi-red' : ''}`}>
           <div className="kpi-label">Failed Tests</div>
@@ -1106,56 +1163,20 @@ function ReportPage({ report }) {
         </>
       )}
 
-      {tab === 'failures' && (
-        <div className="card table-wrap">
-          {failures.length === 0
-            ? <div className="empty">No failures detected 🎉</div>
-            : <table>
-                <thead><tr><th>Type</th><th>Question</th><th>Score</th><th>Hallucination</th><th>Reason</th></tr></thead>
-                <tbody>
-                  {failures.map((r, i) => (
-                    <tr key={i}>
-                      <td><TypeChip type={r.test_type} /></td>
-                      <td style={{ maxWidth: 280 }}>{r.question}</td>
-                      <td><ScorePill value={weighted(r)} /></td>
-                      <td style={{ color: r.hallucination ? 'var(--red)' : 'var(--teal)' }}>{r.hallucination ? '⚠ Yes' : 'No'}</td>
-                      <td className="td-muted" style={{ maxWidth: 260, fontSize: 11 }}>{r.reason}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-          }
-        </div>
-      )}
-
-      {tab === 'all results' && (
-        <div className="card table-wrap">
-          <table>
-            <thead><tr><th>Type</th><th>Question</th><th>Model Answer</th><th>Score</th><th>Halluc.</th></tr></thead>
-            <tbody>
-              {results.map((r, i) => (
-                <tr key={i}>
-                  <td><TypeChip type={r.test_type} /></td>
-                  <td style={{ maxWidth: 200, fontSize: 11 }}>{r.question}</td>
-                  <td style={{ maxWidth: 260, fontSize: 11 }}>{r.model_answer || <span style={{ color: 'var(--mute)' }}>—</span>}</td>
-                  <td><ScorePill value={weighted(r)} /></td>
-                  <td style={{ color: r.hallucination ? 'var(--red)' : 'var(--teal)', fontSize: 11 }}>{r.hallucination ? 'Yes' : 'No'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {tab === 'failures' && <ResultTable rows={failures} />}
+      {tab === 'all results' && <ResultTable rows={results} />}
     </div>
   );
 }
 
 // ── History Page ──────────────────────────────────────────────────────────────
 function HistoryPage({ onLoadReport }) {
-  const [rows,    setRows]    = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [err,     setErr]     = useState('');
+  const [rows,     setRows]     = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [err,      setErr]      = useState('');
   const [deleting, setDeleting] = useState(new Set());
+  const [sortKey,  setSortKey]  = useState('timestamp');
+  const [sortDir,  setSortDir]  = useState(-1); // -1 = desc
 
   useEffect(() => {
     api.getHistory()
@@ -1169,7 +1190,6 @@ function HistoryPage({ onLoadReport }) {
     try {
       const res = await api.deleteReport(reportId);
       if (res.ok || res.status === 404) {
-        // 404 means already gone — remove from UI either way
         setRows(prev => prev.filter(r => r.report_id !== reportId));
       } else {
         const body = await res.json().catch(() => ({}));
@@ -1182,30 +1202,63 @@ function HistoryPage({ onLoadReport }) {
     }
   }
 
+  function toggleSort(key) {
+    if (sortKey === key) setSortDir(d => -d);
+    else { setSortKey(key); setSortDir(-1); }
+  }
+
+  const sorted = [...rows].sort((a, b) => {
+    const av = a[sortKey] ?? '';
+    const bv = b[sortKey] ?? '';
+    return sortDir * (av < bv ? -1 : av > bv ? 1 : 0);
+  });
+
+  function SortTh({ k, label }) {
+    const active = sortKey === k;
+    return (
+      <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort(k)}>
+        {label} {active ? (sortDir === -1 ? '↓' : '↑') : <span style={{ opacity: .3 }}>↕</span>}
+      </th>
+    );
+  }
+
   return (
     <div className="page">
       <div className="page-header">
         <div className="page-tag">// audit trail</div>
         <div className="page-title">Run History</div>
+        <div className="page-desc">{rows.length} run{rows.length !== 1 ? 's' : ''} · click column headers to sort</div>
       </div>
 
       {err && <div className="error-box">{err}</div>}
 
       {loading ? (
-        <div className="empty">Loading…</div>
+        <div className="empty"><div className="spinner" style={{ margin: '0 auto 12px' }} /></div>
       ) : rows.length === 0 ? (
-        <div className="empty">No runs yet — break something first.</div>
+        <div className="empty">
+          <div className="empty-icon">🕑</div>
+          No runs yet — break something first.
+        </div>
       ) : (
         <div className="card table-wrap">
           <table>
             <thead>
-              <tr><th>Date</th><th>Model</th><th>Tests</th><th>Status</th><th>Actions</th></tr>
+              <tr>
+                <SortTh k="timestamp"     label="Date" />
+                <SortTh k="model_version" label="Model" />
+                <SortTh k="sample_count"  label="Tests" />
+                <SortTh k="status"        label="Status" />
+                <SortTh k="total_cost_usd" label="Cost" />
+                <th>Actions</th>
+              </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {sorted.map((r) => (
                 <tr key={r.report_id}>
-                  <td className="td-muted">{fmtDate(r.timestamp)}</td>
-                  <td className="td-bright">{r.model_version || '—'}</td>
+                  <td className="td-muted" style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.timestamp)}</td>
+                  <td className="td-bright" style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.model_version || '—'}
+                  </td>
                   <td>{r.sample_count}</td>
                   <td>
                     <span className={`badge badge-${r.status || 'done'}`}>
@@ -1213,13 +1266,16 @@ function HistoryPage({ onLoadReport }) {
                       {r.status || 'done'}
                     </span>
                   </td>
+                  <td className="td-muted">
+                    {r.total_cost_usd != null ? `$${(+r.total_cost_usd).toFixed(4)}` : '—'}
+                  </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {r.report_id && (
                         <button
                           className="btn btn-ghost"
                           style={{ padding: '4px 10px', fontSize: 11 }}
-                          onClick={() => api.getReport(r.report_id).then(onLoadReport).catch(() => {})}
+                          onClick={() => api.getReport(r.report_id).then(onLoadReport).catch(e => setErr(e.message))}
                         >
                           View
                         </button>
@@ -1230,13 +1286,12 @@ function HistoryPage({ onLoadReport }) {
                         disabled={deleting.has(r.report_id)}
                         onClick={() => handleDelete(r.report_id)}
                       >
-                        {deleting.has(r.report_id) ? (
-                          <div className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
-                        ) : (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                          </svg>
-                        )}
+                        {deleting.has(r.report_id)
+                          ? <div className="spinner spinner-sm" />
+                          : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        }
                       </button>
                     </div>
                   </td>
@@ -1268,7 +1323,9 @@ function UsagePage() {
         <div className="page-title">API Usage</div>
       </div>
       {err && <div className="error-box">{err}</div>}
-      {!usage ? <div className="empty">Loading…</div> : (
+      {!usage ? (
+        <div className="empty"><div className="spinner" style={{ margin: '0 auto 12px' }} /></div>
+      ) : (
         <>
           {['today', 'month', 'overall'].map(period => (
             <div key={period} style={{ marginBottom: 22 }}>
@@ -1277,7 +1334,7 @@ function UsagePage() {
                 <div className="kpi"><div className="kpi-label">Evaluations</div><div className="kpi-value">{slice(period).evaluations ?? slice(period).req_count ?? '—'}</div></div>
                 <div className="kpi"><div className="kpi-label">Samples</div><div className="kpi-value">{slice(period).samples ?? slice(period).sample_count ?? '—'}</div></div>
                 <div className="kpi"><div className="kpi-label">Tokens</div><div className="kpi-value">{(slice(period).total_tokens || 0).toLocaleString()}</div></div>
-                <div className="kpi"><div className="kpi-label">Cost (USD)</div><div className="kpi-value">${(+(slice(period).total_cost_usd || 0)).toFixed(4)}</div></div>
+                <div className="kpi"><div className="kpi-label">Cost</div><div className="kpi-value">${(+(slice(period).total_cost_usd || 0)).toFixed(4)}</div></div>
               </div>
             </div>
           ))}
@@ -1289,14 +1346,28 @@ function UsagePage() {
 
 // ── Settings Page ─────────────────────────────────────────────────────────────
 function SettingsPage() {
-  const [key,   setKey]   = useState(getApiKey());
-  const [saved, setSaved] = useState(false);
+  const [key,         setKeyLocal] = useState(getApiKey());
+  const [saved,       setSaved]    = useState(false);
+  const [healthState, setHealth]   = useState('idle'); // idle | checking | ok | fail
+  const [healthMsg,   setHealthMsg] = useState('');
 
   function save() {
-    setApiKey(key);
-    setSaved(true);
+    setApiKey(key); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
+
+  async function checkHealth() {
+    setHealth('checking'); setHealthMsg('');
+    try {
+      const h = await api.health();
+      setHealth('ok');
+      setHealthMsg(`v${h.version} · queue: ${h.queue?.queued_jobs ?? 0} jobs`);
+    } catch (e) {
+      setHealth('fail'); setHealthMsg(e.message);
+    }
+  }
+
+  const healthDotClass = healthState === 'ok' ? 'health-ok' : healthState === 'fail' ? 'health-fail' : 'health-idle';
 
   return (
     <div className="page">
@@ -1304,22 +1375,43 @@ function SettingsPage() {
         <div className="page-tag">// configuration</div>
         <div className="page-title">Settings</div>
       </div>
-      <div className="card" style={{ maxWidth: 480 }}>
+
+      <div className="card" style={{ maxWidth: 480, marginBottom: 14 }}>
         <div className="card-title">API Key</div>
         <div className="field">
           <label className="label">Your X-API-KEY</label>
-          <PwInput value={key} onChange={e => setKey(e.target.value)} placeholder="client_key" autoComplete="off" />
+          <PwInput value={key} onChange={e => setKeyLocal(e.target.value)} placeholder="client_key" autoComplete="off" />
         </div>
         <button className="btn btn-primary" onClick={save}>
           {saved ? '✓ Saved' : 'Save Key'}
         </button>
       </div>
-      <div className="card" style={{ maxWidth: 480, marginTop: 14 }}>
+
+      <div className="card" style={{ maxWidth: 480 }}>
         <div className="card-title">Backend</div>
-        <div style={{ fontSize: 12, color: 'var(--mid)' }}>
+        <div style={{ fontSize: 12, color: 'var(--mid)', marginBottom: 12 }}>
           Connected to: <span style={{ color: 'var(--acid)' }}>{API_BASE}</span>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--mute)', marginTop: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+          <button
+            className="btn btn-ghost"
+            onClick={checkHealth}
+            disabled={healthState === 'checking'}
+            style={{ fontSize: 11 }}
+          >
+            {healthState === 'checking' ? <><div className="spinner spinner-sm" /> Checking…</> : 'Ping backend'}
+          </button>
+          {healthState !== 'idle' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11 }}>
+              <div className={`health-dot ${healthDotClass}`} />
+              <span style={{ color: healthState === 'ok' ? 'var(--teal)' : 'var(--red)' }}>
+                {healthState === 'ok' ? 'Online' : 'Offline'}
+              </span>
+              {healthMsg && <span style={{ color: 'var(--mute)' }}>· {healthMsg}</span>}
+            </div>
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--mute)' }}>
           Override with VITE_API_BASE_URL env variable on Vercel.
         </div>
       </div>
@@ -1336,26 +1428,36 @@ const NAV = [
   { key: 'settings', icon: '⚙',  label: 'Settings',      section: 'config' },
 ];
 
+const BOTTOM_NAV = [
+  { key: 'break',   icon: '⚡', label: 'Break'   },
+  { key: 'report',  icon: '📊', label: 'Report'  },
+  { key: 'history', icon: '🕑', label: 'History' },
+  { key: 'usage',   icon: '📈', label: 'Usage'   },
+  { key: 'settings',icon: '⚙',  label: 'Settings'},
+];
+
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [page,    setPage]        = useState('break');
-  const [report,  setReport]      = useState(null);
-  const [apiKey,  setApiKeyState] = useState(getApiKey());
-  const [running, setRunning]     = useState(pollIsActive());
+  const [page,        setPage]        = useState('break');
+  const [report,      setReport]      = useState(null);
+  const [apiKey,      setApiKeyState] = useState(getApiKey());
+  const [running,     setRunning]     = useState(pollIsActive());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const unsub = pollSubscribe(ev => {
-      if (ev.type === 'done') {
-        setRunning(false);
-        setReport(ev.report);
-      } else if (ev.type === 'failed' || ev.type === 'timeout') {
-        setRunning(false);
-      } else if (ev.type === 'tick') {
-        setRunning(true);
-      }
+      if (ev.type === 'done')                            { setRunning(false); setReport(ev.report); }
+      else if (ev.type === 'failed' || ev.type === 'timeout') { setRunning(false); }
+      else if (ev.type === 'tick')                       { setRunning(true); }
     });
     return unsub;
   }, []);
+
+  // Close sidebar on page change (mobile)
+  function navigate(key) {
+    setPage(key);
+    setSidebarOpen(false);
+  }
 
   function handleReportReady(r) {
     setReport(r);
@@ -1372,8 +1474,26 @@ export default function App() {
   return (
     <>
       <style>{css}</style>
+
+      {/* Mobile header */}
+      <header className="mobile-header">
+        <div className="mobile-logo">Breaker<span>Lab</span></div>
+        <button
+          className={`hamburger ${sidebarOpen ? 'open' : ''}`}
+          onClick={() => setSidebarOpen(o => !o)}
+        >
+          <span /><span /><span />
+        </button>
+      </header>
+
+      {/* Sidebar overlay (mobile) */}
+      <div
+        className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
       <div className="shell">
-        <aside className="sidebar">
+        <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
           <div className="logo">
             <div className="logo-badge"><span className="logo-pulse" /> AI Breaker Lab</div>
             <div className="logo-name">Breaker Lab</div>
@@ -1388,14 +1508,12 @@ export default function App() {
                   <button
                     key={n.key}
                     className={`nav-btn ${page === n.key ? 'active' : ''}`}
-                    onClick={() => setPage(n.key)}
+                    onClick={() => navigate(n.key)}
                   >
                     <span className="nav-icon">{n.icon}</span>
                     {n.label}
                     {n.key === 'break' && running && (
-                      <span className="nav-badge">
-                        <span className="nav-badge-dot" /> running
-                      </span>
+                      <span className="nav-badge"><span className="nav-badge-dot" /> running</span>
                     )}
                     {n.key === 'report' && report && !running && (
                       <span className="nav-dot-acid" />
@@ -1408,10 +1526,7 @@ export default function App() {
 
           <div className="sidebar-footer">
             <div className="key-label">API Key</div>
-            <SidebarKeyInput
-              value={apiKey}
-              onChange={e => handleApiKeyChange(e.target.value)}
-            />
+            <SidebarKeyInput value={apiKey} onChange={e => handleApiKeyChange(e.target.value)} />
           </div>
         </aside>
 
@@ -1423,6 +1538,23 @@ export default function App() {
           {page === 'settings' && <SettingsPage />}
         </main>
       </div>
+
+      {/* Mobile bottom nav */}
+      <nav className="bottom-nav">
+        <div className="bottom-nav-inner">
+          {BOTTOM_NAV.map(n => (
+            <button
+              key={n.key}
+              className={`bottom-nav-btn ${page === n.key ? 'active' : ''}`}
+              onClick={() => navigate(n.key)}
+            >
+              <span className="bnav-icon">{n.icon}</span>
+              <span>{n.label}</span>
+              {n.key === 'break' && running && <span className="bnav-badge" />}
+            </button>
+          ))}
+        </div>
+      </nav>
     </>
   );
 }
