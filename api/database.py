@@ -14,8 +14,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import psycopg2
-import psycopg2.extras
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -31,10 +29,14 @@ _DATA_DIR = os.getenv("DATA_DIR", "/app/data")
 os.makedirs(_DATA_DIR, exist_ok=True)
 _SQLITE_FILE = os.path.join(_DATA_DIR, "usage.db")
 
+# Backwards-compatibility alias — routes.py imports DB_FILE directly
+DB_FILE = _SQLITE_FILE
+
 # ── Connection helpers ────────────────────────────────────────────────────────
 
 if _USE_PG:
-    
+    import psycopg2
+    import psycopg2.extras
 
     @contextmanager
     def _get_conn() -> Generator:
@@ -407,61 +409,6 @@ def get_latest_regression_baseline(client_name, dataset_id, current_model_versio
         return _row_to_dict(cur.fetchone())
 
 
-# ── Report CRUD ───────────────────────────────────────────────────────────────
-
-def insert_report(report_id, client_id, client_name, status, judge_model,
-                  sample_count, dataset_id, model_version):
-    now = _utc_now()
-    with _get_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            f"""
-            INSERT INTO evaluation_reports(
-                report_id, client_id, client_name, status, judge_model,
-                sample_count, dataset_id, model_version, created_at, updated_at
-            ) VALUES ({_ph(10)})
-            """,
-            (report_id, client_id, client_name, status, judge_model,
-             sample_count, dataset_id, model_version, now, now),
-        )
-
-
-def get_report(report_id: str) -> dict | None:
-    with _get_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            f"SELECT * FROM evaluation_reports WHERE report_id = {_P}",
-            (report_id,),
-        )
-        return _row_to_dict(cur.fetchone())
-
-
-def update_report_success(report_id, results_json, metrics_json, html_path, html_content,
-                          total_tokens=None, total_cost_usd=None):
-    with _get_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            f"""
-            UPDATE evaluation_reports SET
-                status={_P}, results_json={_P}, metrics_json={_P},
-                html_path={_P}, html_content={_P},
-                total_tokens={_P}, total_cost_usd={_P}, updated_at={_P}
-            WHERE report_id={_P}
-            """,
-            ("done", results_json, metrics_json, html_path, html_content,
-             total_tokens, total_cost_usd, _utc_now(), report_id),
-        )
-
-
-def update_report_failure(report_id, error_message):
-    with _get_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            f"UPDATE evaluation_reports SET status={_P}, error={_P}, updated_at={_P} WHERE report_id={_P}",
-            ("failed", error_message, _utc_now(), report_id),
-        )
-
-
 def delete_report(report_id: str, client_name: str) -> bool:
     """
     Delete a report and its associated usage log rows.
@@ -485,17 +432,126 @@ def delete_report(report_id: str, client_name: str) -> bool:
         return True
 
 
-def list_reports_for_client(client_name: str, limit: int = 50) -> list[dict]:
+# ── Query functions replacing inline _connect() blocks in routes.py ───────────
+
+def insert_report(*, report_id, client_id, client_name, status, judge_model,
+                  sample_count, dataset_id, model_version):
+    now = _utc_now()
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             f"""
-            SELECT report_id, status, judge_model, sample_count, created_at, updated_at,
-                   total_tokens, total_cost_usd
-            FROM evaluation_reports
-            WHERE client_name = {_P}
-            ORDER BY created_at DESC LIMIT {_P}
+            INSERT INTO evaluation_reports(
+                report_id, client_id, client_name, status, judge_model,
+                sample_count, dataset_id, model_version, created_at, updated_at
+            ) VALUES ({_ph(10)})
+            """,
+            (report_id, client_id, client_name, status, judge_model,
+             sample_count, dataset_id, model_version, now, now),
+        )
+
+
+def finalize_report_success(report_id, results_json, metrics_json, html_path,
+                             html_content, total_tokens, total_cost):
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE evaluation_reports
+            SET status={_P}, updated_at={_P}, results_json={_P}, metrics_json={_P},
+                html_path={_P}, html_content={_P}, total_tokens={_P},
+                total_cost_usd={_P}, error=NULL
+            WHERE report_id={_P}
+            """,
+            ("done", _utc_now(), results_json, metrics_json,
+             html_path, html_content, total_tokens, total_cost, report_id),
+        )
+
+
+def finalize_report_failure(report_id, error_message):
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"UPDATE evaluation_reports SET status={_P}, updated_at={_P}, error={_P} WHERE report_id={_P}",
+            ("failed", _utc_now(), error_message[:2000], report_id),
+        )
+
+
+def get_report_row(report_id: str) -> dict | None:
+    """Fetch a single report by ID (all columns)."""
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT * FROM evaluation_reports WHERE report_id={_P} LIMIT 1",
+            (report_id,),
+        )
+        return _row_to_dict(cur.fetchone())
+
+
+def get_history_for_client(client_name: str, limit: int = 50) -> list[dict]:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            SELECT ul.report_id, ul.timestamp, ul.sample_count, ul.dataset_id,
+                   ul.model_version, ul.evaluation_date,
+                   er.status, er.judge_model, er.total_tokens, er.total_cost_usd
+            FROM usage_logs ul
+            LEFT JOIN evaluation_reports er ON er.report_id = ul.report_id
+            WHERE ul.client_name = {_P}
+            ORDER BY ul.timestamp DESC LIMIT {_P}
             """,
             (client_name, int(limit)),
         )
         return [_row_to_dict(r) for r in cur.fetchall()]
+
+
+def get_usage_slice(client_name: str, time_prefix: str | None) -> dict:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if time_prefix:
+            cur.execute(
+                f"""
+                SELECT COUNT(*) AS evaluations,
+                       COALESCE(SUM(ul.sample_count), 0)      AS samples,
+                       COALESCE(SUM(er.total_tokens), 0)      AS total_tokens,
+                       COALESCE(SUM(er.total_cost_usd), 0.0)  AS total_cost_usd
+                FROM usage_logs ul
+                LEFT JOIN evaluation_reports er ON er.report_id = ul.report_id
+                WHERE ul.client_name = {_P} AND ul.timestamp LIKE {_P}
+                """,
+                (client_name, f"{time_prefix}%"),
+            )
+        else:
+            cur.execute(
+                f"""
+                SELECT COUNT(*) AS evaluations,
+                       COALESCE(SUM(ul.sample_count), 0)      AS samples,
+                       COALESCE(SUM(er.total_tokens), 0)      AS total_tokens,
+                       COALESCE(SUM(er.total_cost_usd), 0.0)  AS total_cost_usd
+                FROM usage_logs ul
+                LEFT JOIN evaluation_reports er ON er.report_id = ul.report_id
+                WHERE ul.client_name = {_P}
+                """,
+                (client_name,),
+            )
+        row = _row_to_dict(cur.fetchone())
+    row["total_cost_usd"] = round(float(row["total_cost_usd"] or 0.0), 6)
+    return row
+
+
+def save_human_reviews(report_id: str, reviews: list[dict]) -> None:
+    """Replace all human reviews for a report in a single transaction."""
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(f"DELETE FROM human_reviews WHERE report_id={_P}", (report_id,))
+        for r in reviews:
+            cur.execute(
+                f"""
+                INSERT INTO human_reviews(report_id, item_index, score, comment, approved, created_at)
+                VALUES ({_ph(6)})
+                """,
+                (report_id, int(r["index"]), float(r["score"]),
+                 r.get("comment"), 1 if r["approved"] else 0, now),
+            )
