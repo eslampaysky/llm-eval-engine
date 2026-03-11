@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
@@ -24,6 +24,7 @@ from api.database import (
 )
 from api.job_queue import enqueue_job
 from api.models import EvaluationRequest
+from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ, limiter
 from reports.report_generator import ReportGenerator, generate_html_report
 from src.llm_eval_engine.infrastructure.config_loader import load_project_config
 from src.llm_eval_engine.infrastructure.evaluator_factories import (
@@ -429,7 +430,9 @@ def _process_break_job(report_id, target_cfg, description, num_tests, groq_api_k
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.post("/evaluate")
+@limiter.limit(LIMIT_EVALUATE)
 async def evaluate(
+    request: Request,
     payload: EvaluationRequest,
     auth_ctx: dict[str, Any] = Depends(validate_api_key),
 ) -> dict[str, Any]:
@@ -478,7 +481,9 @@ async def evaluate(
 
 
 @router.post("/break")
+@limiter.limit(LIMIT_BREAK)
 async def break_model(
+    request: Request,
     payload: BreakRequest,
     auth_ctx: dict[str, Any] = Depends(validate_api_key),
 ) -> dict[str, Any]:
@@ -541,7 +546,8 @@ async def break_model(
 
 
 @router.get("/reports")
-def list_reports(auth_ctx: dict[str, Any] = Depends(validate_api_key)) -> list[dict[str, Any]]:
+@limiter.limit(LIMIT_READ)
+def list_reports(request: Request, auth_ctx: dict[str, Any] = Depends(validate_api_key)) -> list[dict[str, Any]]:
     conn = _connect()
     cur = conn.cursor()
     cur.execute("""
@@ -556,7 +562,9 @@ def list_reports(auth_ctx: dict[str, Any] = Depends(validate_api_key)) -> list[d
 
 
 @router.get("/report/{report_id}")
+@limiter.limit(LIMIT_READ)
 def get_report(
+    request: Request,
     report_id: str,
     auth_ctx: dict[str, Any] = Depends(validate_api_key),
 ) -> dict[str, Any]:
@@ -583,7 +591,9 @@ def get_report(
 
 
 @router.delete("/report/{report_id}", status_code=200)
+@limiter.limit(LIMIT_DELETE)
 def delete_report_endpoint(
+    request: Request,
     report_id: str,
     auth_ctx: dict[str, Any] = Depends(validate_api_key),
 ) -> dict[str, Any]:
@@ -601,7 +611,9 @@ def delete_report_endpoint(
 
 
 @router.get("/report/{report_id}/html", response_class=HTMLResponse)
+@limiter.limit(LIMIT_READ)
 def get_report_html(
+    request: Request,
     report_id: str,
     auth_ctx: dict[str, Any] = Depends(validate_api_key),
 ):
@@ -645,7 +657,9 @@ def get_report_html(
 
 
 @router.post("/report/{report_id}/human-review")
+@limiter.limit(LIMIT_READ)
 def submit_human_review(
+    request: Request,
     report_id: str,
     payload: HumanReviewRequest,
     auth_ctx: dict[str, Any] = Depends(validate_api_key),
@@ -682,14 +696,17 @@ def submit_human_review(
 
 
 @router.get("/providers")
-def get_providers(auth_ctx: dict[str, Any] = Depends(validate_api_key)) -> list[str]:
+@limiter.limit(LIMIT_READ)
+def get_providers(request: Request, auth_ctx: dict[str, Any] = Depends(validate_api_key)) -> list[str]:
     config = load_project_config()
     providers = config.get("judge_providers", config.get("judge_provider", ["ollama"]))
     return [providers] if isinstance(providers, str) else [str(p) for p in providers]
 
 
 @router.get("/history")
+@limiter.limit(LIMIT_READ)
 def get_history(
+    request: Request,
     limit: int = 50,
     auth_ctx: dict[str, Any] = Depends(validate_api_key),
 ) -> list[dict[str, Any]]:
@@ -731,7 +748,8 @@ def _usage_slice(client_name, time_prefix):
 
 
 @router.get("/usage/summary")
-def usage_summary(auth_ctx: dict[str, Any] = Depends(validate_api_key)) -> dict[str, Any]:
+@limiter.limit(LIMIT_READ)
+def usage_summary(request: Request, auth_ctx: dict[str, Any] = Depends(validate_api_key)) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
     client_name = auth_ctx.get("client_name")
     return {
@@ -743,5 +761,6 @@ def usage_summary(auth_ctx: dict[str, Any] = Depends(validate_api_key)) -> dict[
 
 
 @router.get("/review/rules")
-def review_rules(auth_ctx: dict[str, Any] = Depends(validate_api_key)) -> dict[str, Any]:
+@limiter.limit(LIMIT_READ)
+def review_rules(request: Request, auth_ctx: dict[str, Any] = Depends(validate_api_key)) -> dict[str, Any]:
     return _load_review_rules()
