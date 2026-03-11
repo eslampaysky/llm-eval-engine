@@ -1,16 +1,21 @@
-# Core
-requests
-pyyaml
-pandas
-python-dotenv
-psycopg2
-psycopg2-binary
-# API server
-fastapi
-uvicorn
-slowapi
+# ── Core ──────────────────────────────────────────────────────────────────────
+requests>=2.31.0
+pyyaml>=6.0.1
+pandas>=2.1.0
+python-dotenv>=1.0.0
 
-# Provider SDKs
-openai
-anthropic
-google-generativeai
+# ── Database ──────────────────────────────────────────────────────────────────
+# psycopg2-binary covers PostgreSQL (Railway); sqlite3 is stdlib (local dev)
+psycopg2-binary>=2.9.9
+
+# ── API server ────────────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.7.0
+slowapi>=0.1.9
+python-multipart>=0.0.9
+
+# ── Provider SDKs ─────────────────────────────────────────────────────────────
+openai>=1.30.0
+anthropic>=0.28.0
+google-generativeai>=0.5.0
