@@ -18,19 +18,22 @@ async function apiFetch(path, opts = {}) {
 }
 
 const api = {
-  breakModel: (p) => apiFetch('/break', { method: 'POST', body: JSON.stringify(p) }),
+  breakModel: (p)  => apiFetch('/break', { method: 'POST', body: JSON.stringify(p) }),
   getReport:  (id) => apiFetch(`/report/${id}`),
-  getHistory: () => apiFetch('/history?limit=100'),
-  getUsage:   () => apiFetch('/usage/summary'),
-  health:     () => apiFetch('/health'),
+  getHistory: ()   => apiFetch('/history?limit=100'),
+  getUsage:   ()   => apiFetch('/usage/summary'),
+  health:     ()   => apiFetch('/health'),
+  deleteReport: (id) => fetch(`${API_BASE}/report/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-API-KEY': getApiKey() },
+  }),
 };
 
-// ── Global poll store — lives outside React, survives tab switches ─────────────
+// ── Global poll store — lives outside React, survives tab switches ────────────
 const POLL = {
-  timerId: null,
-  reportId: null,
-  attempts: 0,
-  logs: [],             // shared log buffer
+  timerId:   null,
+  reportId:  null,
+  attempts:  0,
   callbacks: new Set(),
 };
 
@@ -46,18 +49,18 @@ function pollStart(reportId) {
   if (POLL.timerId) clearInterval(POLL.timerId);
   POLL.reportId = reportId;
   POLL.attempts = 0;
-  POLL.timerId = setInterval(async () => {
+  POLL.timerId  = setInterval(async () => {
     POLL.attempts++;
     try {
       const r = await api.getReport(reportId);
       if (r.status === 'done') {
         clearInterval(POLL.timerId);
-        POLL.timerId = null;
+        POLL.timerId  = null;
         POLL.reportId = null;
         pollNotify({ type: 'done', report: r });
       } else if (r.status === 'failed') {
         clearInterval(POLL.timerId);
-        POLL.timerId = null;
+        POLL.timerId  = null;
         POLL.reportId = null;
         pollNotify({ type: 'failed', error: r.error || 'Evaluation failed' });
       } else {
@@ -68,7 +71,7 @@ function pollStart(reportId) {
     }
     if (POLL.attempts >= 120) {
       clearInterval(POLL.timerId);
-      POLL.timerId = null;
+      POLL.timerId  = null;
       POLL.reportId = null;
       pollNotify({ type: 'timeout' });
     }
@@ -76,13 +79,12 @@ function pollStart(reportId) {
 }
 
 function pollIsActive() { return !!POLL.timerId; }
-function pollGetId()    { return POLL.reportId; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function scoreClass(s) {
-  if (s == null)  return 'score-mid';
-  if (s >= 7)     return 'score-high';
-  if (s >= 4.5)   return 'score-mid';
+  if (s == null) return 'score-mid';
+  if (s >= 7)    return 'score-high';
+  if (s >= 4.5)  return 'score-mid';
   return 'score-low';
 }
 function grade(s) {
@@ -573,6 +575,7 @@ const css = `
     transition: all .14s;
   }
   .del-btn:hover { color: var(--red); background: rgba(255,64,96,.08); border-color: rgba(255,64,96,.25); }
+  .del-btn:disabled { opacity: .4; cursor: not-allowed; }
 
   /* ── Chips ── */
   .chip {
@@ -678,13 +681,11 @@ function PwInput({ value, onChange, placeholder, disabled, autoComplete }) {
       />
       <button type="button" className="pw-toggle" onClick={() => setShow(v => !v)} tabIndex={-1}>
         {show ? (
-          // eye-off
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
             <line x1="1" y1="1" x2="23" y2="23"/>
           </svg>
         ) : (
-          // eye
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
             <circle cx="12" cy="12" r="3"/>
@@ -695,7 +696,7 @@ function PwInput({ value, onChange, placeholder, disabled, autoComplete }) {
   );
 }
 
-// ── Sidebar eye toggle (for the mini key input) ───────────────────────────────
+// ── Sidebar eye toggle ────────────────────────────────────────────────────────
 function SidebarKeyInput({ value, onChange }) {
   const [show, setShow] = useState(false);
   return (
@@ -774,13 +775,12 @@ function BreakPage({ onReportReady }) {
     endpoint_url: '', payload_template: '{"input":"{question}"}',
     description: '', num_tests: 20, groq_api_key: '',
   });
-  const [loading, setLoading]   = useState(false);
-  const [polling, setPolling]   = useState(pollIsActive());
-  const [error,   setError]     = useState('');
-  const [logs,    setLogs]      = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [polling, setPolling] = useState(pollIsActive());
+  const [error,   setError]   = useState('');
+  const [logs,    setLogs]    = useState([]);
   const logRef = useRef(null);
 
-  // Connect to the global poll — survives tab navigation
   useEffect(() => {
     const unsub = pollSubscribe((ev) => {
       if (ev.type === 'done') {
@@ -846,7 +846,7 @@ function BreakPage({ onReportReady }) {
   const busy = loading || polling;
 
   const PRESETS = [
-    { label: '✦ Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model: 'gemini-3-flash-preview' },
+    { label: '✦ Gemini',     url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model: 'gemini-3-flash-preview' },
     { label: '✦ GPT-4o mini', url: 'https://api.openai.com', model: 'gpt-4o-mini' },
     { label: '✦ Groq Llama', url: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile' },
   ];
@@ -992,7 +992,7 @@ function BreakPage({ onReportReady }) {
 
 // ── Report Page ───────────────────────────────────────────────────────────────
 function ReportPage({ report }) {
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab]       = useState('overview');
   const [copied, setCopied] = useState(false);
 
   if (!report) return (
@@ -1005,11 +1005,11 @@ function ReportPage({ report }) {
     </div>
   );
 
-  const results   = report.results || [];
-  const metrics   = report.metrics || {};
-  const overall   = +(metrics.average_score || 0);
-  const g         = grade(overall);
-  const failures  = results.filter(r => weighted(r) < 5 || r.hallucination);
+  const results     = report.results || [];
+  const metrics     = report.metrics || {};
+  const overall     = +(metrics.average_score || 0);
+  const g           = grade(overall);
+  const failures    = results.filter(r => weighted(r) < 5 || r.hallucination);
   const hallucCount = results.filter(r => r.hallucination).length;
   const hallucRate  = results.length ? ((hallucCount / results.length) * 100).toFixed(0) : 0;
   const redFlags    = metrics.red_flags || [];
@@ -1152,9 +1152,10 @@ function ReportPage({ report }) {
 
 // ── History Page ──────────────────────────────────────────────────────────────
 function HistoryPage({ onLoadReport }) {
-  const [rows, setRows]       = useState([]);
+  const [rows,    setRows]    = useState([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr]         = useState('');
+  const [err,     setErr]     = useState('');
+  const [deleting, setDeleting] = useState(new Set());
 
   useEffect(() => {
     api.getHistory()
@@ -1163,8 +1164,22 @@ function HistoryPage({ onLoadReport }) {
       .finally(() => setLoading(false));
   }, []);
 
-  function remove(reportId) {
-    setRows(prev => prev.filter(r => r.report_id !== reportId));
+  async function handleDelete(reportId) {
+    setDeleting(prev => new Set(prev).add(reportId));
+    try {
+      const res = await api.deleteReport(reportId);
+      if (res.ok || res.status === 404) {
+        // 404 means already gone — remove from UI either way
+        setRows(prev => prev.filter(r => r.report_id !== reportId));
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setErr(body?.detail || `Delete failed (${res.status})`);
+      }
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setDeleting(prev => { const s = new Set(prev); s.delete(reportId); return s; });
+    }
   }
 
   return (
@@ -1173,7 +1188,9 @@ function HistoryPage({ onLoadReport }) {
         <div className="page-tag">// audit trail</div>
         <div className="page-title">Run History</div>
       </div>
+
       {err && <div className="error-box">{err}</div>}
+
       {loading ? (
         <div className="empty">Loading…</div>
       ) : rows.length === 0 ? (
@@ -1185,8 +1202,8 @@ function HistoryPage({ onLoadReport }) {
               <tr><th>Date</th><th>Model</th><th>Tests</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
-                <tr key={i}>
+              {rows.map((r) => (
+                <tr key={r.report_id}>
                   <td className="td-muted">{fmtDate(r.timestamp)}</td>
                   <td className="td-bright">{r.model_version || '—'}</td>
                   <td>{r.sample_count}</td>
@@ -1199,15 +1216,27 @@ function HistoryPage({ onLoadReport }) {
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {r.report_id && (
-                        <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }}
-                          onClick={() => api.getReport(r.report_id).then(onLoadReport).catch(() => {})}>
+                        <button
+                          className="btn btn-ghost"
+                          style={{ padding: '4px 10px', fontSize: 11 }}
+                          onClick={() => api.getReport(r.report_id).then(onLoadReport).catch(() => {})}
+                        >
                           View
                         </button>
                       )}
-                      <button className="del-btn" title="Remove from list" onClick={() => remove(r.report_id)}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
+                      <button
+                        className="del-btn"
+                        title="Delete report"
+                        disabled={deleting.has(r.report_id)}
+                        onClick={() => handleDelete(r.report_id)}
+                      >
+                        {deleting.has(r.report_id) ? (
+                          <div className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
+                        ) : (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        )}
                       </button>
                     </div>
                   </td>
@@ -1224,7 +1253,7 @@ function HistoryPage({ onLoadReport }) {
 // ── Usage Page ────────────────────────────────────────────────────────────────
 function UsagePage() {
   const [usage, setUsage] = useState(null);
-  const [err, setErr]     = useState('');
+  const [err,   setErr]   = useState('');
 
   useEffect(() => {
     api.getUsage().then(r => setUsage(r)).catch(e => setErr(e.message));
@@ -1260,7 +1289,7 @@ function UsagePage() {
 
 // ── Settings Page ─────────────────────────────────────────────────────────────
 function SettingsPage() {
-  const [key, setKey]     = useState(getApiKey());
+  const [key,   setKey]   = useState(getApiKey());
   const [saved, setSaved] = useState(false);
 
   function save() {
@@ -1309,12 +1338,11 @@ const NAV = [
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [page,    setPage]   = useState('break');
-  const [report,  setReport] = useState(null);
+  const [page,    setPage]        = useState('break');
+  const [report,  setReport]      = useState(null);
   const [apiKey,  setApiKeyState] = useState(getApiKey());
-  const [running, setRunning]    = useState(pollIsActive());
+  const [running, setRunning]     = useState(pollIsActive());
 
-  // Track global poll state for nav badge — works even when BreakPage is unmounted
   useEffect(() => {
     const unsub = pollSubscribe(ev => {
       if (ev.type === 'done') {

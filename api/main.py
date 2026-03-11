@@ -1,49 +1,71 @@
+"""
+main.py — FastAPI application entry point.
+
+Changes from previous version:
+  - Uses @asynccontextmanager lifespan instead of deprecated on_event handlers
+  - Starts / stops the job queue worker pool on startup / shutdown
+  - Adds /health endpoint with queue health info
+"""
+
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
-from api.routes import initialize_api_storage, router
-
-# ── Persistent data directory ─────────────────────────────────────────────────
-# Set DATA_DIR env var on Railway after attaching a Volume at /app/data.
-# Falls back to local ./data for development.
-DATA_DIR = Path(os.getenv("DATA_DIR", "/app/data"))
-REPORTS_DIR = DATA_DIR / "reports"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+from api.database import init_db
+from api.job_queue import start_workers, stop_workers, JobQueue
+from api.routes import router
 
 
-def create_app() -> FastAPI:
-    app = FastAPI(
-        title="AI Breaker Lab API",
-        version="1.0.0",
-        description="Adversarial evaluation API — break your model before production does.",
-    )
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── Startup ──────────────────────────────────────────────────────────────
+    init_db()
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    num_workers = int(os.getenv("JOB_WORKERS", "4"))
+    await start_workers(num_workers=num_workers)
 
-    initialize_api_storage()
-    app.include_router(router)
+    yield  # app is running
 
-    # Serve generated HTML reports as static files
-    app.mount("/reports", StaticFiles(directory=str(REPORTS_DIR)), name="reports")
-
-    @app.get("/health")
-    def health() -> dict[str, str]:
-        return {"status": "ok", "version": "1.0.0"}
-
-    return app
+    # ── Shutdown ─────────────────────────────────────────────────────────────
+    await stop_workers()
 
 
-app = create_app()
+app = FastAPI(
+    title="Breaker Lab API",
+    version="2.0.0",
+    description="AI model adversarial evaluation API",
+    lifespan=lifespan,
+)
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:3000,https://*.vercel.app",
+).split(",")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # tighten in production if needed
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(router)
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "version": "2.0.0",
+        "queue": {
+            "healthy": JobQueue.is_healthy,
+            "queued_jobs": JobQueue.queue_size,
+        },
+    }
+    

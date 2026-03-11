@@ -3,7 +3,8 @@ requests
 pyyaml
 pandas
 python-dotenv
-
+psycopg2
+psycopg2-binary
 # API server
 fastapi
 uvicorn
