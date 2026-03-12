@@ -244,7 +244,6 @@ def init_db():
             cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_logs_timestamp   ON usage_logs(timestamp)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_client    ON evaluation_reports(client_name)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_created   ON evaluation_reports(created_at)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target    ON evaluation_reports(target_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_test_cache_key         ON test_suite_cache(cache_key)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date         ON demo_runs(run_date)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_targets_client         ON targets(client_name)")
@@ -261,6 +260,9 @@ def init_db():
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
             if "target_id" not in existing:
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN target_id TEXT")
+                existing.add("target_id")
+            if "target_id" in existing:
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
 
         else:
             # --- SQLite DDL (unchanged from original) -------------------------
@@ -398,8 +400,10 @@ def init_db():
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
             if "target_id" not in existing:
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN target_id TEXT")
+                existing.add("target_id")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date ON demo_runs(run_date)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
+            if "target_id" in existing:
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_targets_client ON targets(client_name)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
 
