@@ -26,11 +26,11 @@ class OpenAICompatibleAdapter(BaseTargetAdapter):
 
         # Smart endpoint building:
         # - already ends with /chat/completions → use as-is
-        # - ends with /v1 → append /chat/completions
+        # - ends with /v1 or /openai → append /chat/completions
         # - anything else → append /v1/chat/completions
         if self._base_url.endswith("/chat/completions"):
             endpoint = self._base_url
-        elif self._base_url.endswith("/v1"):
+        elif self._base_url.endswith("/v1") or self._base_url.endswith("/openai"):
             endpoint = f"{self._base_url}/chat/completions"
         else:
             endpoint = f"{self._base_url}/v1/chat/completions"

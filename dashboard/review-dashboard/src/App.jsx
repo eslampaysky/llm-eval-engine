@@ -2489,27 +2489,60 @@ export default function App() {
   const [running,     setRunning]  = useState(pollActive());
 
   useEffect(() => {
-    // Re-attach to any in-flight poll (e.g. user refreshed the tab)
-    const savedId = ls.get('abl_active_run_id');
-    const savedDemoId = ls.get('abl_demo_active_run_id');
-    if (savedDemoId && !pollActive()) {
-      setRunning(true); setPage('demo');
-      pollStart(savedDemoId, 5, api.getDemoReport, 'demo');
-    } else if (savedId && !pollActive()) {
-      setRunning(true); setPage('break');
-      pollStart(savedId, 20);
+    let mounted = true;
+
+    async function reattachIfStillProcessing() {
+      const savedId = ls.get('abl_active_run_id');
+      const savedDemoId = ls.get('abl_demo_active_run_id');
+      if (pollActive()) return;
+
+      if (savedDemoId) {
+        try {
+          const report = await api.getDemoReport(savedDemoId);
+          if (!mounted) return;
+          if (report.status === 'processing') {
+            setRunning(true);
+            setPage('demo');
+            pollStart(savedDemoId, report.sample_count || 5, api.getDemoReport, 'demo');
+            return;
+          }
+        } catch {}
+        ls.set('abl_demo_active_run_id', null);
+      }
+
+      if (savedId) {
+        try {
+          const report = await api.getReport(savedId);
+          if (!mounted) return;
+          if (report.status === 'processing') {
+            setRunning(true);
+            setPage('break');
+            pollStart(savedId, report.sample_count || 20, api.getReport, 'break');
+            return;
+          }
+        } catch {}
+        ls.set('abl_active_run_id', null);
+      }
+
+      if (mounted) setRunning(false);
     }
+
+    reattachIfStillProcessing();
     const unsub = pollSub(ev => {
       if (ev.type === 'done')   {
         setRunning(false);
         if (ev.mode === 'demo') setDemoReport(ev.report);
         else { setReport(ev.report); setCompareFocus(ev.report); }
         fireNotifications(ev.report);
+        ls.set(ev.mode === 'demo' ? 'abl_demo_active_run_id' : 'abl_active_run_id', null);
       }
-      if (ev.type === 'failed' || ev.type === 'timeout') setRunning(false);
+      if (ev.type === 'failed' || ev.type === 'timeout' || ev.type === 'canceled') {
+        setRunning(false);
+        ls.set(ev.mode === 'demo' ? 'abl_demo_active_run_id' : 'abl_active_run_id', null);
+      }
       if (ev.type === 'tick')   setRunning(true);
     });
-    return unsub;
+    return () => { mounted = false; unsub(); };
   }, []);
 
   function navigate(key) {
