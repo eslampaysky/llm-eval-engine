@@ -36,7 +36,7 @@ function Spinner({ size = 16 }) {
         width: size,
         height: size,
         border: '2px solid rgba(255,255,255,0.1)',
-        borderTopColor: 'var(--neon-blue, var(--blue))',
+        borderTopColor: 'var(--accent, var(--blue))',
         borderRadius: '50%',
         animation: 'spin 0.7s linear infinite',
         display: 'inline-block',
@@ -72,9 +72,9 @@ function EmptyState({ onNew }) {
 
 function typeColor(type) {
   const map = {
-    openai: 'var(--neon-green, var(--green))',
+    openai: 'var(--accent2, var(--green))',
     huggingface: '#ff9f43',
-    webhook: 'var(--neon-blue, var(--blue))',
+    webhook: 'var(--accent, var(--blue))',
   };
   return map[type] || 'var(--muted, var(--mid))';
 }
@@ -104,7 +104,7 @@ function TargetCard({ target, onDelete, onClick }) {
         padding: '20px 22px',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--neon-blue)';
+        e.currentTarget.style.borderColor = 'var(--accent)';
         e.currentTarget.style.transform = 'translateY(-1px)';
       }}
       onMouseLeave={(e) => {
@@ -299,7 +299,7 @@ function NewTargetModal({ onClose, onCreated }) {
               style={{
                 fontFamily: 'var(--mono)',
                 fontSize: 9.5,
-                color: 'var(--neon-blue, var(--blue))',
+                color: 'var(--accent, var(--blue))',
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
                 marginBottom: 4,
@@ -350,7 +350,7 @@ function NewTargetModal({ onClose, onCreated }) {
                     transition: 'all 0.12s',
                     background: form.target_type === t ? 'rgba(59,180,255,0.12)' : 'rgba(255,255,255,0.03)',
                     border: form.target_type === t ? '1px solid rgba(59,180,255,0.5)' : '1px solid rgba(33,57,90,0.8)',
-                    color: form.target_type === t ? 'var(--neon-blue, var(--blue))' : 'var(--muted, var(--mid))',
+                    color: form.target_type === t ? 'var(--accent, var(--blue))' : 'var(--muted, var(--mid))',
                     fontWeight: form.target_type === t ? 600 : 400,
                   }}
                 >
@@ -368,7 +368,7 @@ function NewTargetModal({ onClose, onCreated }) {
               onChange={(e) => set('name', e.target.value)}
               placeholder="Customer Support Bot"
               required
-              onFocus={(e) => { e.target.style.borderColor = 'var(--neon-blue)'; }}
+              onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
               onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
             />
           </div>
@@ -380,7 +380,7 @@ function NewTargetModal({ onClose, onCreated }) {
               value={form.description}
               onChange={(e) => set('description', e.target.value)}
               placeholder="What does this AI system do?"
-              onFocus={(e) => { e.target.style.borderColor = 'var(--neon-blue)'; }}
+              onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
               onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
             />
           </div>
@@ -393,7 +393,7 @@ function NewTargetModal({ onClose, onCreated }) {
               onChange={(e) => set('base_url', e.target.value)}
               placeholder={ph.base_url || 'https://api.example.com'}
               required
-              onFocus={(e) => { e.target.style.borderColor = 'var(--neon-blue)'; }}
+              onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
               onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
             />
           </div>
@@ -406,7 +406,7 @@ function NewTargetModal({ onClose, onCreated }) {
               onChange={(e) => set('model_name', e.target.value)}
               placeholder={ph.model_name || 'model-name'}
               required
-              onFocus={(e) => { e.target.style.borderColor = 'var(--neon-blue)'; }}
+              onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
               onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
             />
           </div>
@@ -421,7 +421,7 @@ function NewTargetModal({ onClose, onCreated }) {
                 onChange={(e) => set('api_key', e.target.value)}
                 placeholder="sk-..."
                 autoComplete="off"
-                onFocus={(e) => { e.target.style.borderColor = 'var(--neon-blue)'; }}
+                onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
                 onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
               />
               <button
@@ -488,7 +488,7 @@ function NewTargetModal({ onClose, onCreated }) {
                 borderRadius: 7,
                 background: saving ? 'rgba(59,180,255,0.2)' : 'rgba(59,180,255,0.15)',
                 border: '1px solid rgba(59,180,255,0.4)',
-                color: 'var(--neon-blue, var(--blue))',
+                color: 'var(--accent, var(--blue))',
                 cursor: saving ? 'not-allowed' : 'pointer',
                 fontFamily: 'var(--mono)',
                 fontSize: 12,
@@ -577,7 +577,7 @@ export default function TargetsPage() {
             style={{
               fontFamily: 'var(--mono)',
               fontSize: 9.5,
-              color: 'var(--neon-blue, var(--blue))',
+              color: 'var(--accent, var(--blue))',
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
               marginBottom: 5,
@@ -607,7 +607,7 @@ export default function TargetsPage() {
             borderRadius: 8,
             background: 'rgba(59,180,255,0.12)',
             border: '1px solid rgba(59,180,255,0.35)',
-            color: 'var(--neon-blue, var(--blue))',
+            color: 'var(--accent, var(--blue))',
             fontFamily: 'var(--mono)',
             fontSize: 12,
             fontWeight: 600,

@@ -170,7 +170,7 @@ export function grade(s) {
 }
 
 export function gradeColor(g) {
-  return { A: '#4ade80', B: '#86efac', C: '#fbbf24', D: '#fb923c', F: '#f87171' }[g] || '#888';
+  return { A: 'var(--accent2)', B: '#86efac', C: '#fbbf24', D: '#fb923c', F: '#f87171' }[g] || '#888';
 }
 
 export function scoreColor(s) {
@@ -343,8 +343,10 @@ export const css = `
   --hi:     #F0F6FF;
   --mid:    #7A96C0;
   --mute:   #3A4F6E;
-  --amber:  #F0A500;
-  --amber2: #FFD166;
+  --accent:       #3BB4FF;
+  --accent2:      #26F0B9;
+  --accent-glow:  0 0 0 3px rgba(59, 180, 255, 0.12);
+  --accent-dim:   rgba(59, 180, 255, 0.08);
   --green:  #3DDC97;
   --red:    #FF5C72;
   --blue:   #5B9BF5;
@@ -359,7 +361,18 @@ export const css = `
 html, body, #root { height: 100%; overflow: hidden; }
 body {
   font-family: var(--sans);
-  background: var(--bg0);
+  background:
+    radial-gradient(circle at 10% 15%, rgba(59,180,255,0.10), transparent 36%),
+    radial-gradient(circle at 85% 12%, rgba(38,240,185,0.08), transparent 30%),
+    radial-gradient(circle at 35% 88%, rgba(59,180,255,0.06), transparent 28%),
+    repeating-linear-gradient(
+      to right,
+      rgba(59,180,255,0.04) 0,
+      rgba(59,180,255,0.04) 1px,
+      transparent 1px,
+      transparent 48px
+    ),
+    #060810;
   color: var(--text);
   font-size: 13px;
   line-height: 1.5;
@@ -393,8 +406,8 @@ body {
 }
 .logo-dot {
   width: 8px; height: 8px; border-radius: 50%;
-  background: var(--amber);
-  box-shadow: 0 0 10px rgba(240,165,0,.9);
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(59,180,255,.9);
   animation: pulsedot 2.4s ease-in-out infinite;
 }
 @keyframes pulsedot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.65)} }
@@ -415,17 +428,17 @@ body {
   position: relative; text-align: left;
 }
 .nav-btn:hover { background: var(--bg3); color: var(--text); }
-.nav-btn.active { background: var(--bg3); color: var(--hi); }
+.nav-btn.active { background: var(--bg3); color: var(--accent); }
 .nav-btn.active::before {
   content: ''; position: absolute; left: 0; top: 6px; bottom: 6px;
-  width: 2px; background: var(--amber); border-radius: 1px;
+  width: 2px; background: var(--accent); border-radius: 1px;
 }
 .nav-icon { font-size: 13px; width: 16px; text-align: center; flex-shrink: 0; }
 .nav-badge {
   margin-left: auto; font-family: var(--mono); font-size: 8.5px;
   padding: 1px 5px; border-radius: 3px;
-  background: rgba(240,165,0,.12); color: var(--amber);
-  border: 1px solid rgba(240,165,0,.28);
+  background: var(--accent); color: #020810;
+  border: 1px solid var(--accent);
   animation: blinkbadge 2.5s step-end infinite;
 }
 @keyframes blinkbadge { 50%{opacity:.35} }
@@ -448,7 +461,7 @@ body {
   border: 1px solid var(--line2); background: none; color: var(--mute);
   border-radius: var(--r); cursor: pointer; transition: all .1s;
 }
-.ptab.on { background: var(--amber); color: #060810; border-color: var(--amber); font-weight: 600; }
+.ptab.on { background: var(--accent); color: #020810; border-color: var(--accent); font-weight: 600; }
 
 .key-label { font-family: var(--mono); font-size: 8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--mute); margin-bottom:5px; margin-top:10px; }
 .key-row { display:flex; gap:4px; }
@@ -457,7 +470,7 @@ body {
   color:var(--text); font-family:var(--mono); font-size:10px; padding:6px 9px;
   outline:none; transition:border-color .12s; min-width:0;
 }
-.key-input:focus { border-color:var(--amber); }
+.key-input:focus { border-color:var(--accent); box-shadow: var(--accent-glow); }
 .eye-btn {
   background:var(--bg3); border:1px solid var(--line2); border-radius:var(--r);
   color:var(--mute); cursor:pointer; padding:5px 7px; font-size:11px; flex-shrink:0;
@@ -471,7 +484,7 @@ body {
 
 /* ── Page header ─────────────────────────────────────────────── */
 .page-eyebrow {
-  font-family: var(--mono); font-size: 9.5px; color: var(--amber);
+  font-family: var(--mono); font-size: 9.5px; color: var(--accent2);
   letter-spacing:.14em; text-transform:uppercase; margin-bottom:5px;
 }
 .page-title {
@@ -492,8 +505,8 @@ body {
   font-family:var(--mono); font-size:11px; font-weight:500;
   cursor:pointer; border:none; transition:all .13s; letter-spacing:.02em; white-space:nowrap;
 }
-.btn-primary { background:var(--amber); color:#060810; }
-.btn-primary:hover { background:var(--amber2); }
+.btn-primary { background:var(--accent); color:#020810; }
+.btn-primary:hover { background:var(--accent2); }
 .btn-ghost {
   background:var(--bg3); color:var(--mid);
   border:1px solid var(--line2);
@@ -525,7 +538,7 @@ body {
   transition:border-color .13s, box-shadow .13s;
 }
 .input:focus, .select:focus, .textarea:focus {
-  border-color:var(--amber); box-shadow:0 0 0 3px rgba(240,165,0,.07);
+  border-color:var(--accent); box-shadow:var(--accent-glow);
 }
 .select option { background:var(--bg2); }
 .textarea { resize:vertical; min-height:80px; }
@@ -584,7 +597,7 @@ body {
 .chip-correctness,.chip-Correctness     { background:rgba(61,220,151,.1); color:#3DDC97; }
 .chip-relevance,.chip-Relevance         { background:rgba(91,155,245,.1); color:#5B9BF5; }
 .chip-safety,.chip-Safety               { background:rgba(196,181,253,.1); color:#c4b5fd; }
-.chip-adversarial,.chip-Adversarial     { background:rgba(240,165,0,.1);   color:var(--amber); }
+.chip-adversarial,.chip-Adversarial     { background:var(--accent-dim);   color:var(--accent); }
 .chip-consistency,.chip-Consistency     { background:rgba(255,200,100,.1); color:#fbbf24; }
 .chip-factual,.chip-Factual             { background:rgba(61,220,151,.1);  color:#3DDC97; }
 .chip-unknown,.chip-Unknown             { background:var(--bg4); color:var(--mid); }
@@ -610,7 +623,7 @@ tr:hover td { background:rgba(255,255,255,.012); }
   border-bottom:2px solid transparent; margin-bottom:-1px; transition:color .12s, border-color .12s;
 }
 .tab-btn:hover { color:var(--text); }
-.tab-btn.active { color:var(--amber); border-bottom-color:var(--amber); }
+.tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
 
 /* ── Progress terminal ───────────────────────────────────────── */
 .terminal {
@@ -644,17 +657,17 @@ tr:hover td { background:rgba(255,255,255,.012); }
 }
 .stage-icon-wrap.done { background:rgba(61,220,151,.1); border-color:rgba(61,220,151,.4); color:var(--green); }
 .stage-icon-wrap.active {
-  background:rgba(240,165,0,.12); border-color:rgba(240,165,0,.5); color:var(--amber);
+  background:var(--accent-dim); border-color:rgba(59,180,255,.5); color:var(--accent);
   animation:pulsestage .9s ease-in-out infinite;
 }
-@keyframes pulsestage { 0%,100%{box-shadow:0 0 0 0 rgba(240,165,0,.4)} 50%{box-shadow:0 0 0 5px rgba(240,165,0,0)} }
+@keyframes pulsestage { 0%,100%{box-shadow:0 0 0 0 rgba(59,180,255,.4)} 50%{box-shadow:0 0 0 5px rgba(59,180,255,0)} }
 .stage-name { font-family:var(--mono); font-size:11.5px; color:var(--mid); transition:color .2s; }
 .stage-name.done,.stage-name.active { color:var(--hi); }
 .stage-detail { font-size:10.5px; color:var(--mute); margin-top:1px; }
 .stage-check { font-family:var(--mono); font-size:10px; color:var(--green); margin-left:auto; flex-shrink:0; }
 
 .prog-bar-wrap { height:2px; background:var(--bg4); border-radius:1px; overflow:hidden; margin:14px 0 10px; }
-.prog-bar-fill { height:100%; background:linear-gradient(90deg,var(--amber),var(--amber2)); border-radius:1px; transition:width .5s ease; }
+.prog-bar-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:1px; transition:width .5s ease; }
 
 .term-log {
   background:var(--bg0); border-radius:var(--r); padding:10px 12px;
@@ -694,7 +707,7 @@ tr:hover td { background:rgba(255,255,255,.012); }
   display:flex; align-items:center; gap:9px;
 }
 .share-url { flex:1; font-family:var(--mono); font-size:11.5px; color:var(--mid); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.share-url em { color:var(--amber); font-style:normal; }
+.share-url em { color:var(--accent); font-style:normal; }
 
 /* ── PM summary ──────────────────────────────────────────────── */
 .pm-card { background:var(--bg1); border:1px solid var(--line); border-radius:var(--r2); overflow:hidden; }
@@ -708,7 +721,7 @@ tr:hover td { background:rgba(255,255,255,.012); }
 .fail-q { font-size:12.5px; color:var(--text); margin-bottom:4px; line-height:1.4; }
 .fail-meta { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
 .rec-box { background:rgba(240,165,0,.06); border:1px solid rgba(240,165,0,.22); border-radius:var(--r); padding:13px 15px; }
-.rec-label { font-family:var(--mono); font-size:9px; color:var(--amber); letter-spacing:.12em; text-transform:uppercase; margin-bottom:5px; }
+.rec-label { font-family:var(--mono); font-size:9px; color:var(--accent); letter-spacing:.12em; text-transform:uppercase; margin-bottom:5px; }
 
 /* ── Enterprise report ───────────────────────────────────────── */
 .ent-wrap { background:#fff; color:#111; border-radius:var(--r2); overflow:hidden; box-shadow:0 8px 48px rgba(0,0,0,.5); font-family:'IBM Plex Sans', sans-serif; }
@@ -733,9 +746,9 @@ tr:hover td { background:rgba(255,255,255,.012); }
 .toggle { width:34px; height:19px; background:var(--bg4); border:1px solid var(--line2); border-radius:10px; cursor:pointer; position:relative; transition:background .2s; flex-shrink:0; }
 .toggle.on { background:rgba(240,165,0,.25); border-color:rgba(240,165,0,.5); }
 .toggle::after { content:''; position:absolute; top:2px; left:2px; width:13px; height:13px; background:var(--mute); border-radius:50%; transition:transform .2s, background .2s; }
-.toggle.on::after { transform:translateX(15px); background:var(--amber); }
+.toggle.on::after { transform:translateX(15px); background:var(--accent); }
 .notif-input { width:100%; background:var(--bg2); border:1px solid var(--line2); border-radius:var(--r); color:var(--text); font-family:var(--mono); font-size:11.5px; padding:7px 11px; outline:none; transition:border-color .13s; }
-.notif-input:focus { border-color:var(--amber); }
+.notif-input:focus { border-color:var(--accent); box-shadow: var(--accent-glow); }
 .notif-input::placeholder { color:var(--mute); }
 
 /* ── History empty ───────────────────────────────────────────── */
@@ -743,7 +756,7 @@ tr:hover td { background:rgba(255,255,255,.012); }
 .empty-icon { font-size:32px; margin-bottom:12px; }
 
 /* ── Spinner ─────────────────────────────────────────────────── */
-.spinner { width:16px; height:16px; border:2px solid var(--line2); border-top-color:var(--amber); border-radius:50%; animation:spin .7s linear infinite; }
+.spinner { width:16px; height:16px; border:2px solid var(--line2); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 
 /* ── Breakpoints ─────────────────────────────────────────────── */
@@ -842,8 +855,8 @@ export function LiveProgress({ stage, pct, logs, logRef, done, reportId, activeT
                 {stopping ? 'Stopping…' : 'Stop'}
               </button>
             )}
-            <div className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5, borderTopColor: 'var(--amber)', borderColor: 'var(--bg4)' }} />
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--amber)', letterSpacing: '.1em' }}>RUNNING</span>
+            <div className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5, borderTopColor: 'var(--accent)', borderColor: 'var(--bg4)' }} />
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--accent)', letterSpacing: '.1em' }}>RUNNING</span>
           </div>
         )}
         {done && <span style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--green)' }}>✓ DONE</span>}
@@ -908,7 +921,7 @@ export function LiveProgress({ stage, pct, logs, logRef, done, reportId, activeT
           {logs.map((l, i) => (
             <div key={i}><span className="log-t">{l.t}</span><span className={`log-${l.type}`}>{l.msg}</span></div>
           ))}
-          {!done && <span style={{ color: 'var(--amber)' }}>█</span>}
+          {!done && <span style={{ color: 'var(--accent)' }}>█</span>}
         </div>
       </div>
     </div>
@@ -1632,12 +1645,12 @@ export function ReportPage({ report, persona }) {
       <div className="kpi-row">
         <div className="kpi"><div className="kpi-label">Score</div><div className="kpi-value" style={{ color: scoreColor(sc) }}>{sc.toFixed(1)}</div><div className="kpi-sub">out of 10</div></div>
         <div className="kpi"><div className="kpi-label">Tests</div><div className="kpi-value">{report.sample_count || results.length}</div></div>
-        <div className="kpi"><div className="kpi-label">Failures</div><div className="kpi-value" style={{ color: tf.length ? 'var(--red)' : 'var(--green)' }}>{tf.length}</div></div>
-        <div className="kpi"><div className="kpi-label">Hallucinations</div><div className="kpi-value" style={{ color: (report.metrics?.hallucinations_detected || 0) ? 'var(--red)' : 'var(--green)' }}>{report.metrics?.hallucinations_detected ?? '—'}</div></div>
+        <div className="kpi"><div className="kpi-label">Failures</div><div className="kpi-value" style={{ color: tf.length ? 'var(--red)' : 'var(--accent2)' }}>{tf.length}</div></div>
+        <div className="kpi"><div className="kpi-label">Hallucinations</div><div className="kpi-value" style={{ color: (report.metrics?.hallucinations_detected || 0) ? 'var(--red)' : 'var(--accent2)' }}>{report.metrics?.hallucinations_detected ?? '—'}</div></div>
         {report.metrics?.judges_agreement !== undefined && (
           <div className="kpi">
             <div className="kpi-label">Judge agreement</div>
-            <div className="kpi-value" style={{ color: report.metrics.judges_agreement >= 0.7 ? 'var(--green)' : 'var(--amber)' }}>
+            <div className="kpi-value" style={{ color: report.metrics.judges_agreement >= 0.7 ? 'var(--accent2)' : 'var(--accent)' }}>
               {Math.round(report.metrics.judges_agreement * 100)}%
             </div>
           </div>
@@ -1737,7 +1750,7 @@ export function ReportPage({ report, persona }) {
                             <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(255,255,255,.03)', borderRadius: 6, border: '1px solid var(--line2)' }}>
                               <div style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--mute)', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 8 }}>
                                 Judge breakdown
-                                {!r._judge_agreed && <span style={{ color: 'var(--amber)', marginLeft: 6 }}>⚠ disagreement ({r._judge_gap?.toFixed(1)} gap)</span>}
+                                {!r._judge_agreed && <span style={{ color: 'var(--accent)', marginLeft: 6 }}>⚠ disagreement ({r._judge_gap?.toFixed(1)} gap)</span>}
                               </div>
                               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                                 {Object.entries(r.judges).map(([name, j]) => (
@@ -1919,13 +1932,13 @@ export function ComparePage({ focusReport, onOpenSingleRun }) {
                   </div>
                   <div className="kpi" style={{ minHeight: 0 }}>
                     <div className="kpi-label">Score delta</div>
-                    <div className="kpi-value" style={{ color: scB >= scA ? 'var(--green)' : 'var(--red)' }}>
+                    <div className="kpi-value" style={{ color: scB >= scA ? 'var(--accent2)' : 'var(--red)' }}>
                       {`${scB >= scA ? '+' : ''}${(scB - scA).toFixed(1)}`}
                     </div>
                   </div>
                   <div className="kpi" style={{ minHeight: 0 }}>
                     <div className="kpi-label">New regressions</div>
-                    <div className="kpi-value" style={{ color: summary.hasRegression ? 'var(--red)' : 'var(--green)' }}>
+                    <div className="kpi-value" style={{ color: summary.hasRegression ? 'var(--red)' : 'var(--accent2)' }}>
                       {summary.scoreRegressions.length + summary.newFailures.length}
                     </div>
                   </div>
@@ -2078,7 +2091,7 @@ export function ComparePage({ focusReport, onOpenSingleRun }) {
                     )}
                     {persistent.length > 0 && (
                       <div style={{ marginBottom: 18 }}>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--amber)', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 10 }}>⚠ Persistent ({persistent.length})</div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--accent)', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 10 }}>⚠ Persistent ({persistent.length})</div>
                         {persistent.map((f, i) => {
                           const aVer = tA.find(a => a.question === f.question);
                           return (
@@ -2170,7 +2183,7 @@ export function HistoryPage({ onLoadReport }) {
                         <td>
                           <span style={{
                             fontFamily: 'var(--mono)', fontSize: 10,
-                            color: r.status === 'done' ? 'var(--green)' : r.status === 'failed' ? 'var(--red)' : 'var(--amber)',
+                            color: r.status === 'done' ? 'var(--accent2)' : r.status === 'failed' ? 'var(--red)' : 'var(--accent)',
                             background: r.status === 'done' ? 'rgba(61,220,151,.1)' : r.status === 'failed' ? 'rgba(255,92,114,.1)' : 'rgba(240,165,0,.1)',
                             padding: '2px 6px', borderRadius: 3,
                           }}>{r.status}</span>
@@ -2290,7 +2303,7 @@ export function NotifsPage() {
             <div style={{ marginTop: 12, background: 'var(--bg0)', borderRadius: 'var(--r)', padding: '10px 12px' }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--mute)', marginBottom: 5 }}>Preview</div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--mid)', lineHeight: 1.8 }}>
-                <span style={{ color: 'var(--amber)' }}>AI Breaker Lab</span><br />
+                <span style={{ color: 'var(--accent)' }}>AI Breaker Lab</span><br />
                 ✓ Run complete: <span style={{ color: 'var(--hi)' }}>gpt-4o-mini</span><br />
                 Score: <span style={{ color: 'var(--green)' }}>8.2/10 (A)</span> · 3 failures<br />
                 <span style={{ color: 'var(--blue)' }}>{SHARE_BASE}/r/demoShareToken</span>
@@ -2324,7 +2337,7 @@ export function NotifsPage() {
               padding: '5px 11px', fontFamily: 'var(--mono)', fontSize: 10.5,
               border: '1px solid', borderRadius: 'var(--r)', cursor: 'pointer',
               background: cfg.when === k ? 'rgba(240,165,0,.12)' : 'var(--bg2)',
-              color: cfg.when === k ? 'var(--amber)' : 'var(--mute)',
+              color: cfg.when === k ? 'var(--accent)' : 'var(--mute)',
               borderColor: cfg.when === k ? 'rgba(240,165,0,.4)' : 'var(--line2)',
             }}>{l}</button>
           ))}

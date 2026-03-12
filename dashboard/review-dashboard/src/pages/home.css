@@ -105,7 +105,7 @@
 
 .radar-fill {
   fill: rgba(59, 180, 255, 0.28);
-  stroke: var(--neon-green);
+  stroke: var(--accent2);
   stroke-width: 2;
 }
 

@@ -80,7 +80,7 @@ export default function SignupPage() {
             width: 52,
             height: 52,
             borderRadius: 14,
-            background: 'linear-gradient(140deg, var(--neon-blue, #3bb4ff), var(--neon-green, #26f0b9))',
+            background: 'linear-gradient(140deg, var(--accent, #3bb4ff), var(--accent2, #26f0b9))',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -124,7 +124,7 @@ export default function SignupPage() {
                 placeholder="Alice Smith"
                 required
                 autoComplete="name"
-                onFocus={(e) => { e.target.style.borderColor = 'var(--neon-blue, #3bb4ff)'; }}
+                onFocus={(e) => { e.target.style.borderColor = 'var(--accent, #3bb4ff)'; }}
                 onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
               />
             </div>
@@ -139,7 +139,7 @@ export default function SignupPage() {
                 placeholder="you@example.com"
                 required
                 autoComplete="email"
-                onFocus={(e) => { e.target.style.borderColor = 'var(--neon-blue, #3bb4ff)'; }}
+                onFocus={(e) => { e.target.style.borderColor = 'var(--accent, #3bb4ff)'; }}
                 onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
               />
             </div>
@@ -155,7 +155,7 @@ export default function SignupPage() {
                   placeholder="Min. 8 characters"
                   required
                   autoComplete="new-password"
-                  onFocus={(e) => { e.target.style.borderColor = 'var(--neon-blue, #3bb4ff)'; }}
+                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent, #3bb4ff)'; }}
                   onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
                 />
                 <button
@@ -186,7 +186,7 @@ export default function SignupPage() {
                 placeholder="Repeat your password"
                 required
                 autoComplete="new-password"
-                onFocus={(e) => { e.target.style.borderColor = 'var(--neon-blue, #3bb4ff)'; }}
+                onFocus={(e) => { e.target.style.borderColor = 'var(--accent, #3bb4ff)'; }}
                 onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
               />
             </div>
@@ -213,7 +213,7 @@ export default function SignupPage() {
                 marginTop: 4,
                 background: 'rgba(38,240,185,0.1)',
                 border: '1px solid rgba(38,240,185,0.35)',
-                color: 'var(--neon-green, #26f0b9)',
+                color: 'var(--accent2, #26f0b9)',
                 fontFamily: 'JetBrains Mono, monospace',
                 fontSize: 13,
                 fontWeight: 600,
@@ -231,7 +231,7 @@ export default function SignupPage() {
                     width: 13,
                     height: 13,
                     border: '2px solid rgba(38,240,185,0.3)',
-                    borderTopColor: 'var(--neon-green, #26f0b9)',
+                    borderTopColor: 'var(--accent2, #26f0b9)',
                     borderRadius: '50%',
                     animation: 'spin 0.7s linear infinite',
                   }} />
@@ -246,7 +246,7 @@ export default function SignupPage() {
           Already have an account?{' '}
           <Link
             to="/auth/login"
-            style={{ color: 'var(--neon-blue, #3bb4ff)', textDecoration: 'none', fontWeight: 600 }}
+            style={{ color: 'var(--accent, #3bb4ff)', textDecoration: 'none', fontWeight: 600 }}
           >
             Sign in
           </Link>

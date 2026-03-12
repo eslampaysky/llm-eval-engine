@@ -15,7 +15,7 @@ export default function PrivateRoute({ children }) {
         <div style={{
           width: 28, height: 28,
           border: '2px solid rgba(255,255,255,0.1)',
-          borderTopColor: 'var(--neon-blue, #3bb4ff)',
+          borderTopColor: 'var(--accent, #3bb4ff)',
           borderRadius: '50%',
           animation: 'spin 0.7s linear infinite',
         }} />

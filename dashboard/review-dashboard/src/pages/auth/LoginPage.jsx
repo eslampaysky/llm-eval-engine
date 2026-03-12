@@ -67,7 +67,7 @@ export default function LoginPage() {
             width: 52,
             height: 52,
             borderRadius: 14,
-            background: 'linear-gradient(140deg, var(--neon-blue, #3bb4ff), var(--neon-green, #26f0b9))',
+            background: 'linear-gradient(140deg, var(--accent, #3bb4ff), var(--accent2, #26f0b9))',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -111,7 +111,7 @@ export default function LoginPage() {
                 placeholder="you@example.com"
                 required
                 autoComplete="email"
-                onFocus={(e) => { e.target.style.borderColor = 'var(--neon-blue, #3bb4ff)'; }}
+                onFocus={(e) => { e.target.style.borderColor = 'var(--accent, #3bb4ff)'; }}
                 onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
               />
             </div>
@@ -123,7 +123,7 @@ export default function LoginPage() {
                   to="/auth/forgot-password"
                   style={{
                     fontSize: 11,
-                    color: 'var(--neon-blue, #3bb4ff)',
+                    color: 'var(--accent, #3bb4ff)',
                     textDecoration: 'none',
                     fontFamily: 'JetBrains Mono, monospace',
                   }}
@@ -140,7 +140,7 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   required
                   autoComplete="current-password"
-                  onFocus={(e) => { e.target.style.borderColor = 'var(--neon-blue, #3bb4ff)'; }}
+                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent, #3bb4ff)'; }}
                   onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
                 />
                 <button
@@ -183,7 +183,7 @@ export default function LoginPage() {
                 marginTop: 4,
                 background: 'rgba(59,180,255,0.12)',
                 border: '1px solid rgba(59,180,255,0.4)',
-                color: 'var(--neon-blue, #3bb4ff)',
+                color: 'var(--accent, #3bb4ff)',
                 fontFamily: 'JetBrains Mono, monospace',
                 fontSize: 13,
                 fontWeight: 600,
@@ -202,7 +202,7 @@ export default function LoginPage() {
                     width: 13,
                     height: 13,
                     border: '2px solid rgba(59,180,255,0.3)',
-                    borderTopColor: 'var(--neon-blue, #3bb4ff)',
+                    borderTopColor: 'var(--accent, #3bb4ff)',
                     borderRadius: '50%',
                     animation: 'spin 0.7s linear infinite',
                   }} />
@@ -217,7 +217,7 @@ export default function LoginPage() {
           Don't have an account?{' '}
           <Link
             to="/auth/signup"
-            style={{ color: 'var(--neon-blue, #3bb4ff)', textDecoration: 'none', fontWeight: 600 }}
+            style={{ color: 'var(--accent, #3bb4ff)', textDecoration: 'none', fontWeight: 600 }}
           >
             Sign up free
           </Link>

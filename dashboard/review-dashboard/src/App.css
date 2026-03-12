@@ -8,9 +8,11 @@
   --line: #21395a;
   --text: #e8f4ff;
   --muted: #8ea8c7;
-  --neon-blue: #3bb4ff;
-  --neon-green: #26f0b9;
+  --accent: #3bb4ff;
+  --accent2: #26f0b9;
   --warn-red: #ff4d6d;
+  --accent-glow: 0 0 0 3px rgba(59, 180, 255, 0.12);
+  --accent-dim: rgba(59, 180, 255, 0.08);
   --glow-blue: 0 0 0.7rem rgba(59, 180, 255, 0.45);
   --glow-green: 0 0 0.7rem rgba(38, 240, 185, 0.4);
 }
@@ -22,20 +24,20 @@ body {
   color: var(--text);
   font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
   background:
-    radial-gradient(circle at 10% 15%, rgba(59, 180, 255, 0.13), transparent 36%),
-    radial-gradient(circle at 85% 12%, rgba(38, 240, 185, 0.11), transparent 30%),
-    radial-gradient(circle at 35% 88%, rgba(255, 77, 109, 0.08), transparent 28%),
+    radial-gradient(circle at 10% 15%, rgba(59,180,255,0.10), transparent 36%),
+    radial-gradient(circle at 85% 12%, rgba(38,240,185,0.08), transparent 30%),
+    radial-gradient(circle at 35% 88%, rgba(59,180,255,0.06), transparent 28%),
     repeating-linear-gradient(
       to right,
-      rgba(33, 57, 90, 0.08) 0,
-      rgba(33, 57, 90, 0.08) 1px,
+      rgba(59,180,255,0.04) 0,
+      rgba(59,180,255,0.04) 1px,
       transparent 1px,
       transparent 48px
     ),
-    var(--bg);
+    #060810;
 }
 
-a { color: var(--neon-blue); }
+a { color: var(--accent); }
 
 .app-shell {
   display: grid;
@@ -66,7 +68,7 @@ a { color: var(--neon-blue); }
   font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
   letter-spacing: 0.04em;
-  background: linear-gradient(140deg, var(--neon-blue), var(--neon-green));
+  background: linear-gradient(140deg, var(--accent), var(--accent2));
   color: #011320;
   box-shadow: var(--glow-blue), var(--glow-green);
 }
@@ -106,7 +108,7 @@ a { color: var(--neon-blue); }
 .nav-item.active {
   color: #03151f;
   border-color: rgba(38, 240, 185, 0.55);
-  background: linear-gradient(120deg, var(--neon-blue), var(--neon-green));
+  background: linear-gradient(120deg, var(--accent), var(--accent2));
   box-shadow: var(--glow-blue);
 }
 
@@ -241,7 +243,7 @@ a { color: var(--neon-blue); }
 
 .bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--neon-blue), var(--neon-green));
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
   box-shadow: var(--glow-blue);
 }
 
@@ -278,8 +280,8 @@ input, select, textarea {
 
 input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: var(--neon-blue);
-  box-shadow: var(--glow-blue);
+  border-color: var(--accent);
+  box-shadow: var(--accent-glow);
 }
 
 textarea { min-height: 95px; resize: vertical; }
@@ -298,10 +300,10 @@ textarea { min-height: 95px; resize: vertical; }
 }
 
 .primary-btn {
-  color: #04131d;
-  background: linear-gradient(120deg, var(--neon-blue), var(--neon-green));
+  color: #020810;
+  background: var(--accent);
   font-weight: 700;
-  box-shadow: var(--glow-blue);
+  box-shadow: var(--accent-glow);
 }
 
 .ghost-btn { background: transparent; color: var(--muted); }
@@ -347,7 +349,7 @@ textarea { min-height: 95px; resize: vertical; }
 
 .filter-pill.active {
   color: #04131d;
-  background: linear-gradient(120deg, var(--neon-blue), var(--neon-green));
+  background: linear-gradient(120deg, var(--accent), var(--accent2));
   border-color: rgba(38, 240, 185, 0.55);
 }
 
