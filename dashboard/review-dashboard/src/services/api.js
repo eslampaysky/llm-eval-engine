@@ -1,3 +1,5 @@
+import { getAuthHeader } from '../context/AuthContext.jsx';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 let pendingRequests = 0;
 
@@ -27,6 +29,7 @@ async function request(path, options = {}) {
     const headers = {
       'Content-Type': 'application/json',
       'X-API-KEY': getApiKey(),
+      ...getAuthHeader(),
       ...(options.headers || {}),
     };
 

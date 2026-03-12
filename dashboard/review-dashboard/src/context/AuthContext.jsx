@@ -1,29 +1,122 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  'https://llm-eval-engine-production.up.railway.app';
+
+let token = null;
+
+export function getAuthHeader() {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export async function authFetch(path, opts = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader(),
+      ...(opts.headers || {}),
+    },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(body?.detail || `Request failed (${res.status})`);
+    err.status = res.status;
+    err.body = body;
+    throw err;
+  }
+  return body;
+}
 
 const AuthContext = createContext(null);
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-
-  const value = useMemo(() => ({
-    user,
-    isAuthenticated: !!user,
-    login(email) {
-      setUser({ email });
-    },
-    signup(email) {
-      setUser({ email });
-    },
-    logout() {
-      setUser(null);
-    },
-  }), [user]);
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
+  return ctx;
 }
 
-export function useAuth() {
-  const value = useContext(AuthContext);
-  if (!value) throw new Error('useAuth must be used within AuthProvider');
-  return value;
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const initRan = useRef(false);
+
+  useEffect(() => {
+    if (initRan.current) return;
+    initRan.current = true;
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    authFetch('/auth/me')
+      .then((userData) => setUser(userData))
+      .catch(() => {
+        token = null;
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const register = useCallback(async ({ name, email, password }) => {
+    setError('');
+    try {
+      const data = await authFetch('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, password }),
+      });
+      token = data.access_token;
+      setUser(data.user);
+      return { success: true };
+    } catch (err) {
+      const msg = err.message || 'Registration failed.';
+      setError(msg);
+      return { success: false, error: msg };
+    }
+  }, []);
+
+  const login = useCallback(async ({ email, password }) => {
+    setError('');
+    try {
+      const data = await authFetch('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      token = data.access_token;
+      setUser(data.user);
+      return { success: true };
+    } catch (err) {
+      const msg = err.status === 401 ? 'Incorrect email or password.' : (err.message || 'Login failed.');
+      setError(msg);
+      return { success: false, error: msg };
+    }
+  }, []);
+
+  const logout = useCallback(() => {
+    token = null;
+    setUser(null);
+    setError('');
+  }, []);
+
+  const clearError = useCallback(() => setError(''), []);
+
+  const value = {
+    user,
+    loading,
+    error,
+    isAuthenticated: !!user,
+    login,
+    logout,
+    register,
+    clearError,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }

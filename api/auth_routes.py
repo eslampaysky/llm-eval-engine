@@ -1,0 +1,212 @@
+"""
+api/auth_routes.py
+==================
+FastAPI router for user authentication endpoints.
+
+Routes:
+  POST /auth/register - create account, return JWT
+  POST /auth/login    - verify credentials, return JWT
+  GET  /auth/me       - return current user (requires Bearer token)
+"""
+
+from __future__ import annotations
+
+from typing import Annotated, Any
+
+import jwt as _jwt
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel, EmailStr, Field
+
+from api.database import create_user, get_user_by_email, get_user_by_id
+from api.user_auth import (
+    create_access_token,
+    decode_access_token,
+    hash_password,
+    verify_password,
+)
+
+auth_router = APIRouter(prefix="/auth", tags=["auth"])
+_bearer = HTTPBearer(auto_error=False)
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=1)
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: dict[str, Any]
+
+
+def get_current_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> dict:
+    """
+    Dependency: extract and verify the Bearer JWT from the Authorization header.
+    Returns the user dict from the database.
+    Raises 401 if the token is missing, invalid, or expired.
+    """
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header missing or not a Bearer token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        payload = decode_access_token(credentials.credentials)
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired. Please log in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except _jwt.InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {exc}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token payload is malformed (missing 'sub').",
+        )
+
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account not found. It may have been deleted.",
+        )
+
+    if not user.get("is_active"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account has been deactivated.",
+        )
+
+    return user
+
+
+@auth_router.post(
+    "/register",
+    response_model=AuthResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a new user account",
+)
+def register(payload: RegisterRequest) -> AuthResponse:
+    """
+    Create a new user account.
+    Returns a JWT access token immediately (no email verification step).
+    """
+    existing = get_user_by_email(payload.email)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists.",
+        )
+
+    try:
+        hashed = hash_password(payload.password)
+        user = create_user(
+            name=payload.name,
+            email=str(payload.email),
+            password_hash=hashed,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+    token = create_access_token(
+        user_id=user["user_id"],
+        email=user["email"],
+        name=user["name"],
+    )
+
+    return AuthResponse(
+        access_token=token,
+        user={
+            "user_id": user["user_id"],
+            "name": user["name"],
+            "email": user["email"],
+            "created_at": user["created_at"],
+        },
+    )
+
+
+@auth_router.post(
+    "/login",
+    response_model=AuthResponse,
+    summary="Log in with email and password",
+)
+def login(payload: LoginRequest) -> AuthResponse:
+    """
+    Authenticate with email + password.
+    Returns a JWT access token on success.
+    Uses a dummy hash when email is not found to avoid timing attacks.
+    """
+    user = get_user_by_email(str(payload.email))
+    stored_hash = (
+        user["password_hash"]
+        if user
+        else "$2b$12$invalidhashpadding000000000000000000000000000000000000000"
+    )
+
+    password_ok = verify_password(payload.password, stored_hash)
+
+    if not user or not password_ok:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.get("is_active"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account has been deactivated.",
+        )
+
+    token = create_access_token(
+        user_id=user["user_id"],
+        email=user["email"],
+        name=user["name"],
+    )
+
+    return AuthResponse(
+        access_token=token,
+        user={
+            "user_id": user["user_id"],
+            "name": user["name"],
+            "email": user["email"],
+            "created_at": user["created_at"],
+        },
+    )
+
+
+@auth_router.get(
+    "/me",
+    summary="Get current authenticated user",
+)
+def me(current_user: Annotated[dict, Depends(get_current_user)]) -> dict:
+    """
+    Return the profile of the currently authenticated user.
+    Requires a valid Bearer token in the Authorization header.
+    """
+    return {
+        "user_id": current_user["user_id"],
+        "name": current_user["name"],
+        "email": current_user["email"],
+        "created_at": current_user["created_at"],
+    }

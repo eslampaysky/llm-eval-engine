@@ -11,6 +11,7 @@ from email.message import EmailMessage
 from html import escape
 from pathlib import Path
 from typing import Annotated, Any
+from cryptography.fernet import Fernet
 from api.multi_judge import (
     build_judges_from_request,
     score_answers,
@@ -23,7 +24,9 @@ from pydantic import BaseModel, Field
 
 from api.database import (
     cancel_report,
+    create_target,
     delete_report,
+    delete_target,
     get_cached_test_suite,     
     get_demo_run_count,
     save_test_suite_cache,     
@@ -36,10 +39,13 @@ from api.database import (
     get_history_for_client,
     get_report_row,
     get_report_row_by_share_token,
+    get_target_by_id,
     get_usage_slice,
     init_db,
     insert_report,
+    list_report_ids_for_target,
     list_reports_for_client,
+    list_targets_for_client,
     log_usage,
     register_client,
     save_human_reviews,
@@ -47,7 +53,7 @@ from api.database import (
     upsert_demo_run,
 )
 from api.job_queue import enqueue_job
-from api.models import BreakRequest, BreakTarget, DemoBreakRequest, EvaluationRequest, JudgeConfig
+from api.models import BreakRequest, BreakTarget, DemoBreakRequest, EvaluationRequest, JudgeConfig, TargetCreate
 from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ, limiter ,LIMIT_RETRY
 from reports.report_generator import ReportGenerator, generate_html_report
 from src.llm_eval_engine.infrastructure.config_loader import load_project_config
@@ -105,6 +111,23 @@ class NotifyRequest(BaseModel):
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _get_targets_fernet() -> Fernet:
+    key = os.getenv("TARGETS_SECRET", "").strip()
+    if not key:
+        raise HTTPException(status_code=500, detail="TARGETS_SECRET is not configured")
+    try:
+        return Fernet(key)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Invalid TARGETS_SECRET: {exc}") from exc
+
+
+def _encrypt_target_api_key(api_key: str | None) -> str | None:
+    if not api_key:
+        return None
+    fernet = _get_targets_fernet()
+    return fernet.encrypt(api_key.encode("utf-8")).decode("utf-8")
 
 
 def _public_report_url(share_token: str) -> str:
@@ -350,7 +373,7 @@ def validate_api_key(
 
 
 def _do_insert_report(*, report_id, auth_ctx, sample_count, judge_model,
-                      dataset_id, model_version, status):
+                      dataset_id, model_version, status, target_id=None):
     share_token = secrets.token_urlsafe(9).replace("-", "").replace("_", "")[:12]
     insert_report(
         report_id=report_id,
@@ -362,6 +385,7 @@ def _do_insert_report(*, report_id, auth_ctx, sample_count, judge_model,
         sample_count=sample_count,
         dataset_id=dataset_id,
         model_version=model_version,
+        target_id=target_id,
     )
 
 
@@ -706,6 +730,11 @@ async def break_model(
     if not groq_api_key:
         raise HTTPException(status_code=422,
                             detail="groq_api_key is required (or set GROQ_API_KEY env var)")
+    target_id = (payload.target_id or "").strip() or None
+    if target_id:
+        target_row = get_target_by_id(target_id)
+        if not target_row or target_row.get("client_name") != auth_ctx.get("client_name"):
+            raise HTTPException(status_code=404, detail="Target not found")
     target_cfg    = payload.target.model_dump(exclude_none=True)
     report_id     = str(uuid.uuid4())
     model_version = (
@@ -715,7 +744,7 @@ async def break_model(
     _do_insert_report(
         report_id=report_id, auth_ctx=auth_ctx, sample_count=payload.num_tests,
         judge_model="+".join(["groq", *[j.name for j in (payload.judges or [])]]), dataset_id=None,
-        model_version=model_version, status="processing",
+        model_version=model_version, status="processing", target_id=target_id,
     )
     log_usage(
         report_id=report_id, api_key=auth_ctx["api_key"],
@@ -746,6 +775,80 @@ async def break_model(
             f"Poll GET /report/{report_id} for results."
         ),
     }
+
+
+@router.post("/targets")
+@limiter.limit(LIMIT_READ)
+def create_target_endpoint(
+    request: Request,
+    payload: TargetCreate,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="name is required")
+    encrypted_key = _encrypt_target_api_key(payload.api_key)
+    target = create_target(
+        client=auth_ctx.get("client"),
+        name=name,
+        description=(payload.description or "").strip() or None,
+        base_url=(payload.base_url or "").strip() or None,
+        model_name=(payload.model_name or "").strip() or None,
+        api_key_enc=encrypted_key,
+        target_type=payload.target_type.strip(),
+    )
+    return {
+        "target_id": target["target_id"],
+        "name": target["name"],
+        "description": target.get("description"),
+        "created_at": target["created_at"],
+    }
+
+
+@router.get("/targets")
+@limiter.limit(LIMIT_READ)
+def list_targets(
+    request: Request,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> list[dict[str, Any]]:
+    return list_targets_for_client(auth_ctx.get("client_name"))
+
+
+@router.get("/targets/{target_id}")
+@limiter.limit(LIMIT_READ)
+def get_target(
+    request: Request,
+    target_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    target = get_target_by_id(target_id)
+    if not target or target.get("client_name") != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=404, detail="Target not found")
+    report_ids = list_report_ids_for_target(target_id, auth_ctx.get("client_name"))
+    return {
+        "target_id": target.get("target_id"),
+        "name": target.get("name"),
+        "description": target.get("description"),
+        "base_url": target.get("base_url"),
+        "model_name": target.get("model_name"),
+        "target_type": target.get("target_type"),
+        "created_at": target.get("created_at"),
+        "updated_at": target.get("updated_at"),
+        "report_ids": report_ids,
+    }
+
+
+@router.delete("/targets/{target_id}", status_code=200)
+@limiter.limit(LIMIT_DELETE)
+def delete_target_endpoint(
+    request: Request,
+    target_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    deleted = delete_target(target_id=target_id, client_name=auth_ctx.get("client_name"))
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Target not found")
+    return {"deleted": True, "target_id": target_id}
 
 
 @router.get("/reports")
@@ -784,6 +887,7 @@ def get_report(
         "sample_count":    row["sample_count"],
         "dataset_id":      row["dataset_id"],
         "model_version":   row["model_version"],
+        "target_id":       row.get("target_id"),
         "created_at":      row["created_at"],
         "updated_at":      row["updated_at"],
         "results":         json.loads(row["results_json"]) if row["results_json"] else [],

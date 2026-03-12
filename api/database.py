@@ -17,6 +17,7 @@ import json
 import os
 import os as _os  
 import sqlite3
+import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Generator
@@ -166,6 +167,7 @@ def init_db():
                     sample_count INTEGER NOT NULL,
                     dataset_id TEXT,
                     model_version TEXT,
+                    target_id TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     results_json TEXT,
@@ -175,6 +177,34 @@ def init_db():
                     total_tokens INTEGER,
                     total_cost_usd REAL,
                     error TEXT
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS targets (
+                    target_id TEXT PRIMARY KEY,
+                    client_id INTEGER,
+                    client_name TEXT,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    base_url TEXT,
+                    model_name TEXT,
+                    api_key_enc TEXT,
+                    target_type TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (client_id) REFERENCES clients(id)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    user_id TEXT NOT NULL UNIQUE,
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 )
             """)
             cur.execute("""
@@ -214,8 +244,11 @@ def init_db():
             cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_logs_timestamp   ON usage_logs(timestamp)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_client    ON evaluation_reports(client_name)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_created   ON evaluation_reports(created_at)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target    ON evaluation_reports(target_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_test_cache_key         ON test_suite_cache(cache_key)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date         ON demo_runs(run_date)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_targets_client         ON targets(client_name)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email           ON users(email)")
             cur.execute("""
                 SELECT column_name
                 FROM information_schema.columns
@@ -226,6 +259,8 @@ def init_db():
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN share_token TEXT UNIQUE")
             if "html_content" not in existing:
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
+            if "target_id" not in existing:
+                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN target_id TEXT")
 
         else:
             # --- SQLite DDL (unchanged from original) -------------------------
@@ -276,6 +311,7 @@ def init_db():
                     sample_count INTEGER NOT NULL,
                     dataset_id TEXT,
                     model_version TEXT,
+                    target_id TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     results_json TEXT,
@@ -285,6 +321,34 @@ def init_db():
                     total_tokens INTEGER,
                     total_cost_usd REAL,
                     error TEXT
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS targets (
+                    target_id TEXT PRIMARY KEY,
+                    client_id INTEGER,
+                    client_name TEXT,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    base_url TEXT,
+                    model_name TEXT,
+                    api_key_enc TEXT,
+                    target_type TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY(client_id) REFERENCES clients(id)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL UNIQUE,
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 )
             """)
             cur.execute("""
@@ -332,7 +396,12 @@ def init_db():
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN share_token TEXT")
             if "html_content" not in existing:
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
+            if "target_id" not in existing:
+                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN target_id TEXT")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date ON demo_runs(run_date)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_targets_client ON targets(client_name)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -518,7 +587,7 @@ def get_latest_regression_baseline(client_name, dataset_id, current_model_versio
 # ── Evaluation reports ────────────────────────────────────────────────────────
 
 def insert_report(*, report_id, client_id, client_name, share_token, status, judge_model,
-                  sample_count, dataset_id, model_version):
+                  sample_count, dataset_id, model_version, target_id=None):
     now = _utc_now()
     with _get_conn() as conn:
         cur = conn.cursor()
@@ -526,11 +595,11 @@ def insert_report(*, report_id, client_id, client_name, share_token, status, jud
             f"""
             INSERT INTO evaluation_reports(
                 report_id, client_id, client_name, share_token, status, judge_model,
-                sample_count, dataset_id, model_version, created_at, updated_at
-            ) VALUES ({_ph(11)})
+                sample_count, dataset_id, model_version, target_id, created_at, updated_at
+            ) VALUES ({_ph(12)})
             """,
             (report_id, client_id, client_name, share_token, status, judge_model,
-             sample_count, dataset_id, model_version, now, now),
+             sample_count, dataset_id, model_version, target_id, now, now),
         )
 
 
@@ -662,7 +731,7 @@ def list_reports_for_client(client_name: str) -> list[dict]:
         cur.execute(
             f"""
             SELECT report_id, share_token, status, judge_model, sample_count, dataset_id,
-                   model_version, created_at, updated_at, metrics_json, error
+                   model_version, target_id, created_at, updated_at, metrics_json, error
             FROM evaluation_reports
             WHERE client_name={_P}
             ORDER BY created_at DESC
@@ -904,3 +973,180 @@ def reset_report_for_retry(report_id: str, client_name: str) -> bool:
             ("processing", _utc_now(), report_id),
         )
         return True
+
+
+# -- Targets ---------------------------------------------------------------
+
+def create_target(*, client, name, description, base_url, model_name, api_key_enc, target_type) -> dict:
+    target_id = str(uuid.uuid4())
+    now = _utc_now()
+    client_name = client.get("name") if isinstance(client, dict) else None
+    client_id = client.get("id") if isinstance(client, dict) else None
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            INSERT INTO targets(
+                target_id, client_id, client_name, name, description, base_url,
+                model_name, api_key_enc, target_type, created_at, updated_at
+            ) VALUES ({_ph(11)})
+            """,
+            (
+                target_id,
+                client_id,
+                client_name,
+                name,
+                description,
+                base_url,
+                model_name,
+                api_key_enc,
+                target_type,
+                now,
+                now,
+            ),
+        )
+    return {
+        "target_id": target_id,
+        "name": name,
+        "description": description,
+        "base_url": base_url,
+        "model_name": model_name,
+        "target_type": target_type,
+        "created_at": now,
+    }
+
+
+def list_targets_for_client(client_name: str) -> list[dict]:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            SELECT target_id, name, description, base_url, model_name,
+                   target_type, created_at, updated_at
+            FROM targets
+            WHERE client_name={_P}
+            ORDER BY created_at DESC
+            """,
+            (client_name,),
+        )
+        return [_row_to_dict(r) for r in cur.fetchall()]
+
+
+def get_target_by_id(target_id: str) -> dict | None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT * FROM targets WHERE target_id={_P}",
+            (target_id,),
+        )
+        return _row_to_dict(cur.fetchone())
+
+
+def list_report_ids_for_target(target_id: str, client_name: str) -> list[str]:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            SELECT report_id
+            FROM evaluation_reports
+            WHERE target_id={_P} AND client_name={_P}
+            ORDER BY created_at DESC
+            """,
+            (target_id, client_name),
+        )
+        rows = cur.fetchall()
+        report_ids: list[str] = []
+        for row in rows:
+            if isinstance(row, dict):
+                report_ids.append(str(row.get("report_id")))
+            else:
+                report_ids.append(str(row[0]))
+        return report_ids
+
+
+def associate_report_with_target(report_id: str, target_id: str, client_name: str) -> bool:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE evaluation_reports
+               SET target_id={_P}, updated_at={_P}
+             WHERE report_id={_P} AND client_name={_P}
+            """,
+            (target_id, _utc_now(), report_id, client_name),
+        )
+        return cur.rowcount > 0
+
+
+def delete_target(target_id: str, client_name: str) -> bool:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT target_id FROM targets WHERE target_id={_P} AND client_name={_P}",
+            (target_id, client_name),
+        )
+        if not cur.fetchone():
+            return False
+        cur.execute(
+            f"UPDATE evaluation_reports SET target_id=NULL WHERE target_id={_P} AND client_name={_P}",
+            (target_id, client_name),
+        )
+        cur.execute(
+            f"DELETE FROM targets WHERE target_id={_P} AND client_name={_P}",
+            (target_id, client_name),
+        )
+        return True
+
+
+# -- User account helpers --------------------------------------------------
+
+def create_user(name: str, email: str, password_hash: str) -> dict:
+    """Insert a new user row. Raises ValueError if email already exists."""
+    user_id = str(uuid.uuid4())
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        try:
+            if _USE_PG:
+                cur.execute(
+                    """
+                    INSERT INTO users
+                        (user_id, name, email, password_hash, is_active, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, TRUE, %s, %s)
+                    """,
+                    (user_id, name, email.lower().strip(), password_hash, now, now),
+                )
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO users
+                        (user_id, name, email, password_hash, is_active, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, 1, ?, ?)
+                    """,
+                    (user_id, name, email.lower().strip(), password_hash, now, now),
+                )
+        except Exception as exc:
+            if "unique" in str(exc).lower() or "UNIQUE" in str(exc):
+                raise ValueError(f"Email already registered: {email}") from exc
+            raise
+    return {"user_id": user_id, "name": name, "email": email.lower().strip(), "created_at": now}
+
+
+def get_user_by_email(email: str) -> dict | None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT id, user_id, name, email, password_hash, is_active, created_at FROM users WHERE email = {_P}",
+            (email.lower().strip(),),
+        )
+        return _row_to_dict(cur.fetchone())
+
+
+def get_user_by_id(user_id: str) -> dict | None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT id, user_id, name, email, is_active, created_at FROM users WHERE user_id = {_P}",
+            (user_id,),
+        )
+        return _row_to_dict(cur.fetchone())

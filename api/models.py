@@ -59,6 +59,10 @@ class BreakRequest(BaseModel):
     description: str = Field(..., min_length=5)
     num_tests: int = Field(default=20, ge=6, le=50)
     groq_api_key: Optional[str] = None
+    target_id: Optional[str] = Field(
+        default=None,
+        description="Optional saved target ID to associate with this break run",
+    )
     judges: list[JudgeConfig] | None = Field(
         default=None,
         description=(
@@ -86,3 +90,22 @@ class DemoBreakRequest(BaseModel):
     description: str = Field(..., min_length=5)
     model_name: str
     num_tests: int = Field(default=5, ge=1)
+
+
+class TargetCreate(BaseModel):
+    name: str = Field(..., min_length=2)
+    description: Optional[str] = None
+    base_url: Optional[str] = None
+    model_name: Optional[str] = None
+    api_key: Optional[str] = None
+    target_type: str = Field(..., description="openai | huggingface | webhook")
+
+
+class TargetSummary(BaseModel):
+    target_id: str
+    name: str
+    description: Optional[str] = None
+    base_url: Optional[str] = None
+    model_name: Optional[str] = None
+    target_type: str
+    created_at: str

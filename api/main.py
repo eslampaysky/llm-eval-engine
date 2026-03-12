@@ -22,6 +22,7 @@ from api.database import init_db, get_stuck_processing_reports, mark_report_stal
 from api.job_queue import JobQueue, start_workers, stop_workers
 from api.rate_limit import limiter, rate_limit_exceeded_handler
 from api.routes import router
+from api.auth_routes import auth_router
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,7 @@ app.add_middleware(
 app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(router)
+app.include_router(auth_router)
 
 
 @app.get("/health")

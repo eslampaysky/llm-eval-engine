@@ -25,6 +25,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { getAuthHeader } from './context/AuthContext.jsx';
 import JudgeConfigPanel from './components/JudgeConfigPanel';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -80,6 +81,7 @@ async function apiFetch(path, opts = {}, includeAuth = true) {
     headers: {
       'Content-Type': 'application/json',
       ...(includeAuth ? { 'X-API-KEY': getApiKey() } : {}),
+      ...(includeAuth ? getAuthHeader() : {}),
       ...(opts.headers || {}),
     },
   });
@@ -98,6 +100,10 @@ export const api = {
   health:       ()    => apiFetch('/health'),
   breakModel:   (p)   => apiFetch('/break', { method: 'POST', body: JSON.stringify(p) }),
   demoBreak:    (p)   => apiFetch('/demo/break', { method: 'POST', body: JSON.stringify(p) }, false),
+  createTarget: (p)   => apiFetch('/targets', { method: 'POST', body: JSON.stringify(p) }),
+  getTargets:   ()    => apiFetch('/targets'),
+  getTarget:    (id)  => apiFetch(`/targets/${id}`),
+  deleteTarget: (id)  => apiFetch(`/targets/${id}`, { method: 'DELETE' }),
   getReport:    (id)  => apiFetch(`/report/${id}`),
   getDemoReport:(id)  => apiFetch(`/demo/report/${id}`, {}, false),
   cancelReport: (id)  => apiFetch(`/report/${id}/cancel`, { method: 'POST' }),
