@@ -148,6 +148,12 @@ class _JobQueue:
             except asyncio.TimeoutError:
                 logger.error(f"[Worker-{worker_id}] Job {jid} timed out after {JOB_TIMEOUT}s")
                 if job.job_id:
+                    try:
+                        from api.database import finalize_report_failure
+                        finalize_report_failure(job.job_id, f"Timed out after {JOB_TIMEOUT}s")
+                    except Exception:
+                        logger.exception(f"[Worker-{worker_id}] Failed to finalize timed out job {jid}")
+                if job.job_id:
                     self._status[job.job_id] = {
                         **self._status.get(job.job_id, {}),
                         "status": "failed",

@@ -533,9 +533,10 @@ def finalize_report_success(report_id, results_json, metrics_json, html_path,
                 html_path={_P}, html_content={_P}, total_tokens={_P},
                 total_cost_usd={_P}, error=NULL
             WHERE report_id={_P}
+              AND status != {_P}
             """,
             ("done", _utc_now(), results_json, metrics_json,
-             html_path, html_content, total_tokens, total_cost, report_id),
+             html_path, html_content, total_tokens, total_cost, report_id, "canceled"),
         )
 
 
@@ -543,9 +544,36 @@ def finalize_report_failure(report_id, error_message):
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            f"UPDATE evaluation_reports SET status={_P}, updated_at={_P}, error={_P} WHERE report_id={_P}",
-            ("failed", _utc_now(), error_message[:2000], report_id),
+            f"UPDATE evaluation_reports SET status={_P}, updated_at={_P}, error={_P} WHERE report_id={_P} AND status != {_P}",
+            ("failed", _utc_now(), error_message[:2000], report_id, "canceled"),
         )
+
+
+def cancel_report(report_id: str, reason: str, client_name: str | None = None) -> bool:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if client_name is None:
+            cur.execute(
+                f"SELECT report_id FROM evaluation_reports WHERE report_id={_P}",
+                (report_id,),
+            )
+        else:
+            cur.execute(
+                f"SELECT report_id FROM evaluation_reports WHERE report_id={_P} AND client_name={_P}",
+                (report_id, client_name),
+            )
+        if not cur.fetchone():
+            return False
+        cur.execute(
+            f"""
+            UPDATE evaluation_reports
+               SET status={_P}, updated_at={_P}, error={_P}
+             WHERE report_id={_P}
+               AND status IN ({_P}, {_P})
+            """,
+            ("canceled", _utc_now(), reason[:2000], report_id, "processing", "stale"),
+        )
+        return cur.rowcount > 0
 
 
 def get_report_row(report_id: str) -> dict | None:

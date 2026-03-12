@@ -19,6 +19,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from api.database import (
+    cancel_report,
     delete_report,
     get_cached_test_suite,     
     get_demo_run_count,
@@ -702,6 +703,21 @@ def get_report(
     }
 
 
+@router.post("/report/{report_id}/cancel", status_code=202)
+async def cancel_report_endpoint(
+    report_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    canceled = cancel_report(
+        report_id=report_id,
+        client_name=auth_ctx.get("client_name"),
+        reason="Canceled by user",
+    )
+    if not canceled:
+        raise HTTPException(status_code=409, detail="Report is not running or you do not have access.")
+    return {"report_id": report_id, "status": "canceled"}
+
+
 def _client_ip(request: Request) -> str:
     forwarded = (request.headers.get("x-forwarded-for") or "").strip()
     if forwarded:
@@ -793,6 +809,21 @@ def get_demo_report(report_id: str) -> dict[str, Any]:
         "error":           row["error"],
         "retryable":       retryable,
     }
+
+
+@router.post("/demo/report/{report_id}/cancel", status_code=202)
+async def cancel_demo_report_endpoint(report_id: str) -> dict[str, Any]:
+    row = get_report_row(report_id)
+    if not row or row["client_name"] != "demo":
+        raise HTTPException(status_code=404, detail="Report not found")
+    canceled = cancel_report(
+        report_id=report_id,
+        client_name="demo",
+        reason="Canceled by user",
+    )
+    if not canceled:
+        raise HTTPException(status_code=409, detail="Demo run is not running.")
+    return {"report_id": report_id, "status": "canceled"}
 
 
 @router.delete("/report/{report_id}", status_code=200)

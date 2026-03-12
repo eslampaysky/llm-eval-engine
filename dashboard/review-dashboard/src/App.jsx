@@ -107,6 +107,8 @@ const api = {
   demoBreak:    (p)   => apiFetch('/demo/break', { method: 'POST', body: JSON.stringify(p) }, false),
   getReport:    (id)  => apiFetch(`/report/${id}`),
   getDemoReport:(id)  => apiFetch(`/demo/report/${id}`, {}, false),
+  cancelReport: (id)  => apiFetch(`/report/${id}/cancel`, { method: 'POST' }),
+  cancelDemoReport: (id) => apiFetch(`/demo/report/${id}/cancel`, { method: 'POST' }, false),
   getReports:   ()    => apiFetch('/reports'),
   getHistory:   ()    => apiFetch('/history?limit=100'),
   getUsage:     ()    => apiFetch('/usage/summary'),
@@ -139,6 +141,9 @@ function pollStart(reportId, numTests = 20, fetchReport = api.getReport, mode = 
       if (r.status === 'done' || r.status === 'stale') {
         clearInterval(POLL.timerId); POLL.timerId = null;
         pollNotify({ type: 'done', report: r, mode: POLL.mode });
+      } else if (r.status === 'canceled') {
+        clearInterval(POLL.timerId); POLL.timerId = null;
+        pollNotify({ type: 'canceled', report: r, mode: POLL.mode });
       } else if (r.status === 'failed') {
         clearInterval(POLL.timerId); POLL.timerId = null;
         pollNotify({ type: 'failed', error: r.error || 'Evaluation failed', report: r, mode: POLL.mode });
@@ -820,7 +825,7 @@ function Toggle({ on, onClick }) {
 
 // ─── Live Progress Panel ──────────────────────────────────────────────────────
 
-function LiveProgress({ stage, pct, logs, logRef, done, reportId, activeType }) {
+function LiveProgress({ stage, pct, logs, logRef, done, reportId, activeType, onStop, stopping = false }) {
   return (
     <div className="terminal fade-in" style={{ marginBottom: 20 }}>
       <div className="terminal-bar">
@@ -832,6 +837,11 @@ function LiveProgress({ stage, pct, logs, logRef, done, reportId, activeType }) 
         <div className="term-title">ai-breaker-lab — {reportId ? reportId.slice(0, 8) : 'pending'}</div>
         {!done && (
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {onStop && (
+              <button className="btn btn-ghost" onClick={onStop} disabled={stopping} style={{ fontSize: 10.5, padding: '4px 10px' }}>
+                {stopping ? 'Stopping…' : 'Stop'}
+              </button>
+            )}
             <div className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5, borderTopColor: 'var(--amber)', borderColor: 'var(--bg4)' }} />
             <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--amber)', letterSpacing: '.1em' }}>RUNNING</span>
           </div>
@@ -929,6 +939,7 @@ function BreakPage({ onReportReady }) {
   const [stage,    setStage]    = useState(0);
   const [pct,      setPct]      = useState(0);
   const [error,    setError]    = useState('');
+  const [stopping, setStopping] = useState(false);
   const [logs,     setLogs]     = useState([]);
   const [runId,    setRunId]    = useState(ls.get('abl_active_run_id'));
   const [activeType, setActiveType] = useState(currentTestType(0, 0));
@@ -943,14 +954,20 @@ function BreakPage({ onReportReady }) {
     const unsub = pollSub(ev => {
       if (ev.mode && ev.mode !== 'break') return;
       if (ev.type === 'done') {
+        setStopping(false);
         setPolling(false); setPct(100);
         ls.set('abl_active_run_id', null);
         addLog(`✓ Done — ${ev.report.results?.length || ev.report.sample_count || 0} tests completed.`, 'ok');
         fireNotifications(ev.report);
         setTimeout(() => onReportReady(ev.report), 400);
+      } else if (ev.type === 'canceled') {
+        setStopping(false);
+        setPolling(false); setError('Run canceled'); addLog('■ Run canceled by user.', 'info');
       } else if (ev.type === 'failed') {
+        setStopping(false);
         setPolling(false); setError(ev.error); addLog(`✗ Failed: ${ev.error}`, 'err');
       } else if (ev.type === 'timeout') {
+        setStopping(false);
         setPolling(false); setError('Timed out after 7 minutes'); addLog('✗ Timed out', 'err');
       } else if (ev.type === 'error') {
         addLog(`⚠ Poll error: ${ev.error}`, 'err');
@@ -966,6 +983,26 @@ function BreakPage({ onReportReady }) {
   function set(k, v) { setForm(p => ({ ...p, [k]: v })); }
   function setJudge(k, v) { setJudgeCfg(p => ({ ...p, [k]: v })); }
 
+  async function handleStop() {
+    if (!runId || stopping) return;
+    setStopping(true);
+    try {
+      await api.cancelReport(runId);
+      ls.set('abl_active_run_id', null);
+      if (POLL.timerId) {
+        clearInterval(POLL.timerId);
+        POLL.timerId = null;
+      }
+      setPolling(false);
+      setError('Run canceled');
+      addLog('■ Stop requested. This run has been canceled.', 'info');
+    } catch (e) {
+      setStopping(false);
+      setError(e.message);
+      addLog(`✗ ${e.message}`, 'err');
+    }
+  }
+
   function changeJudgeProvider(provider) {
     const preset = JUDGE_PROVIDER_PRESETS[provider];
     setJudgeCfg(p => ({
@@ -978,7 +1015,7 @@ function BreakPage({ onReportReady }) {
   }
 
   async function handleSubmit() {
-    setError(''); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0));
+    setError(''); setStopping(false); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0));
 
     const target =
       targetType === 'openai'      ? { type: 'openai', base_url: form.base_url || 'https://api.openai.com', api_key: form.api_key, model_name: form.model_name }
@@ -1229,6 +1266,7 @@ function DemoPage({ report, onReportReady }) {
   const [errorStatus, setErrorStatus] = useState(null);
   const [retryableReport, setRetryableReport] = useState(null);
   const [countdown, setCountdown] = useState(60);
+  const [stopping, setStopping] = useState(false);
   const [logs, setLogs] = useState([]);
   const [runId, setRunId] = useState(ls.get('abl_demo_active_run_id'));
   const [activeType, setActiveType] = useState(currentTestType(0, 0));
@@ -1243,12 +1281,21 @@ function DemoPage({ report, onReportReady }) {
     const unsub = pollSub(ev => {
       if (ev.mode !== 'demo') return;
       if (ev.type === 'done') {
+        setStopping(false);
         setRetryableReport(null);
         setPolling(false); setPct(100);
         ls.set('abl_demo_active_run_id', null);
         addLog(`✓ Demo complete — ${ev.report.results?.length || ev.report.sample_count || 0} tests completed.`, 'ok');
         setTimeout(() => onReportReady(ev.report), 400);
+      } else if (ev.type === 'canceled') {
+        setStopping(false);
+        setPolling(false);
+        ls.set('abl_demo_active_run_id', null);
+        setRetryableReport(null);
+        setError('Demo run canceled');
+        addLog('Stop requested. This demo run has been canceled.', 'info');
       } else if (ev.type === 'failed') {
+        setStopping(false);
         setPolling(false);
         ls.set('abl_demo_active_run_id', null);
         setError(ev.error);
@@ -1280,7 +1327,7 @@ function DemoPage({ report, onReportReady }) {
   }, [retryableReport, countdown, polling]);
 
   async function handleSubmit() {
-    setError(''); setErrorStatus(null); setRetryableReport(null); setCountdown(60); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0));
+    setError(''); setErrorStatus(null); setRetryableReport(null); setCountdown(60); setStopping(false); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0));
     try {
       addLog('Submitting public demo request…', 'info');
       const res = await api.demoBreak({
@@ -1303,6 +1350,28 @@ function DemoPage({ report, onReportReady }) {
     }
   }
 
+  async function handleStop() {
+    if (!runId || stopping) return;
+    setStopping(true);
+    try {
+      await api.cancelDemoReport(runId);
+      ls.set('abl_demo_active_run_id', null);
+      if (POLL.timerId) {
+        clearInterval(POLL.timerId);
+        POLL.timerId = null;
+      }
+      setPolling(false);
+      setRetryableReport(null);
+      setError('Demo run canceled');
+      addLog('Stop requested. This demo run has been canceled.', 'info');
+    } catch (e) {
+      setStopping(false);
+      setErrorStatus(e.status || null);
+      setError(e.message);
+      addLog(`âœ• ${e.message}`, 'err');
+    }
+  }
+
   const busy = loading || polling;
   const isQuotaError = (errorStatus === 429) || /demo quota/i.test(error || '');
   const showRetryableState = !polling && !report && !!retryableReport;
@@ -1317,7 +1386,7 @@ function DemoPage({ report, onReportReady }) {
         <div className="page-desc">Try the public Gemini demo with server-hosted target and judge models.</div>
       </div>
 
-      {polling && <LiveProgress stage={stage} pct={pct} logs={logs} logRef={logRef} done={false} reportId={runId} activeType={activeType} />}
+      {polling && <LiveProgress stage={stage} pct={pct} logs={logs} logRef={logRef} done={false} reportId={runId} activeType={activeType} onStop={handleStop} stopping={stopping} />}
       {!report && error && <div className="err-box">⚠ {error}</div>}
 
       {showQuotaState && (
