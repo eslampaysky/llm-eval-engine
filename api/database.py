@@ -189,6 +189,14 @@ def init_db():
                     FOREIGN KEY (report_id) REFERENCES evaluation_reports(report_id) ON DELETE CASCADE
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS demo_runs (
+                    ip_hash TEXT NOT NULL,
+                    run_date TEXT NOT NULL,
+                    run_count INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (ip_hash, run_date)
+                )
+            """)
             # ── Test suite cache ──────────────────────────────────────────────
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS test_suite_cache (
@@ -207,6 +215,7 @@ def init_db():
             cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_client    ON evaluation_reports(client_name)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_created   ON evaluation_reports(created_at)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_test_cache_key         ON test_suite_cache(cache_key)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date         ON demo_runs(run_date)")
             cur.execute("""
                 SELECT column_name
                 FROM information_schema.columns
@@ -290,6 +299,14 @@ def init_db():
                     FOREIGN KEY(report_id) REFERENCES evaluation_reports(report_id)
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS demo_runs (
+                    ip_hash TEXT NOT NULL,
+                    run_date TEXT NOT NULL,
+                    run_count INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (ip_hash, run_date)
+                )
+            """)
             # ── Test suite cache ──────────────────────────────────────────────
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS test_suite_cache (
@@ -315,12 +332,17 @@ def init_db():
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN share_token TEXT")
             if "html_content" not in existing:
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date ON demo_runs(run_date)")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _hash_key(api_key: str) -> str:
     return hashlib.sha256(api_key.encode()).hexdigest()
+
+
+def hash_ip(ip_address: str) -> str:
+    return hashlib.sha256(ip_address.encode()).hexdigest()
 
 
 def _utc_now() -> str:
@@ -537,6 +559,40 @@ def get_report_row(report_id: str) -> dict | None:
             (report_id,),
         )
         return _row_to_dict(cur.fetchone())
+
+
+def get_demo_run_count(ip_hash: str, run_date: str) -> int:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT run_count FROM demo_runs WHERE ip_hash={_P} AND run_date={_P}",
+            (ip_hash, run_date),
+        )
+        row = _row_to_dict(cur.fetchone())
+        return int((row or {}).get("run_count") or 0)
+
+
+def upsert_demo_run(ip_hash: str, run_date: str) -> int:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT run_count FROM demo_runs WHERE ip_hash={_P} AND run_date={_P}",
+            (ip_hash, run_date),
+        )
+        row = _row_to_dict(cur.fetchone())
+        if row is None:
+            cur.execute(
+                f"INSERT INTO demo_runs(ip_hash, run_date, run_count) VALUES ({_ph(3)})",
+                (ip_hash, run_date, 1),
+            )
+            return 1
+
+        new_count = int(row["run_count"] or 0) + 1
+        cur.execute(
+            f"UPDATE demo_runs SET run_count={_P} WHERE ip_hash={_P} AND run_date={_P}",
+            (new_count, ip_hash, run_date),
+        )
+        return new_count
 
 
 def get_report_row_by_share_token(share_token: str) -> dict | None:

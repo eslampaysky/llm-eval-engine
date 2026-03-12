@@ -21,10 +21,12 @@ from pydantic import BaseModel, Field
 from api.database import (
     delete_report,
     get_cached_test_suite,     
+    get_demo_run_count,
     save_test_suite_cache,     
     finalize_report_failure,
     finalize_report_success,
     get_client_by_api_key,
+    hash_ip,
     reset_report_for_retry,     
     get_stuck_processing_reports,
     get_history_for_client,
@@ -38,9 +40,10 @@ from api.database import (
     register_client,
     save_human_reviews,
     set_report_share_token,
+    upsert_demo_run,
 )
 from api.job_queue import enqueue_job
-from api.models import BreakRequest, BreakTarget, EvaluationRequest, JudgeConfig
+from api.models import BreakRequest, BreakTarget, DemoBreakRequest, EvaluationRequest, JudgeConfig
 from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ, limiter ,LIMIT_RETRY
 from reports.report_generator import ReportGenerator, generate_html_report
 from src.llm_eval_engine.infrastructure.config_loader import load_project_config
@@ -49,7 +52,7 @@ from src.llm_eval_engine.infrastructure.evaluator_factories import (
 )
 from src.arabic_test_generator import ArabicTestGenerator, detect_language
 from src.metrics import compute_metrics
-from src.target_adapter import AdapterFactory
+from src.target_adapter import AdapterFactory, GeminiDemoAdapter
 from src.test_generator import GroqJudgeClient, TestSuiteGenerator
 from src.use_cases.run_evaluation import EvaluationPipeline
 
@@ -65,6 +68,12 @@ REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 GROQ_JUDGE_MODEL = "llama-3.3-70b-versatile"
 GROQ_BASE_URL    = "https://api.groq.com/openai/v1"
+DEMO_ALLOWED_MODELS = {
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-2.5-flash",
+}
+DEMO_DAILY_LIMIT = 5
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
@@ -430,7 +439,8 @@ _log = _logging.getLogger(__name__)
 def _process_break_job(report_id, target_cfg, description, num_tests,
                        groq_api_key, force_refresh=False, language="auto",
                        judges_config: list[dict[str, Any]] | None = None,
-                       disagreement_threshold: float | None = None):
+                       disagreement_threshold: float | None = None,
+                       target_adapter: Any | None = None):
     try:
         judge_client = GroqJudgeClient(
             api_key=groq_api_key, base_url=GROQ_BASE_URL, model=GROQ_JUDGE_MODEL,
@@ -457,7 +467,7 @@ def _process_break_job(report_id, target_cfg, description, num_tests,
             except Exception as cache_err:
                 _log.warning("Cache write failed (non-fatal): %s", cache_err)
 
-        target_adapter = AdapterFactory.from_config(target_cfg)
+        target_adapter = target_adapter or AdapterFactory.from_config(target_cfg)
         resolved_judges = [JudgeConfig(**j) for j in (judges_config or [])]
         judges = _resolve_break_judges(groq_api_key, resolved_judges)
         original_threshold = multi_judge_module.DISAGREEMENT_THRESHOLD
@@ -579,6 +589,7 @@ async def break_model(
         payload.language,
         [j.model_dump() for j in (payload.judges or [])],
         payload.disagreement_threshold,
+        None,
         job_id=report_id,
     )
     return {
@@ -618,6 +629,101 @@ def get_report(
         raise HTTPException(status_code=404, detail="Report not found")
     if row["client_name"] != auth_ctx.get("client_name"):
         raise HTTPException(status_code=403, detail="Not allowed to access this report")
+    share_token = _ensure_share_token(row)
+    return {
+        "report_id":       row["report_id"],
+        "share_token":     share_token,
+        "status":          row["status"],
+        "judge_model":     row["judge_model"],
+        "sample_count":    row["sample_count"],
+        "dataset_id":      row["dataset_id"],
+        "model_version":   row["model_version"],
+        "created_at":      row["created_at"],
+        "updated_at":      row["updated_at"],
+        "results":         json.loads(row["results_json"]) if row["results_json"] else [],
+        "metrics":         json.loads(row["metrics_json"]) if row["metrics_json"] else {},
+        "report_url":      f"/report/{row['report_id']}",
+        "public_share_url": _public_report_url(share_token),
+        "html_report_url": f"/report/{row['report_id']}/html" if row["html_path"] else None,
+        "error":           row["error"],
+    }
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = (request.headers.get("x-forwarded-for") or "").strip()
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+@router.post("/demo/break")
+async def demo_break_model(
+    request: Request,
+    payload: DemoBreakRequest,
+) -> dict[str, Any]:
+    model_name = payload.model_name.strip()
+    if model_name not in DEMO_ALLOWED_MODELS:
+        raise HTTPException(status_code=400, detail="Unsupported demo model")
+
+    gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
+    if not gemini_api_key:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY is not configured")
+    if not groq_api_key:
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY is not configured")
+
+    ip_hash = hash_ip(_client_ip(request))
+    run_date = datetime.now(timezone.utc).date().isoformat()
+    if get_demo_run_count(ip_hash, run_date) >= DEMO_DAILY_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail="You've used today's demo quota (5 runs). Come back tomorrow or sign up for full access.",
+        )
+    upsert_demo_run(ip_hash, run_date)
+
+    num_tests = min(int(payload.num_tests), 10)
+    report_id = str(uuid.uuid4())
+    _do_insert_report(
+        report_id=report_id,
+        auth_ctx={"client_name": "demo", "client": None},
+        sample_count=num_tests,
+        judge_model="groq",
+        dataset_id=None,
+        model_version=model_name,
+        status="processing",
+    )
+    await enqueue_job(
+        _process_break_job,
+        report_id,
+        {"type": "openai", "model_name": model_name},
+        payload.description,
+        num_tests,
+        groq_api_key,
+        False,
+        "auto",
+        [],
+        None,
+        GeminiDemoAdapter(api_key=gemini_api_key, model_name=model_name),
+        job_id=report_id,
+    )
+    return {
+        "report_id": report_id,
+        "status": "processing",
+        "num_tests": num_tests,
+        "message": (
+            f"Generating {num_tests} adversarial tests and breaking the demo Gemini model. "
+            f"Poll GET /demo/report/{report_id} for results."
+        ),
+    }
+
+
+@router.get("/demo/report/{report_id}")
+def get_demo_report(report_id: str) -> dict[str, Any]:
+    row = get_report_row(report_id)
+    if not row or row["client_name"] != "demo":
+        raise HTTPException(status_code=404, detail="Report not found")
     share_token = _ensure_share_token(row)
     return {
         "report_id":       row["report_id"],

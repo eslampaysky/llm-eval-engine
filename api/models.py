@@ -71,3 +71,9 @@ class BreakRequest(BaseModel):
         default="auto",
         description="'en', 'ar', or 'auto' (detect from description)",
     )
+
+
+class DemoBreakRequest(BaseModel):
+    description: str = Field(..., min_length=5)
+    model_name: str
+    num_tests: int = Field(default=5, ge=1)

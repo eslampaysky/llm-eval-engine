@@ -46,6 +46,18 @@ const PRESETS = [
   { label: 'Groq Llama',  url: 'https://api.groq.com/openai/v1',                                       model: 'llama-3.3-70b-versatile' },
 ];
 
+const DEMO_MODEL_OPTIONS = [
+  { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite', hint: 'fastest' },
+  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', hint: 'balanced' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'most capable' },
+];
+
+const DEMO_DESCRIPTION_SUGGESTIONS = [
+  'A customer support chatbot for an e-commerce store',
+  'A medical FAQ assistant',
+  'نظام دعم عملاء بالعربية',
+];
+
 const JUDGE_PROVIDER_PRESETS = {
   openai: { label: 'OpenAI', base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', name: 'openai' },
   anthropic: { label: 'Anthropic', base_url: 'https://api.anthropic.com/v1', model: 'claude-3-5-sonnet-latest', name: 'anthropic' },
@@ -69,12 +81,12 @@ function setApiKey(k) { ls.set('abl_api_key', k); }
 
 // ─── API layer ────────────────────────────────────────────────────────────────
 
-async function apiFetch(path, opts = {}) {
+async function apiFetch(path, opts = {}, includeAuth = true) {
   const res = await fetch(`${API_BASE}${path}`, {
     ...opts,
     headers: {
       'Content-Type': 'application/json',
-      'X-API-KEY': getApiKey(),
+      ...(includeAuth ? { 'X-API-KEY': getApiKey() } : {}),
       ...(opts.headers || {}),
     },
   });
@@ -87,7 +99,9 @@ async function apiFetch(path, opts = {}) {
 const api = {
   health:       ()    => apiFetch('/health'),
   breakModel:   (p)   => apiFetch('/break', { method: 'POST', body: JSON.stringify(p) }),
+  demoBreak:    (p)   => apiFetch('/demo/break', { method: 'POST', body: JSON.stringify(p) }, false),
   getReport:    (id)  => apiFetch(`/report/${id}`),
+  getDemoReport:(id)  => apiFetch(`/demo/report/${id}`, {}, false),
   getReports:   ()    => apiFetch('/reports'),
   getHistory:   ()    => apiFetch('/history?limit=100'),
   getUsage:     ()    => apiFetch('/usage/summary'),
@@ -96,7 +110,7 @@ const api = {
 
 // ─── Poll store (survives tab switches) ──────────────────────────────────────
 
-const POLL = { timerId: null, reportId: null, attempts: 0, numTests: 20, cbs: new Set() };
+const POLL = { timerId: null, reportId: null, attempts: 0, numTests: 20, cbs: new Set(), fetchReport: api.getReport, mode: 'break' };
 const pollSub    = (cb) => { POLL.cbs.add(cb); return () => POLL.cbs.delete(cb); };
 const pollNotify = (ev) => POLL.cbs.forEach(cb => cb(ev));
 const pollActive = ()   => !!POLL.timerId;
@@ -110,31 +124,31 @@ function stageFromAttempts(attempts, n) {
   return 4;
 }
 
-function pollStart(reportId, numTests = 20) {
+function pollStart(reportId, numTests = 20, fetchReport = api.getReport, mode = 'break') {
   if (POLL.timerId) clearInterval(POLL.timerId);
-  POLL.reportId = reportId; POLL.attempts = 0; POLL.numTests = numTests;
+  POLL.reportId = reportId; POLL.attempts = 0; POLL.numTests = numTests; POLL.fetchReport = fetchReport; POLL.mode = mode;
   POLL.timerId = setInterval(async () => {
     POLL.attempts++;
     try {
-      const r = await api.getReport(reportId);
+      const r = await POLL.fetchReport(reportId);
       if (r.status === 'done' || r.status === 'stale') {
         clearInterval(POLL.timerId); POLL.timerId = null;
-        pollNotify({ type: 'done', report: r });
+        pollNotify({ type: 'done', report: r, mode: POLL.mode });
       } else if (r.status === 'failed') {
         clearInterval(POLL.timerId); POLL.timerId = null;
-        pollNotify({ type: 'failed', error: r.error || 'Evaluation failed' });
+        pollNotify({ type: 'failed', error: r.error || 'Evaluation failed', mode: POLL.mode });
       } else {
         const stage = stageFromAttempts(POLL.attempts, numTests);
         const total = 12 + numTests * 5;
         const pct   = Math.min(95, Math.round((POLL.attempts * 3 / total) * 100));
-        pollNotify({ type: 'tick', attempts: POLL.attempts, stage, pct });
+        pollNotify({ type: 'tick', attempts: POLL.attempts, stage, pct, mode: POLL.mode });
       }
     } catch (e) {
-      pollNotify({ type: 'error', error: e.message });
+      pollNotify({ type: 'error', error: e.message, mode: POLL.mode });
     }
     if (POLL.attempts >= 140) {
       clearInterval(POLL.timerId); POLL.timerId = null;
-      pollNotify({ type: 'timeout' });
+      pollNotify({ type: 'timeout', mode: POLL.mode });
     }
   }, 3000);
 }
@@ -922,6 +936,7 @@ function BreakPage({ onReportReady }) {
 
   useEffect(() => {
     const unsub = pollSub(ev => {
+      if (ev.mode && ev.mode !== 'break') return;
       if (ev.type === 'done') {
         setPolling(false); setPct(100);
         ls.set('abl_active_run_id', null);
@@ -1194,6 +1209,175 @@ function BreakPage({ onReportReady }) {
 }
 
 // ─── Report Page ──────────────────────────────────────────────────────────────
+
+function DemoPage({ report, onReportReady }) {
+  const [form, setForm] = useState({
+    description: '',
+    model_name: DEMO_MODEL_OPTIONS[0].value,
+    num_tests: 5,
+  });
+  const [loading, setLoading] = useState(false);
+  const [polling, setPolling] = useState(pollActive() && POLL.mode === 'demo');
+  const [stage, setStage] = useState(0);
+  const [pct, setPct] = useState(0);
+  const [error, setError] = useState('');
+  const [logs, setLogs] = useState([]);
+  const [runId, setRunId] = useState(ls.get('abl_demo_active_run_id'));
+  const [activeType, setActiveType] = useState(currentTestType(0, 0));
+  const logRef = useRef(null);
+
+  const addLog = useCallback((msg, type = 'info') => {
+    setLogs(p => [...p, { msg, type, t: ts() }]);
+    setTimeout(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, 40);
+  }, []);
+
+  useEffect(() => {
+    const unsub = pollSub(ev => {
+      if (ev.mode !== 'demo') return;
+      if (ev.type === 'done') {
+        setPolling(false); setPct(100);
+        ls.set('abl_demo_active_run_id', null);
+        addLog(`✓ Demo complete — ${ev.report.results?.length || ev.report.sample_count || 0} tests completed.`, 'ok');
+        setTimeout(() => onReportReady(ev.report), 400);
+      } else if (ev.type === 'failed') {
+        setPolling(false); ls.set('abl_demo_active_run_id', null); setError(ev.error); addLog(`✕ Failed: ${ev.error}`, 'err');
+      } else if (ev.type === 'timeout') {
+        setPolling(false); ls.set('abl_demo_active_run_id', null); setError('Timed out after 7 minutes'); addLog('✕ Timed out', 'err');
+      } else if (ev.type === 'error') {
+        addLog(`⚠ Poll error: ${ev.error}`, 'err');
+      } else if (ev.type === 'tick') {
+        setStage(ev.stage ?? 0); setPct(ev.pct ?? 0);
+        setActiveType(currentTestType(ev.stage ?? 0, ev.pct ?? 0));
+        if (ev.attempts % 5 === 0) addLog(`${STAGES[ev.stage ?? 0].label}… (${ev.attempts * 3}s elapsed)`, 'info');
+      }
+    });
+    return unsub;
+  }, [addLog, onReportReady]);
+
+  async function handleSubmit() {
+    setError(''); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0));
+    try {
+      addLog('Submitting public demo request…', 'info');
+      const res = await api.demoBreak({
+        description: form.description,
+        model_name: form.model_name,
+        num_tests: +form.num_tests,
+      });
+      addLog(`✓ Job queued · ID: ${res.report_id}`, 'ok');
+      addLog(`Generating ${form.num_tests} adversarial tests…`, 'info');
+      setRunId(res.report_id);
+      ls.set('abl_demo_active_run_id', res.report_id);
+      setPolling(true);
+      pollStart(res.report_id, +form.num_tests, api.getDemoReport, 'demo');
+    } catch (e) {
+      setError(e.message);
+      addLog(`✕ ${e.message}`, 'err');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const busy = loading || polling;
+
+  return (
+    <div className="page fade-in">
+      <div className="page-header">
+        <div className="page-eyebrow">// core · demo</div>
+        <div className="page-title">Live Demo</div>
+        <div className="page-desc">Try the public Gemini demo with server-hosted target and judge models.</div>
+      </div>
+
+      {polling && <LiveProgress stage={stage} pct={pct} logs={logs} logRef={logRef} done={false} reportId={runId} activeType={activeType} />}
+      {error && <div className="err-box">⚠ {error}</div>}
+
+      {!polling && !report && (
+        <div style={{ maxWidth: 960 }}>
+          <div className="card" style={{ marginBottom: 14 }}>
+            <div className="card-label">01 — Demo setup</div>
+            <div className="field">
+              <label className="label">What does your model do?</label>
+              <textarea
+                className="textarea"
+                value={form.description}
+                onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                placeholder="Describe the model you want to simulate and test."
+                disabled={busy}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              {DEMO_DESCRIPTION_SUGGESTIONS.map(suggestion => (
+                <button
+                  key={suggestion}
+                  className="btn btn-ghost"
+                  style={{ fontSize: 10.5 }}
+                  onClick={() => setForm(p => ({ ...p, description: suggestion }))}
+                  disabled={busy}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="field">
+                <label className="label">Choose a model to test</label>
+                <select
+                  className="select"
+                  value={form.model_name}
+                  onChange={e => setForm(p => ({ ...p, model_name: e.target.value }))}
+                  disabled={busy}
+                >
+                  {DEMO_MODEL_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label} — {option.hint}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label className="label">Number of tests</label>
+                <select
+                  className="select"
+                  value={form.num_tests}
+                  onChange={e => setForm(p => ({ ...p, num_tests: Number(e.target.value) }))}
+                  disabled={busy}
+                >
+                  <option value={5}>5 — quick check</option>
+                  <option value={10}>10 — deeper sample</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ marginTop: 6, padding: '12px 14px', border: '1px solid var(--line2)', borderRadius: 'var(--r)', background: 'rgba(255,255,255,.02)', color: 'var(--mid)', fontSize: 11.5 }}>
+              Judge and target models are provided by AI Breaker Lab.
+            </div>
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%', marginTop: 14, justifyContent: 'center' }}
+              onClick={handleSubmit}
+              disabled={busy || form.description.trim().length < 5}
+            >
+              {loading ? <><div className="spinner" />Running…</> : 'Run Demo'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!polling && report && (
+        <>
+          <ReportPage report={report} persona="dev" />
+          <div className="card" style={{ marginTop: 14, borderColor: 'rgba(240,165,0,.35)', background: 'linear-gradient(135deg, rgba(240,165,0,.10), rgba(77,158,255,.08))' }}>
+            <div className="card-label">Next step</div>
+            <div style={{ fontSize: 18, color: 'var(--hi)', fontWeight: 600, marginBottom: 6 }}>
+              Testing your own model? Get full access — unlimited tests, all providers, CI integration.
+            </div>
+            <button className="btn btn-primary" onClick={() => setTimeout(() => { window.location.href = '/signup'; }, 0)}>
+              Get Started
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function ReportPage({ report, persona }) {
   const [tab, setTab]     = useState('overview');
@@ -2139,6 +2323,7 @@ function SettingsPage() {
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
 const NAV = [
+  { key: 'demo',     icon: '🎯', label: 'Live Demo',         section: 'core' },
   { key: 'break',    icon: '⚡', label: 'Break Your Model',   section: 'core' },
   { key: 'compare',  icon: '⇌',  label: 'Compare runs',    section: 'core' },
   { key: 'report',   icon: '📊', label: 'Single run',      section: 'reports' },
@@ -2153,8 +2338,10 @@ const sections = [...new Set(NAV.map(n => n.section))];
 // ─── App root ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [page,        setPage]     = useState('break');
+  const initialPage = window.location.pathname.toLowerCase() === '/demo' ? 'demo' : 'break';
+  const [page,        setPage]     = useState(initialPage);
   const [report,      setReport]   = useState(null);
+  const [demoReport,  setDemoReport] = useState(null);
   const [compareFocus, setCompareFocus] = useState(null);
   const [persona,     setPersona]  = useState('dev');
   const [apiKey,      setApiKeyS]  = useState(getApiKey());
@@ -2163,22 +2350,38 @@ export default function App() {
   useEffect(() => {
     // Re-attach to any in-flight poll (e.g. user refreshed the tab)
     const savedId = ls.get('abl_active_run_id');
-    if (savedId && !pollActive()) {
+    const savedDemoId = ls.get('abl_demo_active_run_id');
+    if (savedDemoId && !pollActive()) {
+      setRunning(true); setPage('demo');
+      pollStart(savedDemoId, 5, api.getDemoReport, 'demo');
+    } else if (savedId && !pollActive()) {
       setRunning(true); setPage('break');
       pollStart(savedId, 20);
     }
     const unsub = pollSub(ev => {
-      if (ev.type === 'done')   { setRunning(false); setReport(ev.report); setCompareFocus(ev.report); fireNotifications(ev.report); }
+      if (ev.type === 'done')   {
+        setRunning(false);
+        if (ev.mode === 'demo') setDemoReport(ev.report);
+        else { setReport(ev.report); setCompareFocus(ev.report); }
+        fireNotifications(ev.report);
+      }
       if (ev.type === 'failed' || ev.type === 'timeout') setRunning(false);
       if (ev.type === 'tick')   setRunning(true);
     });
     return unsub;
   }, []);
 
-  function navigate(key) { setPage(key); }
+  function navigate(key) {
+    setPage(key);
+    window.history.replaceState({}, '', key === 'demo' ? '/demo' : '/');
+  }
 
   function handleReportReady(r) {
     setReport(r); setCompareFocus(r); setPage('compare');
+  }
+
+  function handleDemoReportReady(r) {
+    setDemoReport(r); setPage('demo');
   }
 
   function handleApiKeyChange(k) { setApiKey(k); setApiKeyS(k); }
@@ -2217,8 +2420,8 @@ export default function App() {
                   <button key={n.key} className={`nav-btn${page === n.key ? ' active' : ''}`} onClick={() => navigate(n.key)}>
                     <span className="nav-icon">{n.icon}</span>
                     {n.label}
-                    {n.key === 'break' && running && <span className="nav-badge">running</span>}
-                    {n.badge && !(n.key === 'break' && running) && <span className="nav-badge">{n.badge}</span>}
+                    {((n.key === 'break' && running && POLL.mode === 'break') || (n.key === 'demo' && running && POLL.mode === 'demo')) && <span className="nav-badge">running</span>}
+                    {n.badge && !((n.key === 'break' && running && POLL.mode === 'break') || (n.key === 'demo' && running && POLL.mode === 'demo')) && <span className="nav-badge">{n.badge}</span>}
                   </button>
                 ))}
               </div>
@@ -2239,6 +2442,7 @@ export default function App() {
             </div>
             <PersonaSwitcher persona={persona} setPersona={setPersona} />
           </div>
+          {page === 'demo'     && <DemoPage report={demoReport} onReportReady={handleDemoReportReady} />}
           {page === 'break'    && <BreakPage onReportReady={handleReportReady} />}
           {page === 'compare'  && <ComparePage focusReport={compareFocus || report} onOpenSingleRun={handleOpenSingleRun} />}
           {page === 'report'   && <ReportPage report={report} persona={persona} />}

@@ -55,6 +55,15 @@ class OpenAICompatibleAdapter(BaseTargetAdapter):
         return str(content).strip()
 
 
+class GeminiDemoAdapter(OpenAICompatibleAdapter):
+    def __init__(self, api_key: str, model_name: str) -> None:
+        super().__init__(
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai",
+            api_key=api_key,
+            model_name=model_name,
+        )
+
+
 class HuggingFaceAdapter(BaseTargetAdapter):
     def __init__(self, repo_id: str, api_token: str) -> None:
         self._repo_id = repo_id
