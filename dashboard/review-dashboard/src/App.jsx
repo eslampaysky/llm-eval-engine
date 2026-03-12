@@ -1994,7 +1994,7 @@ function SettingsPage() {
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
 const NAV = [
-  { key: 'break',    icon: '⚡', label: 'Break a model',   section: 'core' },
+  { key: 'break',    icon: '⚡', label: 'Break Your model',   section: 'core' },
   { key: 'compare',  icon: '⇌',  label: 'Compare runs',    section: 'core' },
   { key: 'report',   icon: '📊', label: 'Single run',      section: 'reports' },
   { key: 'history',  icon: '🕑', label: 'History',         section: 'reports' },
