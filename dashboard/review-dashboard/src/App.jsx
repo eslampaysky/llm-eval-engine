@@ -111,6 +111,7 @@ export const api = {
   getReports:   ()    => apiFetch('/reports'),
   getHistory:   ()    => apiFetch('/history?limit=100'),
   getUsage:     ()    => apiFetch('/usage/summary'),
+  getUsageSummary: () => apiFetch('/usage/summary'),
   deleteReport: (id)  => apiFetch(`/report/${id}`, { method: 'DELETE' }),
 };
 
