@@ -726,7 +726,7 @@ tr:hover td { background:rgba(255,255,255,.012); }
 /* ── Enterprise report ───────────────────────────────────────── */
 .ent-wrap { background:#fff; color:#111; border-radius:var(--r2); overflow:hidden; box-shadow:0 8px 48px rgba(0,0,0,.5); font-family:'IBM Plex Sans', sans-serif; }
 .ent-hd { background:#06080f; padding:24px 28px; display:flex; align-items:center; justify-content:space-between; }
-.ent-logo { font-family:'IBM Plex Mono', monospace; font-size:13px; font-weight:600; color:#F0A500; letter-spacing:.07em; }
+.ent-logo { font-family:'IBM Plex Mono', monospace; font-size:13px; font-weight:600; color:var(--accent); letter-spacing:.07em; }
 .ent-meta { font-family:'IBM Plex Mono', monospace; font-size:9.5px; color:#3A4F6E; text-align:right; line-height:1.7; }
 .ent-bd { padding:26px 28px; }
 .ent-title { font-size:20px; font-weight:700; color:#111; margin-bottom:3px; }

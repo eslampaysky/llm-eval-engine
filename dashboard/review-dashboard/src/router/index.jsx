@@ -17,7 +17,11 @@ import RunDetailPage from '../pages/app/RunDetailPage.jsx';
 import PlaygroundPage from '../pages/app/PlaygroundPage.jsx';
 import ComparePage from '../pages/app/ComparePage.jsx';
 import ApiKeysPage from '../pages/app/ApiKeysPage.jsx';
-import SettingsPage from '../pages/app/SettingsPage.jsx';
+import SettingsLayout from '../pages/app/settings/SettingsLayout.jsx';
+import ProfilePage from '../pages/app/settings/ProfilePage.jsx';
+import SecurityPage from '../pages/app/settings/SecurityPage.jsx';
+import BillingPage from '../pages/app/settings/BillingPage.jsx';
+import WorkspacePage from '../pages/app/settings/WorkspacePage.jsx';
 
 const router = createBrowserRouter([
   {
@@ -50,7 +54,17 @@ const router = createBrowserRouter([
       { path: 'playground', element: <PlaygroundPage /> },
       { path: 'compare', element: <ComparePage /> },
       { path: 'api-keys', element: <ApiKeysPage /> },
-      { path: 'settings', element: <SettingsPage /> },
+      {
+        path: 'settings',
+        element: <SettingsLayout />,
+        children: [
+          { index: true, element: <Navigate to="profile" replace /> },
+          { path: 'profile', element: <ProfilePage /> },
+          { path: 'security', element: <SecurityPage /> },
+          { path: 'billing', element: <BillingPage /> },
+          { path: 'workspace', element: <WorkspacePage /> },
+        ],
+      },
     ],
   },
   {

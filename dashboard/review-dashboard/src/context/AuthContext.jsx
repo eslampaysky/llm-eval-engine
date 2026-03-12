@@ -101,6 +101,10 @@ export function AuthProvider({ children }) {
     setError('');
   }, []);
 
+  const updateUser = useCallback((nextUser) => {
+    setUser(nextUser);
+  }, []);
+
   const clearError = useCallback(() => setError(''), []);
 
   const value = {
@@ -111,6 +115,7 @@ export function AuthProvider({ children }) {
     login,
     logout,
     register,
+    updateUser,
     clearError,
   };
 

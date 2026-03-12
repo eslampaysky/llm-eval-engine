@@ -1154,3 +1154,65 @@ def get_user_by_id(user_id: str) -> dict | None:
             (user_id,),
         )
         return _row_to_dict(cur.fetchone())
+
+
+def update_user_profile(user_id: str, name: str, email: str) -> dict | None:
+    """Update name and email. Returns updated user or None if not found."""
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        try:
+            if _USE_PG:
+                cur.execute(
+                    "UPDATE users SET name=%s, email=%s, updated_at=%s WHERE user_id=%s",
+                    (name, email.lower().strip(), now, user_id),
+                )
+            else:
+                cur.execute(
+                    "UPDATE users SET name=?, email=?, updated_at=? WHERE user_id=?",
+                    (name, email.lower().strip(), now, user_id),
+                )
+            if (cur.rowcount or 0) == 0:
+                return None
+        except Exception as exc:
+            # Both SQLite and Postgres will throw on UNIQUE(email) constraint violations.
+            if "unique" in str(exc).lower():
+                raise ValueError("That email is already in use by another account.") from exc
+            raise
+    return get_user_by_id(user_id)
+
+
+def update_user_password(user_id: str, new_password_hash: str) -> bool:
+    """Update password hash. Returns True on success."""
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if _USE_PG:
+            cur.execute(
+                "UPDATE users SET password_hash=%s, updated_at=%s WHERE user_id=%s",
+                (new_password_hash, now, user_id),
+            )
+        else:
+            cur.execute(
+                "UPDATE users SET password_hash=?, updated_at=? WHERE user_id=?",
+                (new_password_hash, now, user_id),
+            )
+        return (cur.rowcount or 0) > 0
+
+
+def deactivate_user(user_id: str) -> bool:
+    """Soft-delete: mark account inactive. Returns True on success."""
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if _USE_PG:
+            cur.execute(
+                "UPDATE users SET is_active=FALSE, updated_at=%s WHERE user_id=%s",
+                (now, user_id),
+            )
+        else:
+            cur.execute(
+                "UPDATE users SET is_active=0, updated_at=? WHERE user_id=?",
+                (now, user_id),
+            )
+        return (cur.rowcount or 0) > 0

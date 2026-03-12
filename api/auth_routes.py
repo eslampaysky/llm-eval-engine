@@ -4,9 +4,12 @@ api/auth_routes.py
 FastAPI router for user authentication endpoints.
 
 Routes:
-  POST /auth/register - create account, return JWT
-  POST /auth/login    - verify credentials, return JWT
-  GET  /auth/me       - return current user (requires Bearer token)
+  POST   /auth/register         - create account, return JWT
+  POST   /auth/login            - verify credentials, return JWT
+  GET    /auth/me               - return current user (requires Bearer token)
+  PATCH  /auth/me               - update name/email (requires Bearer token)
+  POST   /auth/change-password  - change password (requires Bearer token)
+  DELETE /auth/me               - deactivate account (requires Bearer token)
 """
 
 from __future__ import annotations
@@ -18,7 +21,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 
-from api.database import create_user, get_user_by_email, get_user_by_id
+from api.database import (
+    create_user,
+    deactivate_user,
+    get_user_by_email,
+    get_user_by_id,
+    update_user_password,
+    update_user_profile,
+)
 from api.user_auth import (
     create_access_token,
     decode_access_token,
@@ -210,3 +220,102 @@ def me(current_user: Annotated[dict, Depends(get_current_user)]) -> dict:
         "email": current_user["email"],
         "created_at": current_user["created_at"],
     }
+
+
+class UpdateProfileRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    email: EmailStr
+
+
+@auth_router.patch("/me", summary="Update current user profile")
+def update_profile(
+    payload: UpdateProfileRequest,
+    current_user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """
+    Update display name and email address.
+    Returns the updated user profile (token is not rotated).
+    """
+    try:
+        updated = update_user_profile(
+            user_id=current_user["user_id"],
+            name=payload.name,
+            email=str(payload.email),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    return {
+        "user_id": updated["user_id"],
+        "name": updated["name"],
+        "email": updated["email"],
+        "created_at": updated["created_at"],
+    }
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+@auth_router.post("/change-password", summary="Change current user password")
+def change_password(
+    payload: ChangePasswordRequest,
+    current_user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Change password after verifying the current one."""
+    user_with_hash = get_user_by_email(current_user["email"])
+    if not user_with_hash:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    if not verify_password(payload.current_password, user_with_hash["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    new_hash = hash_password(payload.new_password)
+    ok = update_user_password(current_user["user_id"], new_hash)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Password update failed.",
+        )
+
+    return {"success": True, "message": "Password updated successfully."}
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(..., min_length=1)
+    confirm: str
+
+
+@auth_router.delete("/me", summary="Deactivate current user account")
+def delete_account(
+    payload: DeleteAccountRequest,
+    current_user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Soft-delete the account. Requires password + confirmation string."""
+    if payload.confirm != "DELETE MY ACCOUNT":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail='Confirmation string must be exactly: DELETE MY ACCOUNT',
+        )
+
+    user_with_hash = get_user_by_email(current_user["email"])
+    if not user_with_hash:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    if not verify_password(payload.password, user_with_hash["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    deactivate_user(current_user["user_id"])
+    return {"success": True, "message": "Account deactivated."}

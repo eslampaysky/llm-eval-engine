@@ -48,7 +48,7 @@ const PRESETS = {
 const ROLE_INFO = {
   arbiter: {
     label: 'Arbiter',
-    color: 'var(--amber)',
+    color: 'var(--accent)',
     desc: 'Used only when Groq scores land in the uncertain middle.',
     icon: 'A',
   },
@@ -288,7 +288,7 @@ export default function JudgeConfigPanel({ judges, onChange, groqKeySupplied, di
           style={{
             fontFamily: 'var(--mono)',
             fontSize: 10.5,
-            color: groqKeySupplied ? 'var(--green)' : 'var(--amber)',
+            color: groqKeySupplied ? 'var(--accent2)' : 'var(--accent)',
           }}
         >
           {groqKeySupplied ? 'key supplied' : 'env fallback'}
