@@ -1,0 +1,109 @@
+name: "AI Breaker Lab"
+description: >
+  Run adversarial evaluation against your LLM endpoint.
+  Fails the workflow when the model score drops below fail_threshold.
+
+branding:
+  icon: "shield"
+  color: "red"
+
+inputs:
+  api_key:
+    description: "Breaker Lab client API key (X-API-KEY)"
+    required: true
+  groq_api_key:
+    description: "Groq API key for test generation and judging"
+    required: true
+  endpoint:
+    description: "Breaker Lab backend URL"
+    required: false
+    default: "https://llm-eval-engine-production.up.railway.app"
+  target_type:
+    description: "Adapter type: openai | huggingface | webhook"
+    required: false
+    default: "openai"
+  target_base_url:
+    description: "Base URL of the model endpoint (openai adapter)"
+    required: false
+    default: "https://api.openai.com"
+  target_api_key:
+    description: "API key for the target model (openai adapter)"
+    required: false
+    default: ""
+  target_model_name:
+    description: "Model name for the target (openai adapter)"
+    required: false
+    default: ""
+  target_repo_id:
+    description: "HuggingFace repo ID (huggingface adapter)"
+    required: false
+    default: ""
+  target_api_token:
+    description: "HuggingFace API token (huggingface adapter)"
+    required: false
+    default: ""
+  target_endpoint_url:
+    description: "Webhook endpoint URL (webhook adapter)"
+    required: false
+    default: ""
+  target_payload_template:
+    description: 'Webhook payload template, e.g. {"question":"{question}"}'
+    required: false
+    default: ""
+  description:
+    description: "Free-text description of the model under test"
+    required: true
+  num_tests:
+    description: "Number of adversarial tests to generate (6-50)"
+    required: false
+    default: "20"
+  fail_threshold:
+    description: "Score below which the step fails (0-10)"
+    required: false
+    default: "5.0"
+  force_refresh:
+    description: "Bypass test-suite cache (true/false)"
+    required: false
+    default: "false"
+
+outputs:
+  score:
+    description: "Average model score (0-10)"
+  passed:
+    description: "'true' or 'false'"
+  report_url:
+    description: "URL to the full HTML evaluation report"
+  failure_count:
+    description: "Number of tests the model failed"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install local aibreaker SDK
+      shell: bash
+      run: pip install "${{ github.action_path }}/../aibreaker" --quiet
+
+    - name: Run evaluation
+      shell: bash
+      env:
+        INPUT_API_KEY: ${{ inputs.api_key }}
+        INPUT_GROQ_API_KEY: ${{ inputs.groq_api_key }}
+        INPUT_ENDPOINT: ${{ inputs.endpoint }}
+        INPUT_TARGET_TYPE: ${{ inputs.target_type }}
+        INPUT_TARGET_BASE_URL: ${{ inputs.target_base_url }}
+        INPUT_TARGET_API_KEY: ${{ inputs.target_api_key }}
+        INPUT_TARGET_MODEL_NAME: ${{ inputs.target_model_name }}
+        INPUT_TARGET_REPO_ID: ${{ inputs.target_repo_id }}
+        INPUT_TARGET_API_TOKEN: ${{ inputs.target_api_token }}
+        INPUT_TARGET_ENDPOINT_URL: ${{ inputs.target_endpoint_url }}
+        INPUT_TARGET_PAYLOAD_TEMPLATE: ${{ inputs.target_payload_template }}
+        INPUT_DESCRIPTION: ${{ inputs.description }}
+        INPUT_NUM_TESTS: ${{ inputs.num_tests }}
+        INPUT_FAIL_THRESHOLD: ${{ inputs.fail_threshold }}
+        INPUT_FORCE_REFRESH: ${{ inputs.force_refresh }}
+      run: python "${{ github.action_path }}/_run.py"

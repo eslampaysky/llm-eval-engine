@@ -7,7 +7,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Any
-
+from api.multi_judge import build_judges, score_answers, compute_agreement_rate
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -33,13 +33,14 @@ from api.database import (
     save_human_reviews,
 )
 from api.job_queue import enqueue_job
-from api.models import EvaluationRequest
+from api.models import BreakRequest, BreakTarget, EvaluationRequest
 from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ, limiter ,LIMIT_RETRY
 from reports.report_generator import ReportGenerator, generate_html_report
 from src.llm_eval_engine.infrastructure.config_loader import load_project_config
 from src.llm_eval_engine.infrastructure.evaluator_factories import (
     build_default_evaluator_registry,
 )
+from src.arabic_test_generator import ArabicTestGenerator, detect_language
 from src.metrics import compute_metrics
 from src.target_adapter import AdapterFactory
 from src.test_generator import GroqJudgeClient, TestSuiteGenerator
@@ -70,25 +71,6 @@ class HumanReviewItem(BaseModel):
 
 class HumanReviewRequest(BaseModel):
     reviews: list[HumanReviewItem] = Field(default_factory=list)
-
-
-class BreakTarget(BaseModel):
-    type: str
-    base_url: str | None = None
-    api_key: str | None = None
-    model_name: str | None = None
-    repo_id: str | None = None
-    api_token: str | None = None
-    endpoint_url: str | None = None
-    headers: dict | None = None
-    payload_template: str | None = None
-
-
-class BreakRequest(BaseModel):
-    target: BreakTarget
-    description: str = Field(..., min_length=5)
-    num_tests: int = Field(default=20, ge=6, le=50)
-    groq_api_key: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -307,79 +289,59 @@ import logging as _logging
 _log = _logging.getLogger(__name__)
  
  
-def _process_break_job(
-    report_id: str,
-    target_cfg: dict,
-    description: str,
-    num_tests: int,
-    groq_api_key: str,
-    force_refresh: bool = False,
-) -> None:
-    """
-    Background worker: generate (or load cached) test suite, score it, save report.
- 
-    Cache behaviour
-    ───────────────
-    • Cache key  = SHA-256( normalised_description + "::" + num_tests )
-    • Cache hit  → skip Groq generation entirely; Groq is still used for scoring.
-    • Cache miss → generate via Groq, persist to test_suite_cache for next time.
-    • force_refresh=True → bypass the cache read (still writes on miss).
-    """
+
+def _process_break_job(report_id, target_cfg, description, num_tests,
+                       groq_api_key, force_refresh=False, language="auto"):
     try:
-        # ── 1. Test-suite cache lookup ────────────────────────────────────────
+        judge_client = GroqJudgeClient(
+            api_key=groq_api_key, base_url=GROQ_BASE_URL, model=GROQ_JUDGE_MODEL,
+        )
+        resolved_lang = language if language != "auto" else detect_language(description)
+
         tests = None
- 
         if not force_refresh:
             tests = get_cached_test_suite(description=description, num_tests=num_tests)
-            if tests:
-                _log.info(
-                    "[Cache HIT]  description=%r  num_tests=%d  report_id=%s",
-                    description, num_tests, report_id,
-                )
- 
         if tests is None:
-            _log.info(
-                "[Cache MISS] generating  description=%r  num_tests=%d",
-                description, num_tests,
-            )
-            judge_client = GroqJudgeClient(
-                api_key=groq_api_key, base_url=GROQ_BASE_URL, model=GROQ_JUDGE_MODEL,
-            )
-            generator = TestSuiteGenerator(judge_client=judge_client)
-            tests = generator.generate_from_description(
-                description=description, num_tests=num_tests,
-            )
-            # ── 2. Persist to cache (best-effort — never blocks a run) ────────
-            try:
-                save_test_suite_cache(
-                    description=description,
-                    num_tests=num_tests,
-                    tests=tests,
+            if resolved_lang == "ar":
+                generator = ArabicTestGenerator(judge_client=judge_client)
+                tests = generator.generate_arabic_suite(
+                    description=description, num_tests=num_tests,
                 )
+            else:
+                generator = TestSuiteGenerator(judge_client=judge_client)
+                tests = generator.generate_from_description(
+                    description=description, num_tests=num_tests,
+                )
+            try:
+                save_test_suite_cache(description=description,
+                                      num_tests=num_tests, tests=tests)
             except Exception as cache_err:
                 _log.warning("Cache write failed (non-fatal): %s", cache_err)
- 
-        # ── 3. Score answers against the target model ─────────────────────────
+
         target_adapter = AdapterFactory.from_config(target_cfg)
-        judge          = _GroqAnswerJudge(api_key=groq_api_key)
-        results        = _score_answers(tests, target_adapter, judge)
-        metrics        = compute_metrics(results)
- 
-        # ── 4. Generate HTML report ───────────────────────────────────────────
+        judges  = build_judges(groq_api_key)                  # ← multi-judge
+        results = score_answers(tests, target_adapter, judges) # ← multi-judge
+
+        # Inject agreement red-flag into metrics
+        agreement_rate = compute_agreement_rate(results)
+        metrics = compute_metrics(results)
+        metrics["judges_agreement"] = agreement_rate
+        if agreement_rate < 0.7 and len(judges) > 1:
+            metrics.setdefault("red_flags", []).append(
+                f"Judges disagreed on {round((1 - agreement_rate)*100, 1)}% of tests "
+                f"— results may be uncertain."
+            )
+
+        judge_label = "+".join(j.name for j in judges)
         REPORT_DIR.mkdir(parents=True, exist_ok=True)
         html_path = str(REPORT_DIR / f"report_{report_id}.html")
         ReportGenerator().generate(
             metrics=metrics, results=results, output_path=html_path,
-            metadata={
-                "target_type": target_cfg.get("type", "unknown"),
-                "judge_model": GROQ_JUDGE_MODEL,
-            },
+            metadata={"target_type": target_cfg.get("type", "unknown"),
+                      "judge_model": judge_label},
         )
-        _finalize_report_success(
-            report_id=report_id, results=results,
-            metrics=metrics, html_path=html_path,
-        )
- 
+        _finalize_report_success(report_id=report_id, results=results,
+                                  metrics=metrics, html_path=html_path)
     except Exception as exc:
         _finalize_report_failure(report_id=report_id, error_message=str(exc))
 
@@ -461,8 +423,14 @@ async def break_model(
         evaluation_date=datetime.now(timezone.utc).date().isoformat(),
     )
     await enqueue_job(
-        _process_break_job,payload.force_refresh, 
-        report_id, target_cfg, payload.description, payload.num_tests, groq_api_key,
+        _process_break_job,
+        report_id,
+        target_cfg,
+        payload.description,
+        payload.num_tests,
+        groq_api_key,
+        payload.force_refresh,
+        payload.language,
         job_id=report_id,
     )
     return {
@@ -546,6 +514,7 @@ class RetryRequest(BaseModel):
     target: "BreakTarget | None" = None
     description: str | None = None
     groq_api_key: str | None = None
+    language: str = "auto"
  
  
 # ── The retry endpoint ────────────────────────────────────────────────────────
@@ -642,6 +611,7 @@ async def retry_report(
         num_tests,
         groq_api_key,
         False,   # force_refresh=False — use cache if available
+        payload.language,
         job_id=report_id,
     )
  

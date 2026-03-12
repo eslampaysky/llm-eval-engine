@@ -314,6 +314,11 @@ def get_client_by_key(api_key: str) -> dict | None:
         return _row_to_dict(cur.fetchone())
 
 
+def get_client_by_api_key(api_key: str) -> dict | None:
+    """Backward-compatible alias used by routes.py."""
+    return get_client_by_key(api_key)
+
+
 # ── Usage logging ─────────────────────────────────────────────────────────────
 
 def log_usage(*, report_id, api_key, sample_count, client=None,
