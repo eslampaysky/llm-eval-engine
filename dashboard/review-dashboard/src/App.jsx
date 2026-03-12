@@ -294,7 +294,7 @@ async function fireNotifications(report) {
 // ─── CSS (inline for portability) ─────────────────────────────────────────────
 
 const css = `
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -317,6 +317,7 @@ const css = `
   --blue:   #5B9BF5;
   --mono:   'IBM Plex Mono', monospace;
   --sans:   'IBM Plex Sans', sans-serif;
+  --display:'Space Grotesk', sans-serif;
   --r:      5px;
   --r2:     9px;
   --sw:     220px;
@@ -399,13 +400,18 @@ body {
 .sidebar-foot {
   padding: 12px 14px; border-top: 1px solid var(--line); flex-shrink: 0;
 }
+.persona-switcher {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 999px;
+  border: 1px solid var(--line2); background: rgba(17,21,32,.92);
+}
 .persona-label {
   font-family: var(--mono); font-size: 8.5px; letter-spacing:.12em;
-  text-transform: uppercase; color: var(--mute); margin-bottom: 6px;
+  text-transform: uppercase; color: var(--mute);
 }
 .persona-tabs { display: flex; gap: 4px; }
 .ptab {
-  flex: 1; padding: 4px 0; font-size: 10px; font-family: var(--mono);
+  min-width: 42px; padding: 6px 10px; font-size: 10px; font-family: var(--mono);
   border: 1px solid var(--line2); background: none; color: var(--mute);
   border-radius: var(--r); cursor: pointer; transition: all .1s;
 }
@@ -436,11 +442,15 @@ body {
   letter-spacing:.14em; text-transform:uppercase; margin-bottom:5px;
 }
 .page-title {
-  font-family: var(--mono); font-size: 24px; font-weight: 600;
+  font-family: var(--display); font-size: 29px; font-weight: 700;
   color: var(--hi); letter-spacing:-.025em; line-height:1.1;
 }
 .page-desc { color: var(--mid); font-size: 13px; margin-top: 5px; }
 .page-header { margin-bottom: 24px; }
+.main-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 18px 34px 0; max-width: 1180px;
+}
 
 /* ── Buttons ─────────────────────────────────────────────────── */
 .btn {
@@ -763,6 +773,19 @@ function GradeCircle({ g, size = 50, fontSize = 22 }) {
   );
 }
 
+function PersonaSwitcher({ persona, setPersona }) {
+  return (
+    <div className="persona-switcher">
+      <div className="persona-label">Audience</div>
+      <div className="persona-tabs">
+        {[['dev', 'Dev'], ['pm', 'PM'], ['ent', 'Ent']].map(([k, l]) => (
+          <button key={k} className={`ptab${persona === k ? ' on' : ''}`} onClick={() => setPersona(k)}>{l}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Toggle({ on, onClick }) {
   return <div className={`toggle ${on ? 'on' : ''}`} onClick={onClick} />;
 }
@@ -778,7 +801,7 @@ function LiveProgress({ stage, pct, logs, logRef, done, reportId, activeType }) 
           <div className="term-dot" style={{ background: '#fbbf24' }} />
           <div className="term-dot" style={{ background: '#4ade80' }} />
         </div>
-        <div className="term-title">breaker-lab — {reportId ? reportId.slice(0, 8) : 'pending'}</div>
+        <div className="term-title">ai-breaker-lab — {reportId ? reportId.slice(0, 8) : 'pending'}</div>
         {!done && (
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
             <div className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5, borderTopColor: 'var(--amber)', borderColor: 'var(--bg4)' }} />
@@ -1234,7 +1257,7 @@ function ReportPage({ report, persona }) {
       <div className="page-header">
         <div className="page-eyebrow">// report · {fmtDate(report.created_at)}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div className="page-title">Breaker Report</div>
+          <div className="page-title">AI Breaker Report</div>
           <GradeCircle g={g} size={40} fontSize={18} />
           <button className="btn btn-ghost" style={{ fontSize: 10.5, padding: '3px 10px' }}
             onClick={() => { navigator.clipboard?.writeText(report.report_id); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
@@ -2036,7 +2059,7 @@ export default function App() {
           <div className="logo-area">
             <div className="logo-mark">
               <div className="logo-dot" />
-              BREAKER LAB
+              AI BREAKER LAB
             </div>
             <div className="logo-sub">AI model stress-tester</div>
           </div>
@@ -2058,12 +2081,6 @@ export default function App() {
           </nav>
 
           <div className="sidebar-foot">
-            <div className="persona-label">View as</div>
-            <div className="persona-tabs">
-              {[['dev', 'Dev'], ['pm', 'PM'], ['ent', 'Ent']].map(([k, l]) => (
-                <button key={k} className={`ptab${persona === k ? ' on' : ''}`} onClick={() => setPersona(k)}>{l}</button>
-              ))}
-            </div>
             <div className="key-label">API Key</div>
             <SidebarKey value={apiKey} onChange={e => handleApiKeyChange(e.target.value)} />
           </div>
@@ -2071,6 +2088,12 @@ export default function App() {
 
         {/* ── Main ── */}
         <main className="main">
+          <div className="main-toolbar">
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--mute)', letterSpacing: '.12em', textTransform: 'uppercase' }}>
+              AI Breaker Lab
+            </div>
+            <PersonaSwitcher persona={persona} setPersona={setPersona} />
+          </div>
           {page === 'break'    && <BreakPage onReportReady={handleReportReady} />}
           {page === 'compare'  && <ComparePage focusReport={compareFocus || report} onOpenSingleRun={handleOpenSingleRun} />}
           {page === 'report'   && <ReportPage report={report} persona={persona} />}
