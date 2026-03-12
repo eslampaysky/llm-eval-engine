@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -51,6 +51,7 @@ class JudgeConfig(BaseModel):
     base_url: str
     api_key: str
     model: str
+    role: Literal["arbiter", "safety", "custom"] = "custom"
 
 
 class BreakRequest(BaseModel):
@@ -58,7 +59,15 @@ class BreakRequest(BaseModel):
     description: str = Field(..., min_length=5)
     num_tests: int = Field(default=20, ge=6, le=50)
     groq_api_key: Optional[str] = None
-    judges: list[JudgeConfig] | None = None
+    judges: list[JudgeConfig] | None = Field(
+        default=None,
+        description=(
+            "Optional custom judges. Each judge needs: name, base_url, api_key, model, role. "
+            "role='arbiter' replaces the default OpenAI arbiter. "
+            "role='safety' replaces the default Anthropic safety judge. "
+            "role='custom' adds an extra judge that always runs."
+        ),
+    )
     disagreement_threshold: float | None = Field(default=None, ge=1.0, le=3.0)
     force_refresh: bool = Field(
         default=False,

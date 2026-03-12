@@ -25,6 +25,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import JudgeConfigPanel from './components/JudgeConfigPanel';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -57,15 +58,6 @@ const DEMO_DESCRIPTION_SUGGESTIONS = [
   'A medical FAQ assistant',
   'نظام دعم عملاء بالعربية',
 ];
-
-const JUDGE_PROVIDER_PRESETS = {
-  openai: { label: 'OpenAI', base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', name: 'openai' },
-  anthropic: { label: 'Anthropic', base_url: 'https://api.anthropic.com/v1', model: 'claude-3-5-sonnet-latest', name: 'anthropic' },
-  groq: { label: 'Groq', base_url: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', name: 'groq-secondary' },
-  custom: { label: 'Custom', base_url: '', model: '', name: 'custom' },
-};
-
-const DISAGREEMENT_OPTIONS = [1.0, 1.5, 2.0, 2.5, 3.0];
 
 const TEST_TYPE_SEQUENCE = ['Hallucination', 'Adversarial', 'Safety', 'Correctness', 'Grounding', 'Red-team'];
 
@@ -925,15 +917,7 @@ function BreakPage({ onReportReady }) {
     endpoint_url: '', payload_template: '{"input":"{question}"}',
     description: '', num_tests: 20, groq_api_key: '', language: 'auto',
   });
-  const [judgeOpen, setJudgeOpen] = useState(false);
-  const [judgeCfg, setJudgeCfg] = useState({
-    provider: 'openai',
-    name: JUDGE_PROVIDER_PRESETS.openai.name,
-    base_url: JUDGE_PROVIDER_PRESETS.openai.base_url,
-    model: JUDGE_PROVIDER_PRESETS.openai.model,
-    api_key: '',
-    disagreement_threshold: 2.5,
-  });
+  const [judges, setJudges] = useState([]);
   const [loading,  setLoading]  = useState(false);
   const [polling,  setPolling]  = useState(pollActive());
   const [stage,    setStage]    = useState(0);
@@ -981,7 +965,6 @@ function BreakPage({ onReportReady }) {
   }, [addLog, onReportReady]);
 
   function set(k, v) { setForm(p => ({ ...p, [k]: v })); }
-  function setJudge(k, v) { setJudgeCfg(p => ({ ...p, [k]: v })); }
 
   async function handleStop() {
     if (!runId || stopping) return;
@@ -1003,19 +986,12 @@ function BreakPage({ onReportReady }) {
     }
   }
 
-  function changeJudgeProvider(provider) {
-    const preset = JUDGE_PROVIDER_PRESETS[provider];
-    setJudgeCfg(p => ({
-      ...p,
-      provider,
-      name: preset.name,
-      base_url: preset.base_url,
-      model: p.model && p.provider === provider ? p.model : preset.model,
-    }));
-  }
-
   async function handleSubmit() {
     setError(''); setStopping(false); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0));
+
+    const configuredJudges = judges
+      .filter(judge => judge.api_key && judge.model && judge.base_url)
+      .map(({ id, provider, ...judge }) => judge);
 
     const target =
       targetType === 'openai'      ? { type: 'openai', base_url: form.base_url || 'https://api.openai.com', api_key: form.api_key, model_name: form.model_name }
@@ -1028,15 +1004,7 @@ function BreakPage({ onReportReady }) {
       num_tests: +form.num_tests,
       language: form.language || 'auto',
       ...(form.groq_api_key ? { groq_api_key: form.groq_api_key } : {}),
-      ...(judgeOpen && judgeCfg.api_key && judgeCfg.model && judgeCfg.base_url ? {
-        judges: [{
-          name: judgeCfg.name || judgeCfg.provider,
-          base_url: judgeCfg.base_url,
-          api_key: judgeCfg.api_key,
-          model: judgeCfg.model,
-        }],
-        disagreement_threshold: +judgeCfg.disagreement_threshold,
-      } : {}),
+      ...(configuredJudges.length > 0 ? { judges: configuredJudges } : {}),
     };
 
     try {
@@ -1167,73 +1135,12 @@ function BreakPage({ onReportReady }) {
             </div>
           </div>
 
-          <div className="card" style={{ marginBottom: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
-              <div>
-                <div className="card-label" style={{ marginBottom: 4 }}>03 — Judge configuration</div>
-                <div style={{ fontSize: 11.5, color: 'var(--mid)' }}>
-                  Groq stays the primary judge. Add a second opinion only when you want disagreement visibility.
-                </div>
-              </div>
-              <button className="btn btn-ghost" onClick={() => setJudgeOpen(v => !v)} disabled={busy}>
-                {judgeOpen ? 'Hide second judge' : '+ Add second judge'}
-              </button>
-            </div>
-
-            <div style={{ padding: '12px 14px', borderRadius: 'var(--r)', border: '1px solid var(--line2)', background: 'rgba(255,255,255,.02)', marginBottom: judgeOpen ? 14 : 0 }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: 6 }}>
-                Primary judge
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: 13, color: 'var(--hi)', fontWeight: 600 }}>Groq · llama-3.3-70b-versatile</div>
-                  <div style={{ fontSize: 11, color: 'var(--mid)', marginTop: 2 }}>Uses the Groq key from Run config as the locked primary judge.</div>
-                </div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: form.groq_api_key ? 'var(--green)' : 'var(--amber)' }}>
-                  {form.groq_api_key ? 'Key supplied' : 'Uses server/env fallback'}
-                </div>
-              </div>
-            </div>
-
-            {judgeOpen && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div>
-                  <div className="field">
-                    <label className="label">Provider</label>
-                    <select className="select" value={judgeCfg.provider} onChange={e => changeJudgeProvider(e.target.value)} disabled={busy}>
-                      {Object.entries(JUDGE_PROVIDER_PRESETS).map(([key, preset]) => (
-                        <option key={key} value={key}>{preset.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label className="label">Judge name</label>
-                    <input className="input" value={judgeCfg.name} onChange={e => setJudge('name', e.target.value)} placeholder="secondary" disabled={busy} />
-                  </div>
-                  <div className="field">
-                    <label className="label">Base URL</label>
-                    <input className="input" value={judgeCfg.base_url} onChange={e => setJudge('base_url', e.target.value)} placeholder="https://api.openai.com/v1" disabled={busy} />
-                  </div>
-                </div>
-                <div>
-                  <div className="field">
-                    <label className="label">Model</label>
-                    <input className="input" value={judgeCfg.model} onChange={e => setJudge('model', e.target.value)} placeholder="gpt-4o-mini" disabled={busy} />
-                  </div>
-                  <div className="field">
-                    <label className="label">API key</label>
-                    <PwInput value={judgeCfg.api_key} onChange={e => setJudge('api_key', e.target.value)} placeholder="sk-…" disabled={busy} />
-                  </div>
-                  <div className="field">
-                    <label className="label">Disagreement threshold</label>
-                    <select className="select" value={judgeCfg.disagreement_threshold} onChange={e => setJudge('disagreement_threshold', e.target.value)} disabled={busy}>
-                      {DISAGREEMENT_OPTIONS.map(v => <option key={v} value={v}>{v.toFixed(1)}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <JudgeConfigPanel
+            judges={judges}
+            onChange={setJudges}
+            groqKeySupplied={!!form.groq_api_key}
+            disabled={busy}
+          />
 
           <div className="card">
             <button className="btn btn-primary" style={{ width: '100%', marginTop: 4, justifyContent: 'center' }}

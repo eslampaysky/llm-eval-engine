@@ -11,8 +11,11 @@ from email.message import EmailMessage
 from html import escape
 from pathlib import Path
 from typing import Annotated, Any
-import api.multi_judge as multi_judge_module
-from api.multi_judge import build_judges, score_answers, compute_agreement_rate
+from api.multi_judge import (
+    build_judges_from_request,
+    score_answers,
+    compute_agreement_rate,
+)
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -292,27 +295,7 @@ def _resolve_break_judges(
     groq_api_key: str,
     judges_config: list[JudgeConfig] | None = None,
 ) -> list[Any]:
-    if not judges_config:
-        return build_judges(groq_api_key)
-
-    judges: list[Any] = [
-        multi_judge_module._Judge(
-            name="groq",
-            api_key=groq_api_key,
-            base_url=GROQ_BASE_URL,
-            model=GROQ_JUDGE_MODEL,
-        )
-    ]
-    for judge in judges_config:
-        judges.append(
-            multi_judge_module._Judge(
-                name=judge.name,
-                api_key=judge.api_key,
-                base_url=judge.base_url,
-                model=judge.model,
-            )
-        )
-    return judges
+    return build_judges_from_request(groq_api_key, judges_config)
 
 
 def _process_evaluation_job(report_id, samples, judge_model):
@@ -498,13 +481,7 @@ def _process_break_job(report_id, target_cfg, description, num_tests,
         target_adapter = target_adapter or AdapterFactory.from_config(target_cfg)
         resolved_judges = [JudgeConfig(**j) for j in (judges_config or [])]
         judges = _resolve_break_judges(groq_api_key, resolved_judges)
-        original_threshold = multi_judge_module.DISAGREEMENT_THRESHOLD
-        if disagreement_threshold is not None:
-            multi_judge_module.DISAGREEMENT_THRESHOLD = float(disagreement_threshold)
-        try:
-            results = score_answers(tests, target_adapter, judges)
-        finally:
-            multi_judge_module.DISAGREEMENT_THRESHOLD = original_threshold
+        results = score_answers(tests, target_adapter, judges)
 
         # Inject agreement red-flag into metrics
         agreement_rate = compute_agreement_rate(results)
