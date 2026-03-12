@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
+import smtplib
 import uuid
 import time
 from datetime import datetime, timezone
+from email.message import EmailMessage
+from html import escape
 from pathlib import Path
 from typing import Annotated, Any
 from api.multi_judge import build_judges, score_answers, compute_agreement_rate
@@ -24,6 +28,7 @@ from api.database import (
     get_stuck_processing_reports,
     get_history_for_client,
     get_report_row,
+    get_report_row_by_share_token,
     get_usage_slice,
     init_db,
     insert_report,
@@ -31,6 +36,7 @@ from api.database import (
     log_usage,
     register_client,
     save_human_reviews,
+    set_report_share_token,
 )
 from api.job_queue import enqueue_job
 from api.models import BreakRequest, BreakTarget, EvaluationRequest
@@ -73,10 +79,111 @@ class HumanReviewRequest(BaseModel):
     reviews: list[HumanReviewItem] = Field(default_factory=list)
 
 
+class NotifyRequest(BaseModel):
+    report_id: str
+    email: str | None = None
+    slack_enabled: bool = False
+    email_enabled: bool = False
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _public_report_url(share_token: str) -> str:
+    base = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if base:
+        return f"{base}/r/{share_token}"
+    return f"/r/{share_token}"
+
+
+def _ensure_share_token(row: dict[str, Any]) -> str:
+    share_token = (row.get("share_token") or "").strip()
+    if share_token:
+        return share_token
+    share_token = secrets.token_urlsafe(9).replace("-", "").replace("_", "")[:12]
+    set_report_share_token(str(row["report_id"]), share_token)
+    row["share_token"] = share_token
+    return share_token
+
+
+def _send_email_notification(to_email: str, report: dict[str, Any]) -> None:
+    host = os.getenv("SMTP_HOST", "").strip()
+    port = int(os.getenv("SMTP_PORT", "587"))
+    user = os.getenv("SMTP_USER", "").strip()
+    password = os.getenv("SMTP_PASSWORD", "").strip()
+    sender = os.getenv("NOTIFY_EMAIL_FROM", "").strip()
+
+    if not all([host, user, password, sender]):
+        raise HTTPException(status_code=500, detail="SMTP is not configured")
+
+    metrics = report.get("metrics") or {}
+    score = metrics.get("average_score", 0)
+    failed = len(metrics.get("failed_rows", []))
+    public_url = _public_report_url(str(report["share_token"]))
+
+    msg = EmailMessage()
+    msg["Subject"] = f"AI Breaker Lab report {report['report_id']}"
+    msg["From"] = sender
+    msg["To"] = to_email
+    msg.set_content(
+        f"Your run is complete.\n\n"
+        f"Report ID: {report['report_id']}\n"
+        f"Score: {score}/10\n"
+        f"Failures: {failed}\n"
+        f"Public report: {public_url}\n"
+    )
+
+    with smtplib.SMTP(host, port) as smtp:
+        smtp.starttls()
+        smtp.login(user, password)
+        smtp.send_message(msg)
+
+
+def build_public_html(row: dict[str, Any]) -> str:
+    metrics = json.loads(row["metrics_json"]) if row["metrics_json"] else {}
+    score = metrics.get("average_score", 0)
+    failed = len(metrics.get("failed_rows", []))
+    red_flags = metrics.get("red_flags", [])
+    flags_html = "".join(f"<li>{escape(str(flag))}</li>" for flag in red_flags) or "<li>None</li>"
+
+    return f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Breaker Lab Report {escape(str(row["report_id"]))}</title>
+    <style>
+      :root {{ color-scheme: light; }}
+      body {{ font-family: Arial, sans-serif; margin: 0; background: #f5f7fb; color: #0f172a; }}
+      main {{ max-width: 760px; margin: 40px auto; background: #fff; border: 1px solid #dbe3f0; border-radius: 16px; padding: 28px; }}
+      h1 {{ margin: 0 0 18px; font-size: 28px; }}
+      .meta {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }}
+      .card {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; }}
+      .label {{ font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #64748b; margin-bottom: 6px; }}
+      .value {{ font-size: 18px; font-weight: 700; }}
+      ul {{ padding-left: 20px; }}
+      li {{ margin: 8px 0; }}
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>AI Breaker Lab Report</h1>
+      <div class="meta">
+        <div class="card"><div class="label">Report ID</div><div class="value">{escape(str(row["report_id"]))}</div></div>
+        <div class="card"><div class="label">Model</div><div class="value">{escape(str(row.get("model_version") or "unknown"))}</div></div>
+        <div class="card"><div class="label">Score</div><div class="value">{escape(str(score))}/10</div></div>
+        <div class="card"><div class="label">Tests</div><div class="value">{escape(str(row.get("sample_count") or 0))}</div></div>
+        <div class="card"><div class="label">Failures</div><div class="value">{failed}</div></div>
+      </div>
+      <h2>Red Flags</h2>
+      <ul>{flags_html}</ul>
+    </main>
+  </body>
+</html>
+"""
 
 
 def initialize_api_storage() -> None:
@@ -113,10 +220,12 @@ def validate_api_key(
 
 def _do_insert_report(*, report_id, auth_ctx, sample_count, judge_model,
                       dataset_id, model_version, status):
+    share_token = secrets.token_urlsafe(9).replace("-", "").replace("_", "")[:12]
     insert_report(
         report_id=report_id,
         client_id=auth_ctx.get("client", {}).get("id") if auth_ctx.get("client") else None,
         client_name=auth_ctx.get("client_name"),
+        share_token=share_token,
         status=status,
         judge_model=judge_model,
         sample_count=sample_count,
@@ -452,7 +561,9 @@ def list_reports(
 ) -> list[dict[str, Any]]:
     rows = list_reports_for_client(auth_ctx.get("client_name"))
     for r in rows:
+        share_token = _ensure_share_token(r)
         r["report_url"] = f"/report/{r['report_id']}"
+        r["public_share_url"] = _public_report_url(share_token)
     return rows
 
 
@@ -468,8 +579,10 @@ def get_report(
         raise HTTPException(status_code=404, detail="Report not found")
     if row["client_name"] != auth_ctx.get("client_name"):
         raise HTTPException(status_code=403, detail="Not allowed to access this report")
+    share_token = _ensure_share_token(row)
     return {
         "report_id":       row["report_id"],
+        "share_token":     share_token,
         "status":          row["status"],
         "judge_model":     row["judge_model"],
         "sample_count":    row["sample_count"],
@@ -480,6 +593,7 @@ def get_report(
         "results":         json.loads(row["results_json"]) if row["results_json"] else [],
         "metrics":         json.loads(row["metrics_json"]) if row["metrics_json"] else {},
         "report_url":      f"/report/{row['report_id']}",
+        "public_share_url": _public_report_url(share_token),
         "html_report_url": f"/report/{row['report_id']}/html" if row["html_path"] else None,
         "error":           row["error"],
     }
@@ -685,6 +799,42 @@ def get_report_html(
             raise HTTPException(status_code=404, detail="Could not generate HTML report")
 
     return HTMLResponse(content=html_content)
+
+
+@router.post("/notify")
+@limiter.limit(LIMIT_READ)
+def notify(
+    request: Request,
+    payload: NotifyRequest,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    row = get_report_row(payload.report_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if row["client_name"] != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=403, detail="Not allowed")
+    if row["status"] != "done":
+        raise HTTPException(status_code=409, detail="Report is not complete")
+
+    report = {
+        "report_id": row["report_id"],
+        "share_token": _ensure_share_token(row),
+        "metrics": json.loads(row["metrics_json"]) if row["metrics_json"] else {},
+    }
+
+    if payload.email_enabled and payload.email:
+        _send_email_notification(payload.email, report)
+
+    return {"ok": True}
+
+
+@router.get("/r/{share_token}", response_class=HTMLResponse)
+@limiter.limit(LIMIT_READ)
+def public_report(request: Request, share_token: str):
+    row = get_report_row_by_share_token(share_token)
+    if not row or row["status"] != "done":
+        raise HTTPException(status_code=404, detail="Report not found")
+    return HTMLResponse(content=build_public_html(row))
 
 
 @router.post("/report/{report_id}/human-review")

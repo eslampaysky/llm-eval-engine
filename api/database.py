@@ -134,6 +134,7 @@ def init_db():
                     report_id TEXT PRIMARY KEY,
                     client_id INTEGER,
                     client_name TEXT,
+                    share_token TEXT UNIQUE,
                     status TEXT NOT NULL,
                     judge_model TEXT,
                     sample_count INTEGER NOT NULL,
@@ -180,6 +181,16 @@ def init_db():
             cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_client    ON evaluation_reports(client_name)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_created   ON evaluation_reports(created_at)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_test_cache_key         ON test_suite_cache(cache_key)")
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'evaluation_reports'
+            """)
+            existing = {row["column_name"] for row in cur.fetchall()}
+            if "share_token" not in existing:
+                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN share_token TEXT UNIQUE")
+            if "html_content" not in existing:
+                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
 
         else:
             # --- SQLite DDL (unchanged from original) -------------------------
@@ -224,6 +235,7 @@ def init_db():
                     report_id TEXT PRIMARY KEY,
                     client_id INTEGER,
                     client_name TEXT,
+                    share_token TEXT UNIQUE,
                     status TEXT NOT NULL,
                     judge_model TEXT,
                     sample_count INTEGER NOT NULL,
@@ -273,6 +285,8 @@ def init_db():
             # Migrate: add html_content to evaluation_reports if missing
             cur.execute("PRAGMA table_info(evaluation_reports)")
             existing = {row[1] for row in cur.fetchall()}
+            if "share_token" not in existing:
+                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN share_token TEXT")
             if "html_content" not in existing:
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
 
@@ -443,7 +457,7 @@ def get_latest_regression_baseline(client_name, dataset_id, current_model_versio
 
 # ── Evaluation reports ────────────────────────────────────────────────────────
 
-def insert_report(*, report_id, client_id, client_name, status, judge_model,
+def insert_report(*, report_id, client_id, client_name, share_token, status, judge_model,
                   sample_count, dataset_id, model_version):
     now = _utc_now()
     with _get_conn() as conn:
@@ -451,11 +465,11 @@ def insert_report(*, report_id, client_id, client_name, status, judge_model,
         cur.execute(
             f"""
             INSERT INTO evaluation_reports(
-                report_id, client_id, client_name, status, judge_model,
+                report_id, client_id, client_name, share_token, status, judge_model,
                 sample_count, dataset_id, model_version, created_at, updated_at
-            ) VALUES ({_ph(10)})
+            ) VALUES ({_ph(11)})
             """,
-            (report_id, client_id, client_name, status, judge_model,
+            (report_id, client_id, client_name, share_token, status, judge_model,
              sample_count, dataset_id, model_version, now, now),
         )
 
@@ -499,12 +513,33 @@ def get_report_row(report_id: str) -> dict | None:
         return _row_to_dict(cur.fetchone())
 
 
+def get_report_row_by_share_token(share_token: str) -> dict | None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT * FROM evaluation_reports WHERE share_token=%s" % _P
+            if _USE_PG else
+            "SELECT * FROM evaluation_reports WHERE share_token=?",
+            (share_token,),
+        )
+        return _row_to_dict(cur.fetchone())
+
+
+def set_report_share_token(report_id: str, share_token: str) -> None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"UPDATE evaluation_reports SET share_token={_P} WHERE report_id={_P}",
+            (share_token, report_id),
+        )
+
+
 def list_reports_for_client(client_name: str) -> list[dict]:
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             f"""
-            SELECT report_id, status, judge_model, sample_count, dataset_id,
+            SELECT report_id, share_token, status, judge_model, sample_count, dataset_id,
                    model_version, created_at, updated_at, error
             FROM evaluation_reports
             WHERE client_name={_P}
