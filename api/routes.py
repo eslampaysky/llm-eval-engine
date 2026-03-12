@@ -108,7 +108,11 @@ def _utc_now_iso() -> str:
 
 
 def _public_report_url(share_token: str) -> str:
-    base = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
+    # Public report links are served by the API route /r/{share_token}.
+    base = (
+        os.getenv("API_BASE_URL", "").strip().rstrip("/")
+        or os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
+    )
     if base:
         return f"{base}/r/{share_token}"
     return f"/r/{share_token}"

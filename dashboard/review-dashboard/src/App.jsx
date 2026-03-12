@@ -31,7 +31,7 @@ import JudgeConfigPanel from './components/JudgeConfigPanel';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL
   || 'https://llm-eval-engine-production.up.railway.app';
-const SHARE_BASE = import.meta.env.VITE_SHARE_BASE_URL || 'https://breaker.ai';
+const SHARE_BASE = import.meta.env.VITE_SHARE_BASE_URL || API_BASE;
 
 const STAGES = [
   { id: 'init',     label: 'Initialising',          icon: '◈', detail: 'Connecting to target model' },
@@ -1785,7 +1785,7 @@ function ShareTab({ reportId, shareToken }) {
         <div style={{ fontSize: 10.5, color: 'var(--mute)', marginBottom: 14 }}>
           No auth required. Share in Slack, LinkedIn, or a client email.
         </div>
-        <div className="card-label">HTML report (full, authenticated)</div>
+        <div className="card-label">Internal HTML report (authenticated)</div>
         <div className="share-box">
           <span style={{ fontSize: 13 }}>📄</span>
           <div className="share-url">{shareUrl.replace('https://', '')}</div>
@@ -1793,7 +1793,7 @@ function ShareTab({ reportId, shareToken }) {
         </div>
       </div>
       <div style={{ fontSize: 11, color: 'var(--mute)' }}>
-        The public link shows a read-only summary view. The HTML link requires your API key header.
+        The public link is safe to share. The HTML link is internal-only and still requires your API key header.
       </div>
     </div>
   );
