@@ -11,6 +11,7 @@ from email.message import EmailMessage
 from html import escape
 from pathlib import Path
 from typing import Annotated, Any
+import api.multi_judge as multi_judge_module
 from api.multi_judge import build_judges, score_answers, compute_agreement_rate
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -39,7 +40,7 @@ from api.database import (
     set_report_share_token,
 )
 from api.job_queue import enqueue_job
-from api.models import BreakRequest, BreakTarget, EvaluationRequest
+from api.models import BreakRequest, BreakTarget, EvaluationRequest, JudgeConfig
 from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ, limiter ,LIMIT_RETRY
 from reports.report_generator import ReportGenerator, generate_html_report
 from src.llm_eval_engine.infrastructure.config_loader import load_project_config
@@ -276,6 +277,33 @@ def _run_pipeline(samples, judge_model):
     return results, compute_metrics(results)
 
 
+def _resolve_break_judges(
+    groq_api_key: str,
+    judges_config: list[JudgeConfig] | None = None,
+) -> list[Any]:
+    if not judges_config:
+        return build_judges(groq_api_key)
+
+    judges: list[Any] = [
+        multi_judge_module._Judge(
+            name="groq",
+            api_key=groq_api_key,
+            base_url=GROQ_BASE_URL,
+            model=GROQ_JUDGE_MODEL,
+        )
+    ]
+    for judge in judges_config:
+        judges.append(
+            multi_judge_module._Judge(
+                name=judge.name,
+                api_key=judge.api_key,
+                base_url=judge.base_url,
+                model=judge.model,
+            )
+        )
+    return judges
+
+
 def _process_evaluation_job(report_id, samples, judge_model):
     try:
         results, metrics = _run_pipeline(samples=samples, judge_model=judge_model)
@@ -400,7 +428,9 @@ _log = _logging.getLogger(__name__)
  
 
 def _process_break_job(report_id, target_cfg, description, num_tests,
-                       groq_api_key, force_refresh=False, language="auto"):
+                       groq_api_key, force_refresh=False, language="auto",
+                       judges_config: list[dict[str, Any]] | None = None,
+                       disagreement_threshold: float | None = None):
     try:
         judge_client = GroqJudgeClient(
             api_key=groq_api_key, base_url=GROQ_BASE_URL, model=GROQ_JUDGE_MODEL,
@@ -428,8 +458,15 @@ def _process_break_job(report_id, target_cfg, description, num_tests,
                 _log.warning("Cache write failed (non-fatal): %s", cache_err)
 
         target_adapter = AdapterFactory.from_config(target_cfg)
-        judges  = build_judges(groq_api_key)                  # ← multi-judge
-        results = score_answers(tests, target_adapter, judges) # ← multi-judge
+        resolved_judges = [JudgeConfig(**j) for j in (judges_config or [])]
+        judges = _resolve_break_judges(groq_api_key, resolved_judges)
+        original_threshold = multi_judge_module.DISAGREEMENT_THRESHOLD
+        if disagreement_threshold is not None:
+            multi_judge_module.DISAGREEMENT_THRESHOLD = float(disagreement_threshold)
+        try:
+            results = score_answers(tests, target_adapter, judges)
+        finally:
+            multi_judge_module.DISAGREEMENT_THRESHOLD = original_threshold
 
         # Inject agreement red-flag into metrics
         agreement_rate = compute_agreement_rate(results)
@@ -522,7 +559,7 @@ async def break_model(
     )
     _do_insert_report(
         report_id=report_id, auth_ctx=auth_ctx, sample_count=payload.num_tests,
-        judge_model=f"groq/{GROQ_JUDGE_MODEL}", dataset_id=None,
+        judge_model="+".join(["groq", *[j.name for j in (payload.judges or [])]]), dataset_id=None,
         model_version=model_version, status="processing",
     )
     log_usage(
@@ -540,6 +577,8 @@ async def break_model(
         groq_api_key,
         payload.force_refresh,
         payload.language,
+        [j.model_dump() for j in (payload.judges or [])],
+        payload.disagreement_threshold,
         job_id=report_id,
     )
     return {
@@ -726,6 +765,8 @@ async def retry_report(
         groq_api_key,
         False,   # force_refresh=False — use cache if available
         payload.language,
+        None,
+        None,
         job_id=report_id,
     )
  

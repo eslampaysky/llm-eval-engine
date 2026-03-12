@@ -46,6 +46,15 @@ const PRESETS = [
   { label: 'Groq Llama',  url: 'https://api.groq.com/openai/v1',                                       model: 'llama-3.3-70b-versatile' },
 ];
 
+const JUDGE_PROVIDER_PRESETS = {
+  openai: { label: 'OpenAI', base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', name: 'openai' },
+  anthropic: { label: 'Anthropic', base_url: 'https://api.anthropic.com/v1', model: 'claude-3-5-sonnet-latest', name: 'anthropic' },
+  groq: { label: 'Groq', base_url: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', name: 'groq-secondary' },
+  custom: { label: 'Custom', base_url: '', model: '', name: 'custom' },
+};
+
+const DISAGREEMENT_OPTIONS = [1.0, 1.5, 2.0, 2.5, 3.0];
+
 const TEST_TYPE_SEQUENCE = ['Hallucination', 'Adversarial', 'Safety', 'Correctness', 'Grounding', 'Red-team'];
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
@@ -887,6 +896,15 @@ function BreakPage({ onReportReady }) {
     endpoint_url: '', payload_template: '{"input":"{question}"}',
     description: '', num_tests: 20, groq_api_key: '', language: 'auto',
   });
+  const [judgeOpen, setJudgeOpen] = useState(false);
+  const [judgeCfg, setJudgeCfg] = useState({
+    provider: 'openai',
+    name: JUDGE_PROVIDER_PRESETS.openai.name,
+    base_url: JUDGE_PROVIDER_PRESETS.openai.base_url,
+    model: JUDGE_PROVIDER_PRESETS.openai.model,
+    api_key: '',
+    disagreement_threshold: 2.5,
+  });
   const [loading,  setLoading]  = useState(false);
   const [polling,  setPolling]  = useState(pollActive());
   const [stage,    setStage]    = useState(0);
@@ -926,6 +944,18 @@ function BreakPage({ onReportReady }) {
   }, [addLog, onReportReady]);
 
   function set(k, v) { setForm(p => ({ ...p, [k]: v })); }
+  function setJudge(k, v) { setJudgeCfg(p => ({ ...p, [k]: v })); }
+
+  function changeJudgeProvider(provider) {
+    const preset = JUDGE_PROVIDER_PRESETS[provider];
+    setJudgeCfg(p => ({
+      ...p,
+      provider,
+      name: preset.name,
+      base_url: preset.base_url,
+      model: p.model && p.provider === provider ? p.model : preset.model,
+    }));
+  }
 
   async function handleSubmit() {
     setError(''); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0));
@@ -941,6 +971,15 @@ function BreakPage({ onReportReady }) {
       num_tests: +form.num_tests,
       language: form.language || 'auto',
       ...(form.groq_api_key ? { groq_api_key: form.groq_api_key } : {}),
+      ...(judgeOpen && judgeCfg.api_key && judgeCfg.model && judgeCfg.base_url ? {
+        judges: [{
+          name: judgeCfg.name || judgeCfg.provider,
+          base_url: judgeCfg.base_url,
+          api_key: judgeCfg.api_key,
+          model: judgeCfg.model,
+        }],
+        disagreement_threshold: +judgeCfg.disagreement_threshold,
+      } : {}),
     };
 
     try {
@@ -974,9 +1013,10 @@ function BreakPage({ onReportReady }) {
       {error && <div className="err-box">⚠ {error}</div>}
 
       {!polling && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, maxWidth: 860 }}>
-          {/* Target */}
-          <div className="card">
+        <div style={{ maxWidth: 960 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+            {/* Target */}
+            <div className="card">
             <div className="card-label">01 — Target model</div>
 
             {/* Quick presets */}
@@ -1035,44 +1075,116 @@ function BreakPage({ onReportReady }) {
                 <textarea className="textarea" value={form.payload_template} onChange={e => set('payload_template', e.target.value)} disabled={busy} />
               </div>
             </>}
+            </div>
+
+            {/* Config */}
+            <div className="card">
+              <div className="card-label">02 — Run config</div>
+              <div className="field">
+                <label className="label">Run description</label>
+                <input className="input" value={form.description} onChange={e => set('description', e.target.value)}
+                  placeholder="Customer-support chatbot v2.1" disabled={busy} />
+              </div>
+              <div className="field">
+                <label className="label">Number of tests</label>
+                <select className="select" value={form.num_tests} onChange={e => set('num_tests', e.target.value)} disabled={busy}>
+                  <option value={10}>10 — quick check (~1 min)</option>
+                  <option value={20}>20 — standard (~2 min)</option>
+                  <option value={30}>30 — thorough (~3.5 min)</option>
+                  <option value={50}>50 — deep (~6 min)</option>
+                </select>
+              </div>
+              <div className="field">
+                <label className="label">Language</label>
+                <select className="select" value={form.language} onChange={e => set('language', e.target.value)} disabled={busy}>
+                  <option value="auto">Auto-detect</option>
+                  <option value="en">English</option>
+                  <option value="ar">Arabic</option>
+                </select>
+              </div>
+              <div className="field">
+                <label className="label">Groq API key (primary judge)</label>
+                <PwInput value={form.groq_api_key} onChange={e => set('groq_api_key', e.target.value)}
+                  placeholder="gsk_… (optional if set server-side)" disabled={busy} />
+              </div>
+            </div>
           </div>
 
-          {/* Config */}
+          <div className="card" style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+              <div>
+                <div className="card-label" style={{ marginBottom: 4 }}>03 — Judge configuration</div>
+                <div style={{ fontSize: 11.5, color: 'var(--mid)' }}>
+                  Groq stays the primary judge. Add a second opinion only when you want disagreement visibility.
+                </div>
+              </div>
+              <button className="btn btn-ghost" onClick={() => setJudgeOpen(v => !v)} disabled={busy}>
+                {judgeOpen ? 'Hide second judge' : '+ Add second judge'}
+              </button>
+            </div>
+
+            <div style={{ padding: '12px 14px', borderRadius: 'var(--r)', border: '1px solid var(--line2)', background: 'rgba(255,255,255,.02)', marginBottom: judgeOpen ? 14 : 0 }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: 6 }}>
+                Primary judge
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 13, color: 'var(--hi)', fontWeight: 600 }}>Groq · llama-3.3-70b-versatile</div>
+                  <div style={{ fontSize: 11, color: 'var(--mid)', marginTop: 2 }}>Uses the Groq key from Run config as the locked primary judge.</div>
+                </div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: form.groq_api_key ? 'var(--green)' : 'var(--amber)' }}>
+                  {form.groq_api_key ? 'Key supplied' : 'Uses server/env fallback'}
+                </div>
+              </div>
+            </div>
+
+            {judgeOpen && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <div className="field">
+                    <label className="label">Provider</label>
+                    <select className="select" value={judgeCfg.provider} onChange={e => changeJudgeProvider(e.target.value)} disabled={busy}>
+                      {Object.entries(JUDGE_PROVIDER_PRESETS).map(([key, preset]) => (
+                        <option key={key} value={key}>{preset.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label className="label">Judge name</label>
+                    <input className="input" value={judgeCfg.name} onChange={e => setJudge('name', e.target.value)} placeholder="secondary" disabled={busy} />
+                  </div>
+                  <div className="field">
+                    <label className="label">Base URL</label>
+                    <input className="input" value={judgeCfg.base_url} onChange={e => setJudge('base_url', e.target.value)} placeholder="https://api.openai.com/v1" disabled={busy} />
+                  </div>
+                </div>
+                <div>
+                  <div className="field">
+                    <label className="label">Model</label>
+                    <input className="input" value={judgeCfg.model} onChange={e => setJudge('model', e.target.value)} placeholder="gpt-4o-mini" disabled={busy} />
+                  </div>
+                  <div className="field">
+                    <label className="label">API key</label>
+                    <PwInput value={judgeCfg.api_key} onChange={e => setJudge('api_key', e.target.value)} placeholder="sk-…" disabled={busy} />
+                  </div>
+                  <div className="field">
+                    <label className="label">Disagreement threshold</label>
+                    <select className="select" value={judgeCfg.disagreement_threshold} onChange={e => setJudge('disagreement_threshold', e.target.value)} disabled={busy}>
+                      {DISAGREEMENT_OPTIONS.map(v => <option key={v} value={v}>{v.toFixed(1)}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="card">
-            <div className="card-label">02 — Run config</div>
-            <div className="field">
-              <label className="label">Run description</label>
-              <input className="input" value={form.description} onChange={e => set('description', e.target.value)}
-                placeholder="Customer-support chatbot v2.1" disabled={busy} />
-            </div>
-            <div className="field">
-              <label className="label">Number of tests</label>
-              <select className="select" value={form.num_tests} onChange={e => set('num_tests', e.target.value)} disabled={busy}>
-                <option value={10}>10 — quick check (~1 min)</option>
-                <option value={20}>20 — standard (~2 min)</option>
-                <option value={30}>30 — thorough (~3.5 min)</option>
-                <option value={50}>50 — deep (~6 min)</option>
-              </select>
-            </div>
-            <div className="field">
-              <label className="label">Language</label>
-              <select className="select" value={form.language} onChange={e => set('language', e.target.value)} disabled={busy}>
-                <option value="auto">Auto-detect</option>
-                <option value="en">English</option>
-                <option value="ar">Arabic</option>
-              </select>
-            </div>
-            <div className="field">
-              <label className="label">Groq API key (for judge)</label>
-              <PwInput value={form.groq_api_key} onChange={e => set('groq_api_key', e.target.value)}
-                placeholder="gsk_… (optional if set server-side)" disabled={busy} />
-            </div>
             <button className="btn btn-primary" style={{ width: '100%', marginTop: 4, justifyContent: 'center' }}
               onClick={handleSubmit} disabled={busy}>
               {loading ? <><div className="spinner" />Submitting…</> : '⚡ Start break run'}
             </button>
             <div style={{ fontSize: 10.5, color: 'var(--mute)', marginTop: 7 }}>
-              You'll be notified via Slack when done — you can close this tab.
+              You&apos;ll be notified via Slack when done — you can close this tab.
             </div>
           </div>
         </div>

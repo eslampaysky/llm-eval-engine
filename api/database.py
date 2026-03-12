@@ -11,6 +11,7 @@ needs zero changes except for the new delete + cache helpers at the bottom.
 
 from __future__ import annotations
 
+import atexit
 import hashlib
 import json
 import os
@@ -38,10 +39,35 @@ DB_FILE = _SQLITE_FILE
 if _USE_PG:
     import psycopg2
     import psycopg2.extras
+    from psycopg2.pool import ThreadedConnectionPool
+
+    _PG_POOL: ThreadedConnectionPool | None = None
+    _PG_MIN_CONN = int(os.getenv("PG_POOL_MIN_CONN", "1"))
+    _PG_MAX_CONN = int(os.getenv("PG_POOL_MAX_CONN", "8"))
+
+    def _get_pg_pool() -> ThreadedConnectionPool:
+        global _PG_POOL
+        if _PG_POOL is None:
+            _PG_POOL = ThreadedConnectionPool(
+                _PG_MIN_CONN,
+                _PG_MAX_CONN,
+                DATABASE_URL,
+                cursor_factory=psycopg2.extras.RealDictCursor,
+            )
+        return _PG_POOL
+
+    def _close_pg_pool() -> None:
+        global _PG_POOL
+        if _PG_POOL is not None:
+            _PG_POOL.closeall()
+            _PG_POOL = None
+
+    atexit.register(_close_pg_pool)
 
     @contextmanager
     def _get_conn() -> Generator:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        pool = _get_pg_pool()
+        conn = pool.getconn()
         try:
             yield conn
             conn.commit()
@@ -49,7 +75,7 @@ if _USE_PG:
             conn.rollback()
             raise
         finally:
-            conn.close()
+            pool.putconn(conn)
 
     # Postgres uses %s placeholders; SQLite uses ?
     _P = "%s"

@@ -46,11 +46,20 @@ class BreakTarget(BaseModel):
     payload_template: Optional[str] = None
 
 
+class JudgeConfig(BaseModel):
+    name: str
+    base_url: str
+    api_key: str
+    model: str
+
+
 class BreakRequest(BaseModel):
     target: BreakTarget
     description: str = Field(..., min_length=5)
     num_tests: int = Field(default=20, ge=6, le=50)
     groq_api_key: Optional[str] = None
+    judges: list[JudgeConfig] | None = None
+    disagreement_threshold: float | None = Field(default=None, ge=1.0, le=3.0)
     force_refresh: bool = Field(
         default=False,
         description=(
