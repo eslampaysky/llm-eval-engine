@@ -70,9 +70,9 @@ REPORT_DIR.mkdir(parents=True, exist_ok=True)
 GROQ_JUDGE_MODEL = "llama-3.3-70b-versatile"
 GROQ_BASE_URL    = "https://api.groq.com/openai/v1"
 DEMO_ALLOWED_MODELS = {
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash",
-    "gemini-2.5-flash-preview-05-20",
+    "gemini-2.5-flash",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite-preview",
 }
 DEMO_DAILY_LIMIT = 5
 DEMO_RATE_LIMIT_ERROR = "Gemini rate limit exceeded — please try again in a minute"

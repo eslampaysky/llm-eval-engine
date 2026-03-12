@@ -47,9 +47,9 @@ const PRESETS = [
 ];
 
 const DEMO_MODEL_OPTIONS = [
-  { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite', hint: 'fastest' },
-  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', hint: 'balanced' },
-  { value: 'gemini-2.5-flash-preview-05-20', label: 'Gemini 2.5 Flash', hint: 'most capable' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'stable' },
+  { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash', hint: 'preview' },
+  { value: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash Lite', hint: 'preview' },
 ];
 
 const DEMO_DESCRIPTION_SUGGESTIONS = [
