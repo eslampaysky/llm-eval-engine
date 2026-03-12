@@ -71,9 +71,10 @@ GROQ_BASE_URL    = "https://api.groq.com/openai/v1"
 DEMO_ALLOWED_MODELS = {
     "gemini-2.0-flash-lite",
     "gemini-1.5-flash",
-    "gemini-2.5-flash",
+    "gemini-2.5-flash-preview-05-20",
 }
 DEMO_DAILY_LIMIT = 5
+DEMO_RATE_LIMIT_ERROR = "Gemini rate limit exceeded — please try again in a minute"
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
@@ -431,6 +432,32 @@ class _GroqAnswerJudge:
         }
 
 
+class _RetryingGeminiDemoAdapter:
+    def __init__(self, inner: GeminiDemoAdapter) -> None:
+        self._inner = inner
+
+    def call(self, question: str) -> str:
+        delays = [20, 40, 60]
+        last_exc: Exception | None = None
+        for attempt in range(len(delays) + 1):
+            try:
+                return self._inner.call(question)
+            except Exception as exc:
+                status_code = getattr(getattr(exc, "response", None), "status_code", None)
+                body_text = str(getattr(getattr(exc, "response", None), "text", "") or "")
+                message = str(exc).lower()
+                is_rate_limited = status_code == 429 or "429" in message or "rate limit" in message or "resource exhausted" in body_text.lower()
+                if not is_rate_limited:
+                    raise
+                last_exc = exc
+                if attempt >= len(delays):
+                    raise RuntimeError(DEMO_RATE_LIMIT_ERROR) from exc
+                time.sleep(delays[attempt])
+        if last_exc is not None:
+            raise RuntimeError(DEMO_RATE_LIMIT_ERROR) from last_exc
+        raise RuntimeError(DEMO_RATE_LIMIT_ERROR)
+
+
 import logging as _logging
 _log = _logging.getLogger(__name__)
  
@@ -500,6 +527,30 @@ def _process_break_job(report_id, target_cfg, description, num_tests,
                                   metrics=metrics, html_path=html_path)
     except Exception as exc:
         _finalize_report_failure(report_id=report_id, error_message=str(exc))
+
+
+def _process_demo_break_job(report_id, model_name, description, num_tests, groq_api_key, gemini_api_key):
+    try:
+        adapter = _RetryingGeminiDemoAdapter(
+            GeminiDemoAdapter(api_key=gemini_api_key, model_name=model_name)
+        )
+        _process_break_job(
+            report_id,
+            {"type": "openai", "model_name": model_name},
+            description,
+            num_tests,
+            groq_api_key,
+            False,
+            "auto",
+            [],
+            None,
+            adapter,
+        )
+    except Exception as exc:
+        error_message = str(exc)
+        if "rate limit" in error_message.lower() or "429" in error_message:
+            error_message = DEMO_RATE_LIMIT_ERROR
+        _finalize_report_failure(report_id=report_id, error_message=error_message)
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
@@ -630,6 +681,7 @@ def get_report(
     if row["client_name"] != auth_ctx.get("client_name"):
         raise HTTPException(status_code=403, detail="Not allowed to access this report")
     share_token = _ensure_share_token(row)
+    retryable = bool(row["error"] and "rate limit" in str(row["error"]).lower())
     return {
         "report_id":       row["report_id"],
         "share_token":     share_token,
@@ -646,6 +698,7 @@ def get_report(
         "public_share_url": _public_report_url(share_token),
         "html_report_url": f"/report/{row['report_id']}/html" if row["html_path"] else None,
         "error":           row["error"],
+        "retryable":       retryable,
     }
 
 
@@ -695,17 +748,13 @@ async def demo_break_model(
         status="processing",
     )
     await enqueue_job(
-        _process_break_job,
+        _process_demo_break_job,
         report_id,
-        {"type": "openai", "model_name": model_name},
+        model_name,
         payload.description,
         num_tests,
         groq_api_key,
-        False,
-        "auto",
-        [],
-        None,
-        GeminiDemoAdapter(api_key=gemini_api_key, model_name=model_name),
+        gemini_api_key,
         job_id=report_id,
     )
     return {
@@ -725,6 +774,7 @@ def get_demo_report(report_id: str) -> dict[str, Any]:
     if not row or row["client_name"] != "demo":
         raise HTTPException(status_code=404, detail="Report not found")
     share_token = _ensure_share_token(row)
+    retryable = bool(row["error"] and "rate limit" in str(row["error"]).lower())
     return {
         "report_id":       row["report_id"],
         "share_token":     share_token,
@@ -741,6 +791,7 @@ def get_demo_report(report_id: str) -> dict[str, Any]:
         "public_share_url": _public_report_url(share_token),
         "html_report_url": f"/report/{row['report_id']}/html" if row["html_path"] else None,
         "error":           row["error"],
+        "retryable":       retryable,
     }
 
 

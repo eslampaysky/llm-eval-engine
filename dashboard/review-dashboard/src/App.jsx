@@ -49,7 +49,7 @@ const PRESETS = [
 const DEMO_MODEL_OPTIONS = [
   { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite', hint: 'fastest' },
   { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', hint: 'balanced' },
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'most capable' },
+  { value: 'gemini-2.5-flash-preview-05-20', label: 'Gemini 2.5 Flash', hint: 'most capable' },
 ];
 
 const DEMO_DESCRIPTION_SUGGESTIONS = [
@@ -92,7 +92,12 @@ async function apiFetch(path, opts = {}, includeAuth = true) {
   });
   const ct   = res.headers.get('content-type') || '';
   const body = ct.includes('application/json') ? await res.json() : await res.text();
-  if (!res.ok) throw new Error(typeof body === 'string' ? body : body?.detail || 'Request failed');
+  if (!res.ok) {
+    const err = new Error(typeof body === 'string' ? body : body?.detail || 'Request failed');
+    err.status = res.status;
+    err.body = body;
+    throw err;
+  }
   return body;
 }
 
@@ -136,7 +141,7 @@ function pollStart(reportId, numTests = 20, fetchReport = api.getReport, mode = 
         pollNotify({ type: 'done', report: r, mode: POLL.mode });
       } else if (r.status === 'failed') {
         clearInterval(POLL.timerId); POLL.timerId = null;
-        pollNotify({ type: 'failed', error: r.error || 'Evaluation failed', mode: POLL.mode });
+        pollNotify({ type: 'failed', error: r.error || 'Evaluation failed', report: r, mode: POLL.mode });
       } else {
         const stage = stageFromAttempts(POLL.attempts, numTests);
         const total = 12 + numTests * 5;
@@ -1221,6 +1226,9 @@ function DemoPage({ report, onReportReady }) {
   const [stage, setStage] = useState(0);
   const [pct, setPct] = useState(0);
   const [error, setError] = useState('');
+  const [errorStatus, setErrorStatus] = useState(null);
+  const [retryableReport, setRetryableReport] = useState(null);
+  const [countdown, setCountdown] = useState(60);
   const [logs, setLogs] = useState([]);
   const [runId, setRunId] = useState(ls.get('abl_demo_active_run_id'));
   const [activeType, setActiveType] = useState(currentTestType(0, 0));
@@ -1235,14 +1243,21 @@ function DemoPage({ report, onReportReady }) {
     const unsub = pollSub(ev => {
       if (ev.mode !== 'demo') return;
       if (ev.type === 'done') {
+        setRetryableReport(null);
         setPolling(false); setPct(100);
         ls.set('abl_demo_active_run_id', null);
         addLog(`✓ Demo complete — ${ev.report.results?.length || ev.report.sample_count || 0} tests completed.`, 'ok');
         setTimeout(() => onReportReady(ev.report), 400);
       } else if (ev.type === 'failed') {
-        setPolling(false); ls.set('abl_demo_active_run_id', null); setError(ev.error); addLog(`✕ Failed: ${ev.error}`, 'err');
+        setPolling(false);
+        ls.set('abl_demo_active_run_id', null);
+        setError(ev.error);
+        setErrorStatus(null);
+        setRetryableReport(ev.report?.retryable ? ev.report : null);
+        setCountdown(60);
+        addLog(`✕ Failed: ${ev.error}`, 'err');
       } else if (ev.type === 'timeout') {
-        setPolling(false); ls.set('abl_demo_active_run_id', null); setError('Timed out after 7 minutes'); addLog('✕ Timed out', 'err');
+        setPolling(false); ls.set('abl_demo_active_run_id', null); setRetryableReport(null); setError('Timed out after 7 minutes'); addLog('✕ Timed out', 'err');
       } else if (ev.type === 'error') {
         addLog(`⚠ Poll error: ${ev.error}`, 'err');
       } else if (ev.type === 'tick') {
@@ -1254,8 +1269,18 @@ function DemoPage({ report, onReportReady }) {
     return unsub;
   }, [addLog, onReportReady]);
 
+  useEffect(() => {
+    if (!retryableReport || polling) return undefined;
+    if (countdown <= 0) {
+      handleSubmit();
+      return undefined;
+    }
+    const timer = setTimeout(() => setCountdown(v => v - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [retryableReport, countdown, polling]);
+
   async function handleSubmit() {
-    setError(''); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0));
+    setError(''); setErrorStatus(null); setRetryableReport(null); setCountdown(60); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0));
     try {
       addLog('Submitting public demo request…', 'info');
       const res = await api.demoBreak({
@@ -1270,6 +1295,7 @@ function DemoPage({ report, onReportReady }) {
       setPolling(true);
       pollStart(res.report_id, +form.num_tests, api.getDemoReport, 'demo');
     } catch (e) {
+      setErrorStatus(e.status || null);
       setError(e.message);
       addLog(`✕ ${e.message}`, 'err');
     } finally {
@@ -1278,6 +1304,10 @@ function DemoPage({ report, onReportReady }) {
   }
 
   const busy = loading || polling;
+  const isQuotaError = (errorStatus === 429) || /demo quota/i.test(error || '');
+  const showRetryableState = !polling && !report && !!retryableReport;
+  const showHardFailure = !polling && !report && !!error && !isQuotaError && !showRetryableState;
+  const showQuotaState = !polling && !report && !!error && isQuotaError;
 
   return (
     <div className="page fade-in">
@@ -1288,9 +1318,51 @@ function DemoPage({ report, onReportReady }) {
       </div>
 
       {polling && <LiveProgress stage={stage} pct={pct} logs={logs} logRef={logRef} done={false} reportId={runId} activeType={activeType} />}
-      {error && <div className="err-box">⚠ {error}</div>}
+      {!report && error && <div className="err-box">⚠ {error}</div>}
 
-      {!polling && !report && (
+      {showQuotaState && (
+        <div className="card" style={{ marginBottom: 14, borderColor: 'rgba(240,165,0,.35)' }}>
+          <div className="card-label">Demo quota reached</div>
+          <div style={{ color: 'var(--hi)', fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+            You've used today's demo quota (5 runs). Come back tomorrow or sign up for full access.
+          </div>
+          <button className="btn btn-primary" onClick={() => setTimeout(() => { window.location.href = '/signup'; }, 0)}>
+            Get Started
+          </button>
+        </div>
+      )}
+
+      {showRetryableState && (
+        <div className="card" style={{ marginBottom: 14, borderColor: 'rgba(77,158,255,.35)' }}>
+          <div className="card-label">Temporary model limit</div>
+          <div style={{ color: 'var(--hi)', fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+            Gemini is rate limited right now. Auto-retrying in {countdown}s.
+          </div>
+          <div style={{ color: 'var(--mid)', marginBottom: 12 }}>
+            We’ll resubmit the exact same demo request automatically, or you can retry now.
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={handleSubmit} disabled={busy}>
+              Retry now
+            </button>
+            <button className="btn btn-ghost" onClick={() => setTimeout(() => { window.location.href = '/signup'; }, 0)}>
+              Get Started
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showHardFailure && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="card-label">Demo failed</div>
+          <div style={{ color: 'var(--mid)', marginBottom: 12 }}>{error}</div>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={busy}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!polling && !report && !showQuotaState && (
         <div style={{ maxWidth: 960 }}>
           <div className="card" style={{ marginBottom: 14 }}>
             <div className="card-label">01 — Demo setup</div>
