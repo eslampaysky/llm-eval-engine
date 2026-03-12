@@ -29,9 +29,9 @@ import JudgeConfigPanel from './components/JudgeConfigPanel';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL
+export const API_BASE = import.meta.env.VITE_API_BASE_URL
   || 'https://llm-eval-engine-production.up.railway.app';
-const SHARE_BASE = import.meta.env.VITE_SHARE_BASE_URL
+export const SHARE_BASE = import.meta.env.VITE_SHARE_BASE_URL
   || 'https://llm-eval-engine-production.up.railway.app';
 
 const STAGES = [
@@ -64,13 +64,13 @@ const TEST_TYPE_SEQUENCE = ['Hallucination', 'Adversarial', 'Safety', 'Correctne
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 
-const ls = {
+export const ls = {
   get: (k, fallback = null) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; } },
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
-function getApiKey() { return ls.get('abl_api_key') || 'client_key'; }
-function setApiKey(k) { ls.set('abl_api_key', k); }
+export function getApiKey() { return ls.get('abl_api_key') || 'client_key'; }
+export function setApiKey(k) { ls.set('abl_api_key', k); }
 
 // ─── API layer ────────────────────────────────────────────────────────────────
 
@@ -94,7 +94,7 @@ async function apiFetch(path, opts = {}, includeAuth = true) {
   return body;
 }
 
-const api = {
+export const api = {
   health:       ()    => apiFetch('/health'),
   breakModel:   (p)   => apiFetch('/break', { method: 'POST', body: JSON.stringify(p) }),
   demoBreak:    (p)   => apiFetch('/demo/break', { method: 'POST', body: JSON.stringify(p) }, false),
@@ -110,10 +110,10 @@ const api = {
 
 // ─── Poll store (survives tab switches) ──────────────────────────────────────
 
-const POLL = { timerId: null, reportId: null, attempts: 0, numTests: 20, cbs: new Set(), fetchReport: api.getReport, mode: 'break' };
-const pollSub    = (cb) => { POLL.cbs.add(cb); return () => POLL.cbs.delete(cb); };
+export const POLL = { timerId: null, reportId: null, attempts: 0, numTests: 20, cbs: new Set(), fetchReport: api.getReport, mode: 'break' };
+export const pollSub    = (cb) => { POLL.cbs.add(cb); return () => POLL.cbs.delete(cb); };
 const pollNotify = (ev) => POLL.cbs.forEach(cb => cb(ev));
-const pollActive = ()   => !!POLL.timerId;
+export const pollActive = ()   => !!POLL.timerId;
 
 function stageFromAttempts(attempts, n) {
   const s = attempts * 3;
@@ -124,7 +124,7 @@ function stageFromAttempts(attempts, n) {
   return 4;
 }
 
-function pollStart(reportId, numTests = 20, fetchReport = api.getReport, mode = 'break') {
+export function pollStart(reportId, numTests = 20, fetchReport = api.getReport, mode = 'break') {
   if (POLL.timerId) clearInterval(POLL.timerId);
   POLL.reportId = reportId; POLL.attempts = 0; POLL.numTests = numTests; POLL.fetchReport = fetchReport; POLL.mode = mode;
   POLL.timerId = setInterval(async () => {
@@ -158,20 +158,20 @@ function pollStart(reportId, numTests = 20, fetchReport = api.getReport, mode = 
 
 // ─── Data helpers ─────────────────────────────────────────────────────────────
 
-function grade(s) {
+export function grade(s) {
   if (s >= 8.5) return 'A'; if (s >= 7) return 'B'; if (s >= 5.5) return 'C';
   if (s >= 4)   return 'D'; return 'F';
 }
 
-function gradeColor(g) {
+export function gradeColor(g) {
   return { A: '#4ade80', B: '#86efac', C: '#fbbf24', D: '#fb923c', F: '#f87171' }[g] || '#888';
 }
 
-function scoreColor(s) {
+export function scoreColor(s) {
   return s >= 7 ? '#4ade80' : s >= 5 ? '#fbbf24' : '#f87171';
 }
 
-function overallScore(report) {
+export function overallScore(report) {
   return parseFloat(
     report?.metrics?.average_score
     ?? report?.metrics?.overall_score
@@ -181,7 +181,7 @@ function overallScore(report) {
   );
 }
 
-function breakdownFromReport(report) {
+export function breakdownFromReport(report) {
   const bd = report?.metrics?.breakdown_by_type || report?.metrics?.breakdown || report?.metrics?.test_type_breakdown || {};
   return Object.entries(bd).map(([type, v]) => ({
     type,
@@ -191,12 +191,12 @@ function breakdownFromReport(report) {
   }));
 }
 
-function topFailures(report) {
+export function topFailures(report) {
   const failed = report?.metrics?.failed_rows || [];
   return failed.slice(0, 5);
 }
 
-function regressionSummary(prevReport, nextReport) {
+export function regressionSummary(prevReport, nextReport) {
   if (!prevReport || !nextReport) {
     return { hasRegression: false, scoreRegressions: [], newFailures: [] };
   }
@@ -219,7 +219,7 @@ function regressionSummary(prevReport, nextReport) {
   };
 }
 
-function currentTestType(stage, pct) {
+export function currentTestType(stage, pct) {
   if (stage <= 1) return 'Suite generation';
   if (stage >= 3) return 'Judge scoring';
   const progress = Math.max(0, Math.min(0.999, pct / 100));
@@ -227,7 +227,7 @@ function currentTestType(stage, pct) {
   return TEST_TYPE_SEQUENCE[index];
 }
 
-function selectComparisonBaseline(rows, focusReport) {
+export function selectComparisonBaseline(rows, focusReport) {
   const doneRows = (rows || []).filter(row => row?.status === 'done');
   if (!focusReport) {
     return {
@@ -259,22 +259,22 @@ async function shouldNotifyForRegression(report) {
   return regressionSummary(baselineReport, report).hasRegression;
 }
 
-function redFlags(report) {
+export function redFlags(report) {
   return report?.metrics?.red_flags || [];
 }
 
-function fmtDate(iso) {
+export function fmtDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
 }
 
-function ts() {
+export function ts() {
   return new Date().toLocaleTimeString('en', { hour12: false });
 }
 
 // ─── Notification helper (fire-and-forget) ────────────────────────────────────
 
-async function fireNotifications(report) {
+export async function fireNotifications(report) {
   const cfg = ls.get('abl_notif_cfg', {});
   const failedRows = report?.metrics?.failed_rows || [];
   if (cfg.when === 'failure' && failedRows.length === 0) return;
@@ -320,7 +320,7 @@ async function fireNotifications(report) {
 
 // ─── CSS (inline for portability) ─────────────────────────────────────────────
 
-const css = `
+export const css = `
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -755,7 +755,7 @@ tr:hover td { background:rgba(255,255,255,.012); }
 
 // ─── Reusable micro-components ────────────────────────────────────────────────
 
-function PwInput({ value, onChange, placeholder, disabled, autoComplete }) {
+export function PwInput({ value, onChange, placeholder, disabled, autoComplete }) {
   const [show, setShow] = useState(false);
   return (
     <div className="pw-field">
@@ -766,7 +766,7 @@ function PwInput({ value, onChange, placeholder, disabled, autoComplete }) {
   );
 }
 
-function SidebarKey({ value, onChange }) {
+export function SidebarKey({ value, onChange }) {
   const [show, setShow] = useState(false);
   return (
     <div className="key-row">
@@ -800,7 +800,7 @@ function GradeCircle({ g, size = 50, fontSize = 22 }) {
   );
 }
 
-function PersonaSwitcher({ persona, setPersona }) {
+export function PersonaSwitcher({ persona, setPersona }) {
   return (
     <div className="persona-switcher">
       <div className="persona-label">Audience</div>
@@ -813,13 +813,13 @@ function PersonaSwitcher({ persona, setPersona }) {
   );
 }
 
-function Toggle({ on, onClick }) {
+export function Toggle({ on, onClick }) {
   return <div className={`toggle ${on ? 'on' : ''}`} onClick={onClick} />;
 }
 
 // ─── Live Progress Panel ──────────────────────────────────────────────────────
 
-function LiveProgress({ stage, pct, logs, logRef, done, reportId, activeType, onStop, stopping = false }) {
+export function LiveProgress({ stage, pct, logs, logRef, done, reportId, activeType, onStop, stopping = false }) {
   return (
     <div className="terminal fade-in" style={{ marginBottom: 20 }}>
       <div className="terminal-bar">
@@ -911,13 +911,13 @@ function LiveProgress({ stage, pct, logs, logRef, done, reportId, activeType, on
 
 // ─── Break Page ───────────────────────────────────────────────────────────────
 
-function BreakPage({ onReportReady }) {
+export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyChange }) {
   const [targetType, setTT]  = useState('openai');
   const [form, setForm]      = useState({
     base_url: '', api_key: '', model_name: '',
     repo_id: '', api_token: '',
     endpoint_url: '', payload_template: '{"input":"{question}"}',
-    description: '', num_tests: 20, groq_api_key: '', language: 'auto',
+    description: '', num_tests: 20, groq_api_key: initialGroqApiKey || '', language: 'auto',
   });
   const [judges, setJudges] = useState([]);
   const [loading,  setLoading]  = useState(false);
@@ -966,7 +966,14 @@ function BreakPage({ onReportReady }) {
     return unsub;
   }, [addLog, onReportReady]);
 
-  function set(k, v) { setForm(p => ({ ...p, [k]: v })); }
+  useEffect(() => {
+    setForm(p => (p.groq_api_key === (initialGroqApiKey || '') ? p : { ...p, groq_api_key: initialGroqApiKey || '' }));
+  }, [initialGroqApiKey]);
+
+  function set(k, v) {
+    setForm(p => ({ ...p, [k]: v }));
+    if (k === 'groq_api_key') onGroqApiKeyChange?.(v);
+  }
 
   async function handleStop() {
     if (!runId || stopping) return;
@@ -1161,7 +1168,7 @@ function BreakPage({ onReportReady }) {
 
 // ─── Report Page ──────────────────────────────────────────────────────────────
 
-function DemoPage({ report, onReportReady }) {
+export function DemoPage({ report, onReportReady }) {
   const [form, setForm] = useState({
     description: '',
     model_name: DEMO_MODEL_OPTIONS[0].value,
@@ -1429,7 +1436,7 @@ function DemoPage({ report, onReportReady }) {
   );
 }
 
-function ReportPage({ report, persona }) {
+export function ReportPage({ report, persona }) {
   const [tab, setTab]     = useState('overview');
   const [open, setOpen]   = useState(new Set());
   const [copied, setCopied] = useState(false);
@@ -1763,7 +1770,7 @@ function ReportPage({ report, persona }) {
 
 // ─── Share Tab ────────────────────────────────────────────────────────────────
 
-function ShareTab({ reportId, shareToken }) {
+export function ShareTab({ reportId, shareToken }) {
   const [copied, setCopied] = useState(false);
   const shareUrl = `${API_BASE}/report/${reportId}/html`;
   const publicUrl = `${SHARE_BASE}/r/${shareToken || reportId}`;
@@ -1803,7 +1810,7 @@ function ShareTab({ reportId, shareToken }) {
 
 // ─── Compare Page ─────────────────────────────────────────────────────────────
 
-function ComparePage({ focusReport, onOpenSingleRun }) {
+export function ComparePage({ focusReport, onOpenSingleRun }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [idA, setIdA]         = useState('');
@@ -2107,7 +2114,7 @@ function ComparePage({ focusReport, onOpenSingleRun }) {
 
 // ─── History Page ─────────────────────────────────────────────────────────────
 
-function HistoryPage({ onLoadReport }) {
+export function HistoryPage({ onLoadReport }) {
   const [rows, setRows]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -2181,7 +2188,7 @@ function HistoryPage({ onLoadReport }) {
 
 // ─── Usage Page ───────────────────────────────────────────────────────────────
 
-function UsagePage() {
+export function UsagePage() {
   const [data, setData]   = useState(null);
   const [loading, setL]   = useState(true);
   const [error, setError] = useState('');
@@ -2222,7 +2229,7 @@ function UsagePage() {
 
 // ─── Notifications Page ───────────────────────────────────────────────────────
 
-function NotifsPage() {
+export function NotifsPage() {
   const [cfg, setCfg]   = useState(() => ls.get('abl_notif_cfg', { slack_enabled: false, slack_url: '', email_enabled: false, email_addr: '', when: 'always' }));
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -2325,7 +2332,7 @@ function NotifsPage() {
 
 // ─── Settings Page ────────────────────────────────────────────────────────────
 
-function SettingsPage() {
+export function SettingsPage() {
   const [key, setKey]         = useState(getApiKey());
   const [saved, setSaved]     = useState(false);
   const [health, setHealth]   = useState('idle');
@@ -2396,7 +2403,7 @@ const sections = [...new Set(NAV.map(n => n.section))];
 
 // ─── App root ─────────────────────────────────────────────────────────────────
 
-export default function App() {
+export function LegacyApp() {
   const initialPage = window.location.pathname.toLowerCase() === '/demo' ? 'demo' : 'break';
   const [page,        setPage]     = useState(initialPage);
   const [report,      setReport]   = useState(null);
