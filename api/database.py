@@ -6,7 +6,7 @@ Strategy:
   - Otherwise fall back to SQLite (local dev / legacy).
 
 All public functions share the same signature as before so routes.py
-needs zero changes except for the new delete helpers at the bottom.
+needs zero changes except for the new delete + cache helpers at the bottom.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import os as _os  
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -161,11 +162,24 @@ def init_db():
                     FOREIGN KEY (report_id) REFERENCES evaluation_reports(report_id) ON DELETE CASCADE
                 )
             """)
+            # ── Test suite cache ──────────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS test_suite_cache (
+                    cache_key    TEXT PRIMARY KEY,
+                    description  TEXT NOT NULL,
+                    num_tests    INTEGER NOT NULL,
+                    tests_json   TEXT NOT NULL,
+                    hit_count    INTEGER NOT NULL DEFAULT 0,
+                    created_at   TEXT NOT NULL,
+                    last_used_at TEXT NOT NULL
+                )
+            """)
             # Indexes for common query patterns
             cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_logs_client_name ON usage_logs(client_name)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_logs_timestamp   ON usage_logs(timestamp)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_client    ON evaluation_reports(client_name)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_created   ON evaluation_reports(created_at)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_test_cache_key         ON test_suite_cache(cache_key)")
 
         else:
             # --- SQLite DDL (unchanged from original) -------------------------
@@ -238,6 +252,18 @@ def init_db():
                     FOREIGN KEY(report_id) REFERENCES evaluation_reports(report_id)
                 )
             """)
+            # ── Test suite cache ──────────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS test_suite_cache (
+                    cache_key    TEXT PRIMARY KEY,
+                    description  TEXT NOT NULL,
+                    num_tests    INTEGER NOT NULL,
+                    tests_json   TEXT NOT NULL,
+                    hit_count    INTEGER NOT NULL DEFAULT 0,
+                    created_at   TEXT NOT NULL,
+                    last_used_at TEXT NOT NULL
+                )
+            """)
             # Migrate: add missing columns to usage_logs
             cur.execute("PRAGMA table_info(usage_logs)")
             existing = {row[1] for row in cur.fetchall()}
@@ -278,11 +304,11 @@ def register_client(name: str, api_key: str):
             )
 
 
-def get_client_by_api_key(api_key: str) -> dict | None:
+def get_client_by_key(api_key: str) -> dict | None:
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            f"SELECT id, name, api_key_hash, active, created_at FROM clients WHERE api_key_hash = {_P} AND active = 1 LIMIT 1",
+            f"SELECT id, name, active FROM clients WHERE api_key_hash={_P}",
             (_hash_key(api_key),),
         )
         return _row_to_dict(cur.fetchone())
@@ -290,68 +316,69 @@ def get_client_by_api_key(api_key: str) -> dict | None:
 
 # ── Usage logging ─────────────────────────────────────────────────────────────
 
-def log_usage(report_id, api_key, sample_count, client=None, dataset_id=None, model_version=None, evaluation_date=None):
+def log_usage(*, report_id, api_key, sample_count, client=None,
+              dataset_id=None, model_version=None, evaluation_date=None):
+    client_name = client.get("name") if isinstance(client, dict) else None
+    client_id   = client.get("id")   if isinstance(client, dict) else None
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             f"""
-            INSERT INTO usage_logs(
-                client_id, client_name, report_id, dataset_id, model_version,
-                evaluation_date, api_key_hash, timestamp, sample_count
-            ) VALUES ({_ph(9)})
+            INSERT INTO usage_logs
+                (client_id, client_name, report_id, dataset_id, model_version,
+                 evaluation_date, api_key_hash, timestamp, sample_count)
+            VALUES ({_ph(9)})
             """,
-            (
-                client.get("id") if client else None,
-                client.get("name") if client else None,
-                report_id,
-                dataset_id,
-                model_version,
-                evaluation_date,
-                _hash_key(api_key),
-                _utc_now(),
-                sample_count,
-            ),
+            (client_id, client_name, report_id, dataset_id, model_version,
+             evaluation_date, _hash_key(api_key), _utc_now(), sample_count),
         )
 
 
-def get_usage_history(limit: int = 200) -> list[dict]:
+def get_history_for_client(client_name: str, limit: int = 50) -> list[dict]:
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             f"""
-            SELECT client_id, client_name, report_id, dataset_id, model_version,
-                   evaluation_date, timestamp, sample_count
-            FROM usage_logs ORDER BY timestamp DESC LIMIT {_P}
+            SELECT report_id, status, judge_model, sample_count, dataset_id,
+                   model_version, created_at, updated_at, metrics_json, error
+            FROM evaluation_reports
+            WHERE client_name={_P}
+            ORDER BY created_at DESC
+            LIMIT {int(limit)}
             """,
-            (int(limit),),
+            (client_name,),
         )
-        return [_row_to_dict(r) for r in cur.fetchall()]
+        rows = cur.fetchall()
+    return [_row_to_dict(r) for r in rows]
 
 
-def get_usage_summary(client_name: str | None = None) -> dict:
+def get_usage_slice(client_name: str, prefix: str | None) -> dict:
     with _get_conn() as conn:
         cur = conn.cursor()
-        today_prefix = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        month_prefix = datetime.now(timezone.utc).strftime("%Y-%m")
-
-        def _q(extra_where="", params=()):
+        if prefix:
             cur.execute(
-                f"SELECT COUNT(*) as req_count, COALESCE(SUM(sample_count), 0) as sample_count "
-                f"FROM usage_logs WHERE 1=1 {extra_where}",
-                params,
+                f"SELECT COUNT(*) as runs, SUM(sample_count) as samples FROM usage_logs WHERE client_name={_P} AND timestamp LIKE {_P}",
+                (client_name, f"{prefix}%"),
             )
-            return _row_to_dict(cur.fetchone())
-
-        if client_name:
-            overall = _q(f"AND client_name = {_P}", (client_name,))
-            today   = _q(f"AND client_name = {_P} AND timestamp LIKE {_P}", (client_name, f"{today_prefix}%"))
-            month   = _q(f"AND client_name = {_P} AND timestamp LIKE {_P}", (client_name, f"{month_prefix}%"))
         else:
-            overall = _q()
-            today   = _q(f"AND timestamp LIKE {_P}", (f"{today_prefix}%",))
-            month   = _q(f"AND timestamp LIKE {_P}", (f"{month_prefix}%",))
+            cur.execute(
+                f"SELECT COUNT(*) as runs, SUM(sample_count) as samples FROM usage_logs WHERE client_name={_P}",
+                (client_name,),
+            )
+        row = _row_to_dict(cur.fetchone()) or {}
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        month_prefix = datetime.now(timezone.utc).strftime("%Y-%m")
+        cur.execute(
+            f"SELECT COUNT(*) as today_runs FROM usage_logs WHERE client_name={_P} AND timestamp LIKE {_P}",
+            (client_name, f"{today}%",),
+        )
+        today_row = _row_to_dict(cur.fetchone()) or {}
+        cur.execute(
+            f"SELECT COUNT(*) as month_runs FROM usage_logs WHERE client_name={_P} AND timestamp LIKE {_P}",
+            (client_name, f"{month_prefix}%",),
+        )
 
-    return {"today": today, "month": month, "overall": overall}
+    return {"today": today, "month": month_prefix, "overall": row}
 
 
 # ── Evaluation runs ───────────────────────────────────────────────────────────
@@ -409,30 +436,7 @@ def get_latest_regression_baseline(client_name, dataset_id, current_model_versio
         return _row_to_dict(cur.fetchone())
 
 
-def delete_report(report_id: str, client_name: str) -> bool:
-    """
-    Delete a report and its associated usage log rows.
-    Returns True if a row was deleted, False if not found / unauthorized.
-    """
-    with _get_conn() as conn:
-        cur = conn.cursor()
-        # Ownership check
-        cur.execute(
-            f"SELECT report_id FROM evaluation_reports WHERE report_id={_P} AND client_name={_P}",
-            (report_id, client_name),
-        )
-        if not cur.fetchone():
-            return False
-
-        # Cascade: human_reviews, usage_logs, then the report itself
-        cur.execute(f"DELETE FROM human_reviews WHERE report_id={_P}", (report_id,))
-        cur.execute(f"DELETE FROM usage_logs WHERE report_id={_P}", (report_id,))
-        cur.execute(f"DELETE FROM evaluation_reports WHERE report_id={_P}", (report_id,))
-        cur.execute(f"DELETE FROM evaluation_runs WHERE report_id={_P}", (report_id,))
-        return True
-
-
-# ── Query functions replacing inline _connect() blocks in routes.py ───────────
+# ── Evaluation reports ────────────────────────────────────────────────────────
 
 def insert_report(*, report_id, client_id, client_name, status, judge_model,
                   sample_count, dataset_id, model_version):
@@ -482,94 +486,259 @@ def get_report_row(report_id: str) -> dict | None:
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            f"SELECT * FROM evaluation_reports WHERE report_id={_P} LIMIT 1",
+            "SELECT * FROM evaluation_reports WHERE report_id=%s" % _P
+            if _USE_PG else
+            "SELECT * FROM evaluation_reports WHERE report_id=?",
             (report_id,),
         )
         return _row_to_dict(cur.fetchone())
 
 
 def list_reports_for_client(client_name: str) -> list[dict]:
-    """List report records for a client, newest first."""
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             f"""
             SELECT report_id, status, judge_model, sample_count, dataset_id,
-                   model_version, created_at, updated_at, html_path,
-                   total_tokens, total_cost_usd, error
+                   model_version, created_at, updated_at, error
             FROM evaluation_reports
-            WHERE client_name = {_P}
+            WHERE client_name={_P}
             ORDER BY created_at DESC
+            LIMIT 200
             """,
             (client_name,),
         )
         return [_row_to_dict(r) for r in cur.fetchall()]
 
 
-def get_history_for_client(client_name: str, limit: int = 50) -> list[dict]:
-    with _get_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            f"""
-            SELECT ul.report_id, ul.timestamp, ul.sample_count, ul.dataset_id,
-                   ul.model_version, ul.evaluation_date,
-                   er.status, er.judge_model, er.total_tokens, er.total_cost_usd
-            FROM usage_logs ul
-            LEFT JOIN evaluation_reports er ON er.report_id = ul.report_id
-            WHERE ul.client_name = {_P}
-            ORDER BY ul.timestamp DESC LIMIT {_P}
-            """,
-            (client_name, int(limit)),
-        )
-        return [_row_to_dict(r) for r in cur.fetchall()]
+# ── Human reviews ─────────────────────────────────────────────────────────────
 
-
-def get_usage_slice(client_name: str, time_prefix: str | None) -> dict:
-    with _get_conn() as conn:
-        cur = conn.cursor()
-        if time_prefix:
-            cur.execute(
-                f"""
-                SELECT COUNT(*) AS evaluations,
-                       COALESCE(SUM(ul.sample_count), 0)      AS samples,
-                       COALESCE(SUM(er.total_tokens), 0)      AS total_tokens,
-                       COALESCE(SUM(er.total_cost_usd), 0.0)  AS total_cost_usd
-                FROM usage_logs ul
-                LEFT JOIN evaluation_reports er ON er.report_id = ul.report_id
-                WHERE ul.client_name = {_P} AND ul.timestamp LIKE {_P}
-                """,
-                (client_name, f"{time_prefix}%"),
-            )
-        else:
-            cur.execute(
-                f"""
-                SELECT COUNT(*) AS evaluations,
-                       COALESCE(SUM(ul.sample_count), 0)      AS samples,
-                       COALESCE(SUM(er.total_tokens), 0)      AS total_tokens,
-                       COALESCE(SUM(er.total_cost_usd), 0.0)  AS total_cost_usd
-                FROM usage_logs ul
-                LEFT JOIN evaluation_reports er ON er.report_id = ul.report_id
-                WHERE ul.client_name = {_P}
-                """,
-                (client_name,),
-            )
-        row = _row_to_dict(cur.fetchone())
-    row["total_cost_usd"] = round(float(row["total_cost_usd"] or 0.0), 6)
-    return row
-
-
-def save_human_reviews(report_id: str, reviews: list[dict]) -> None:
-    """Replace all human reviews for a report in a single transaction."""
+def save_human_reviews(report_id: str, reviews: list[dict]):
     now = _utc_now()
     with _get_conn() as conn:
         cur = conn.cursor()
-        cur.execute(f"DELETE FROM human_reviews WHERE report_id={_P}", (report_id,))
-        for r in reviews:
+        for rev in reviews:
             cur.execute(
                 f"""
                 INSERT INTO human_reviews(report_id, item_index, score, comment, approved, created_at)
                 VALUES ({_ph(6)})
                 """,
-                (report_id, int(r["index"]), float(r["score"]),
-                 r.get("comment"), 1 if r["approved"] else 0, now),
+                (report_id, rev.get("item_index", 0), float(rev.get("score", 0)),
+                 rev.get("comment", ""), int(bool(rev.get("approved", False))), now),
             )
+
+
+# ── Delete report ─────────────────────────────────────────────────────────────
+
+def delete_report(report_id: str, client_name: str) -> bool:
+    """
+    Delete a report and its associated usage log rows.
+    Returns True if a row was deleted, False if not found / unauthorized.
+    """
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        # Ownership check
+        cur.execute(
+            f"SELECT report_id FROM evaluation_reports WHERE report_id={_P} AND client_name={_P}",
+            (report_id, client_name),
+        )
+        if not cur.fetchone():
+            return False
+
+        # Cascade: human_reviews, usage_logs, then the report itself
+        cur.execute(f"DELETE FROM human_reviews WHERE report_id={_P}", (report_id,))
+        cur.execute(f"DELETE FROM usage_logs WHERE report_id={_P}", (report_id,))
+        cur.execute(f"DELETE FROM evaluation_reports WHERE report_id={_P}", (report_id,))
+        cur.execute(f"DELETE FROM evaluation_runs WHERE report_id={_P}", (report_id,))
+        return True
+
+
+# ── Test Suite Cache ──────────────────────────────────────────────────────────
+
+def _suite_cache_key(description: str, num_tests: int) -> str:
+    """Deterministic SHA-256 key from (normalised description, num_tests)."""
+    raw = f"{description.strip().lower()}::{int(num_tests)}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def get_cached_test_suite(description: str, num_tests: int) -> list[dict] | None:
+    """
+    Return a cached test suite for the given (description, num_tests) pair.
+
+    On a hit:
+      - Deserialises tests_json and returns the list.
+      - Increments hit_count and updates last_used_at (best-effort).
+    On a miss:
+      - Returns None so the caller falls through to generation.
+    """
+    key = _suite_cache_key(description, num_tests)
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT tests_json FROM test_suite_cache WHERE cache_key={_P}",
+            (key,),
+        )
+        row = _row_to_dict(cur.fetchone())
+        if row is None:
+            return None
+
+        # Best-effort stat update — don't let this kill the request
+        try:
+            cur.execute(
+                f"""
+                UPDATE test_suite_cache
+                   SET hit_count    = hit_count + 1,
+                       last_used_at = {_P}
+                 WHERE cache_key    = {_P}
+                """,
+                (_utc_now(), key),
+            )
+        except Exception:
+            pass
+
+        return json.loads(row["tests_json"])
+
+
+def save_test_suite_cache(description: str, num_tests: int, tests: list[dict]) -> None:
+
+    """
+    Persist a freshly-generated test suite so future identical requests
+    skip Groq generation entirely.
+
+    Uses INSERT OR IGNORE / ON CONFLICT DO NOTHING so concurrent workers
+    can both call this without raising.
+    """
+    key  = _suite_cache_key(description, num_tests)
+    now  = _utc_now()
+    data = json.dumps(tests, ensure_ascii=False)
+
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if _USE_PG:
+            cur.execute(
+                """
+                INSERT INTO test_suite_cache
+                    (cache_key, description, num_tests, tests_json, hit_count, created_at, last_used_at)
+                VALUES (%s, %s, %s, %s, 0, %s, %s)
+                ON CONFLICT (cache_key) DO NOTHING
+                """,
+                (key, description.strip(), int(num_tests), data, now, now),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT OR IGNORE INTO test_suite_cache
+                    (cache_key, description, num_tests, tests_json, hit_count, created_at, last_used_at)
+                VALUES (?, ?, ?, ?, 0, ?, ?)
+                """,
+                (key, description.strip(), int(num_tests), data, now, now),
+            )
+
+  # already imported at top of file — this line is just for reference
+ 
+STUCK_AFTER_MINUTES: int = int(_os.getenv("STUCK_REPORT_MINUTES", "15"))
+ 
+ 
+def get_stuck_processing_reports(older_than_minutes: int = STUCK_AFTER_MINUTES) -> list[dict]:
+    """
+    Return reports stuck in 'processing' for longer than `older_than_minutes`.
+ 
+    Also returns reports already marked 'stale' (older_than_minutes=0 trick
+    used by /health to count them). Pass 0 to get all stale reports regardless
+    of age.
+ 
+    Logic:
+      - older_than_minutes > 0  → find 'processing' rows where updated_at is old
+      - older_than_minutes == 0 → find all 'stale' rows (for health/monitoring)
+    """
+    from datetime import timedelta
+ 
+    with _get_conn() as conn:
+        cur = conn.cursor()
+ 
+        if older_than_minutes == 0:
+            # Health check path: count already-marked stale reports
+            cur.execute(
+                f"SELECT report_id, client_name, updated_at FROM evaluation_reports WHERE status = {_P}",
+                ("stale",),
+            )
+        else:
+            cutoff = (
+                datetime.now(timezone.utc) - timedelta(minutes=older_than_minutes)
+            ).isoformat()
+            cur.execute(
+                f"""
+                SELECT report_id, client_name, judge_model, sample_count,
+                       dataset_id, model_version, created_at, updated_at
+                FROM   evaluation_reports
+                WHERE  status     = {_P}
+                AND    updated_at < {_P}
+                ORDER  BY updated_at ASC
+                """,
+                ("processing", cutoff),
+            )
+ 
+        return [_row_to_dict(r) for r in cur.fetchall()]
+ 
+ 
+def mark_report_stale(report_id: str) -> None:
+    """
+    Transition a 'processing' report → 'stale'.
+    Only acts if current status is exactly 'processing' (safe against races).
+    """
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE evaluation_reports
+               SET status     = {_P},
+                   updated_at = {_P},
+                   error      = {_P}
+             WHERE report_id  = {_P}
+               AND status     = {_P}
+            """,
+            (
+                "stale",
+                _utc_now(),
+                (
+                    "Report was in-flight when the server restarted. "
+                    "Re-run via POST /report/{id}/retry."
+                ).replace("{id}", report_id),
+                report_id,
+                "processing",
+            ),
+        )
+ 
+ 
+def reset_report_for_retry(report_id: str, client_name: str) -> bool:
+    """
+    Reset a 'stale' report back to 'processing' so it can be re-enqueued.
+    Ownership check: only the owning client can retry.
+    Returns True if the row was reset, False if not found / wrong owner / wrong status.
+    """
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        # Verify ownership and that it's actually stale
+        cur.execute(
+            f"""
+            SELECT report_id FROM evaluation_reports
+            WHERE  report_id   = {_P}
+              AND  client_name = {_P}
+              AND  status      = {_P}
+            """,
+            (report_id, client_name, "stale"),
+        )
+        if not cur.fetchone():
+            return False
+ 
+        cur.execute(
+            f"""
+            UPDATE evaluation_reports
+               SET status     = {_P},
+                   updated_at = {_P},
+                   error      = NULL
+             WHERE report_id  = {_P}
+            """,
+            ("processing", _utc_now(), report_id),
+        )
+        return True

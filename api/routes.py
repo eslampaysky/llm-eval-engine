@@ -15,9 +15,13 @@ from pydantic import BaseModel, Field
 
 from api.database import (
     delete_report,
+    get_cached_test_suite,     
+    save_test_suite_cache,     
     finalize_report_failure,
     finalize_report_success,
     get_client_by_api_key,
+    reset_report_for_retry,     
+    get_stuck_processing_reports,
     get_history_for_client,
     get_report_row,
     get_usage_slice,
@@ -30,7 +34,7 @@ from api.database import (
 )
 from api.job_queue import enqueue_job
 from api.models import EvaluationRequest
-from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ, limiter
+from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ, limiter ,LIMIT_RETRY
 from reports.report_generator import ReportGenerator, generate_html_report
 from src.llm_eval_engine.infrastructure.config_loader import load_project_config
 from src.llm_eval_engine.infrastructure.evaluator_factories import (
@@ -299,32 +303,85 @@ class _GroqAnswerJudge:
         }
 
 
-def _process_break_job(report_id, target_cfg, description, num_tests, groq_api_key):
+import logging as _logging
+_log = _logging.getLogger(__name__)
+ 
+ 
+def _process_break_job(
+    report_id: str,
+    target_cfg: dict,
+    description: str,
+    num_tests: int,
+    groq_api_key: str,
+    force_refresh: bool = False,
+) -> None:
+    """
+    Background worker: generate (or load cached) test suite, score it, save report.
+ 
+    Cache behaviour
+    ───────────────
+    • Cache key  = SHA-256( normalised_description + "::" + num_tests )
+    • Cache hit  → skip Groq generation entirely; Groq is still used for scoring.
+    • Cache miss → generate via Groq, persist to test_suite_cache for next time.
+    • force_refresh=True → bypass the cache read (still writes on miss).
+    """
     try:
-        judge_client = GroqJudgeClient(
-            api_key=groq_api_key, base_url=GROQ_BASE_URL, model=GROQ_JUDGE_MODEL,
-        )
-        generator = TestSuiteGenerator(judge_client=judge_client)
-        tests     = generator.generate_from_description(
-            description=description, num_tests=num_tests,
-        )
+        # ── 1. Test-suite cache lookup ────────────────────────────────────────
+        tests = None
+ 
+        if not force_refresh:
+            tests = get_cached_test_suite(description=description, num_tests=num_tests)
+            if tests:
+                _log.info(
+                    "[Cache HIT]  description=%r  num_tests=%d  report_id=%s",
+                    description, num_tests, report_id,
+                )
+ 
+        if tests is None:
+            _log.info(
+                "[Cache MISS] generating  description=%r  num_tests=%d",
+                description, num_tests,
+            )
+            judge_client = GroqJudgeClient(
+                api_key=groq_api_key, base_url=GROQ_BASE_URL, model=GROQ_JUDGE_MODEL,
+            )
+            generator = TestSuiteGenerator(judge_client=judge_client)
+            tests = generator.generate_from_description(
+                description=description, num_tests=num_tests,
+            )
+            # ── 2. Persist to cache (best-effort — never blocks a run) ────────
+            try:
+                save_test_suite_cache(
+                    description=description,
+                    num_tests=num_tests,
+                    tests=tests,
+                )
+            except Exception as cache_err:
+                _log.warning("Cache write failed (non-fatal): %s", cache_err)
+ 
+        # ── 3. Score answers against the target model ─────────────────────────
         target_adapter = AdapterFactory.from_config(target_cfg)
-        judge   = _GroqAnswerJudge(api_key=groq_api_key)
-        results = _score_answers(tests, target_adapter, judge)
-        metrics = compute_metrics(results)
-
+        judge          = _GroqAnswerJudge(api_key=groq_api_key)
+        results        = _score_answers(tests, target_adapter, judge)
+        metrics        = compute_metrics(results)
+ 
+        # ── 4. Generate HTML report ───────────────────────────────────────────
         REPORT_DIR.mkdir(parents=True, exist_ok=True)
         html_path = str(REPORT_DIR / f"report_{report_id}.html")
         ReportGenerator().generate(
             metrics=metrics, results=results, output_path=html_path,
-            metadata={"target_type": target_cfg.get("type", "unknown"),
-                      "judge_model": GROQ_JUDGE_MODEL},
+            metadata={
+                "target_type": target_cfg.get("type", "unknown"),
+                "judge_model": GROQ_JUDGE_MODEL,
+            },
         )
-        _finalize_report_success(report_id=report_id, results=results,
-                                  metrics=metrics, html_path=html_path)
+        _finalize_report_success(
+            report_id=report_id, results=results,
+            metrics=metrics, html_path=html_path,
+        )
+ 
     except Exception as exc:
         _finalize_report_failure(report_id=report_id, error_message=str(exc))
-
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
@@ -404,7 +461,7 @@ async def break_model(
         evaluation_date=datetime.now(timezone.utc).date().isoformat(),
     )
     await enqueue_job(
-        _process_break_job,
+        _process_break_job,payload.force_refresh, 
         report_id, target_cfg, payload.description, payload.num_tests, groq_api_key,
         job_id=report_id,
     )
@@ -477,6 +534,147 @@ def delete_report_endpoint(
         )
     return {"deleted": True, "report_id": report_id}
 
+
+# ── RetryRequest model (can live here or in api/models.py) ────────────────────
+class RetryRequest(BaseModel):
+    """
+    Optional body for the retry endpoint.
+    Clients can optionally provide a fresh groq_api_key (e.g. if theirs expired).
+    The target config is already stored in the report's model_version / dataset_id
+    fields — but for /break retries we need the full target + description again.
+    """
+    target: "BreakTarget | None" = None
+    description: str | None = None
+    groq_api_key: str | None = None
+ 
+ 
+# ── The retry endpoint ────────────────────────────────────────────────────────
+ 
+@router.post("/report/{report_id}/retry", status_code=202)
+@limiter.limit(LIMIT_RETRY)
+async def retry_report(
+    request: Request,
+    report_id: str,
+    payload: RetryRequest = RetryRequest(),
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    """
+    Re-enqueue a stale report for processing.
+ 
+    A report becomes 'stale' when the server restarted while the job was
+    in-flight. On the next startup, all such reports are automatically
+    detected and marked 'stale' so clients know they need to retry.
+ 
+    The retry re-uses everything stored on the original report (model_version,
+    sample_count, judge_model) PLUS re-requires a groq_api_key and target
+    config since those were never persisted (by design — we don't store secrets).
+ 
+    Flow:
+      1. Verify report exists, belongs to caller, and is in status='stale'.
+      2. Reset status → 'processing'.
+      3. Re-enqueue the background job.
+      4. Return 202 Accepted with the report_id for polling.
+    """
+    # Validate the report exists and is stale
+    row = get_report_row(report_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    if row["client_name"] != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=403, detail="Not allowed to retry this report.")
+    if row["status"] != "stale":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Report is '{row['status']}', not 'stale'. "
+                "Only stale reports can be retried."
+            ),
+        )
+ 
+    # Resolve groq_api_key: prefer payload, then env
+    groq_api_key = (
+        (payload.groq_api_key or "").strip()
+        or os.getenv("GROQ_API_KEY", "").strip()
+    )
+    if not groq_api_key:
+        raise HTTPException(
+            status_code=422,
+            detail="groq_api_key is required to retry (pass in body or set GROQ_API_KEY env var).",
+        )
+ 
+    # Resolve target config — must be provided since we never store it
+    if not payload.target:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "target config is required to retry a /break report. "
+                "Re-provide the same target you used originally."
+            ),
+        )
+ 
+    # Resolve description — use payload or fall back to model_version (we store it there)
+    description = (
+        (payload.description or "").strip()
+        or row.get("model_version", "")
+        or "unknown model"
+    )
+ 
+    # Reset the report row to 'processing' with ownership check
+    reset_ok = reset_report_for_retry(
+        report_id=report_id,
+        client_name=auth_ctx.get("client_name"),
+    )
+    if not reset_ok:
+        # Race condition: another request got here first, or status changed
+        raise HTTPException(
+            status_code=409,
+            detail="Could not reset report for retry. It may have already been retried.",
+        )
+ 
+    # Re-enqueue the job
+    target_cfg = payload.target.model_dump(exclude_none=True)
+    num_tests  = row.get("sample_count", 20)
+ 
+    await enqueue_job(
+        _process_break_job,
+        report_id,
+        target_cfg,
+        description,
+        num_tests,
+        groq_api_key,
+        False,   # force_refresh=False — use cache if available
+        job_id=report_id,
+    )
+ 
+    return {
+        "report_id": report_id,
+        "status":    "processing",
+        "message":   f"Report re-queued. Poll GET /report/{report_id} for results.",
+    }
+
+
+@router.get("/admin/stale")
+@limiter.limit(LIMIT_READ)
+def list_stale_reports(
+    request: Request,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> list[dict[str, Any]]:
+    """
+    List all reports currently in 'stale' status for the calling client.
+    These are safe to retry via POST /report/{id}/retry.
+    """
+    # get_stuck_processing_reports(0) returns all 'stale' rows
+    all_stale = get_stuck_processing_reports(older_than_minutes=0)
+    client_name = auth_ctx.get("client_name")
+    return [
+        {
+            "report_id":  r["report_id"],
+            "updated_at": r["updated_at"],
+            "retry_url":  f"/report/{r['report_id']}/retry",
+        }
+        for r in all_stale
+        if r.get("client_name") == client_name
+    ]
+ 
 
 @router.get("/report/{report_id}/html", response_class=HTMLResponse)
 @limiter.limit(LIMIT_READ)

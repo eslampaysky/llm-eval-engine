@@ -51,7 +51,7 @@ def _limit(env_var: str, default: str) -> str:
 # Heavy ops — these trigger LLM calls and consume Groq quota
 LIMIT_BREAK    = _limit("RATE_BREAK",    "10/hour")    # POST /break
 LIMIT_EVALUATE = _limit("RATE_EVALUATE", "20/hour")    # POST /evaluate
-
+LIMIT_RETRY = _limit("RATE_RETRY", "10/minute")        # POST /report/{id}/retry
 # Read ops — cheap DB queries
 LIMIT_READ     = _limit("RATE_READ",     "120/minute") # GET  /report*, /history, /usage, /reports
 LIMIT_DELETE   = _limit("RATE_DELETE",   "30/minute")  # DELETE /report/{id}
