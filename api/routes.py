@@ -163,44 +163,156 @@ def _send_email_notification(to_email: str, report: dict[str, Any]) -> None:
 
 def build_public_html(row: dict[str, Any]) -> str:
     metrics = json.loads(row["metrics_json"]) if row["metrics_json"] else {}
-    score = metrics.get("average_score", 0)
+    score = float(metrics.get("average_score", 0))
     failed = len(metrics.get("failed_rows", []))
     red_flags = metrics.get("red_flags", [])
-    flags_html = "".join(f"<li>{escape(str(flag))}</li>" for flag in red_flags) or "<li>None</li>"
+    breakdown = metrics.get("breakdown_by_type", metrics.get("breakdown", {}))
+    total = int(row.get("sample_count") or metrics.get("total_samples", 0))
+    model = escape(str(row.get("model_version") or "unknown"))
+    report_id = escape(str(row["report_id"]))
+    created = str(row.get("created_at", ""))[:10]
+    judges_agreement = metrics.get("judges_agreement")
+
+    if score >= 9:
+        grade, grade_color = "A", "#3DDC97"
+    elif score >= 7:
+        grade, grade_color = "B", "#5B9BF5"
+    elif score >= 5:
+        grade, grade_color = "C", "#F0A500"
+    else:
+        grade, grade_color = "F", "#FF5C72"
+
+    bd_rows = ""
+    for test_type, value in sorted(breakdown.items()):
+        avg = float(value.get("avg_score", value.get("average_score", 0)))
+        count = int(value.get("count", 0))
+        fails = int(value.get("fail_count", value.get("failures", value.get("failed", 0))))
+        bar_color = "#3DDC97" if avg >= 7 else "#F0A500" if avg >= 5 else "#FF5C72"
+        bar_pct = int(avg / 10 * 100)
+        bd_rows += f"""
+        <tr>
+          <td style="color:var(--text);padding:10px 12px;border-bottom:1px solid #1E2638">{escape(test_type)}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #1E2638;color:#7A96C0">{count}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #1E2638">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="flex:1;background:#1E2638;border-radius:4px;height:6px">
+                <div style="width:{bar_pct}%;background:{bar_color};height:6px;border-radius:4px"></div>
+              </div>
+              <span style="font-family:monospace;font-size:12px;color:{bar_color};min-width:32px">{avg:.1f}</span>
+            </div>
+          </td>
+          <td style="padding:10px 12px;border-bottom:1px solid #1E2638;color:{'#FF5C72' if fails > 0 else '#3DDC97'};font-family:monospace;font-size:12px">
+            {'FAIL x' if fails > 0 else 'PASS ok'}
+          </td>
+        </tr>"""
+
+    if not bd_rows:
+        bd_rows = '<tr><td colspan="4" style="padding:16px;color:#3A4F6E;text-align:center">No breakdown available</td></tr>'
+
+    flags_html = ""
+    for flag in red_flags:
+        flags_html += (
+            '<div style="display:flex;gap:8px;align-items:flex-start;padding:10px 0;'
+            'border-bottom:1px solid #1E2638">'
+            f'<span style="color:#F0A500;flex-shrink:0">!</span>'
+            f'<span style="color:#7A96C0;font-size:13px">{escape(str(flag))}</span>'
+            "</div>"
+        )
+    if not flags_html:
+        flags_html = '<div style="color:#3DDC97;font-size:13px;padding:10px 0">No critical issues detected</div>'
+
+    agreement_html = ""
+    if judges_agreement is not None:
+        pct = int(float(judges_agreement) * 100)
+        agreement_html = (
+            '<div class="stat-card"><div class="stat-label">Judge Agreement</div>'
+            f'<div class="stat-value" style="color:#5B9BF5">{pct}%</div></div>'
+        )
 
     return f"""<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Breaker Lab Report {escape(str(row["report_id"]))}</title>
-    <style>
-      :root {{ color-scheme: light; }}
-      body {{ font-family: Arial, sans-serif; margin: 0; background: #f5f7fb; color: #0f172a; }}
-      main {{ max-width: 760px; margin: 40px auto; background: #fff; border: 1px solid #dbe3f0; border-radius: 16px; padding: 28px; }}
-      h1 {{ margin: 0 0 18px; font-size: 28px; }}
-      .meta {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }}
-      .card {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; }}
-      .label {{ font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #64748b; margin-bottom: 6px; }}
-      .value {{ font-size: 18px; font-weight: 700; }}
-      ul {{ padding-left: 20px; }}
-      li {{ margin: 8px 0; }}
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>AI Breaker Lab Report</h1>
-      <div class="meta">
-        <div class="card"><div class="label">Report ID</div><div class="value">{escape(str(row["report_id"]))}</div></div>
-        <div class="card"><div class="label">Model</div><div class="value">{escape(str(row.get("model_version") or "unknown"))}</div></div>
-        <div class="card"><div class="label">Score</div><div class="value">{escape(str(score))}/10</div></div>
-        <div class="card"><div class="label">Tests</div><div class="value">{escape(str(row.get("sample_count") or 0))}</div></div>
-        <div class="card"><div class="label">Failures</div><div class="value">{failed}</div></div>
-      </div>
-      <h2>Red Flags</h2>
-      <ul>{flags_html}</ul>
-    </main>
-  </body>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>AI Breaker Lab - {model}</title>
+  <meta property="og:title" content="AI Breaker Lab Report: {model}"/>
+  <meta property="og:description" content="Score: {score:.1f}/10 · Grade: {grade} · {total} tests · {failed} failures"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {{
+      --bg0:#060810;--bg1:#0C0F1A;--bg2:#111520;--bg3:#171C2C;
+      --line:#1F2A3D;--line2:#263347;
+      --text:#E6EEFF;--mid:#7A96C0;--mute:#3A4F6E;
+      --green:#3DDC97;--red:#FF5C72;--blue:#5B9BF5;--amber:#F0A500;
+    }}
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{font-family:'IBM Plex Mono',monospace;background:var(--bg0);color:var(--text);min-height:100vh}}
+    a{{color:var(--blue);text-decoration:none}}
+    .shell{{max-width:860px;margin:0 auto;padding:40px 20px 80px}}
+    .header{{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:36px;flex-wrap:wrap}}
+    .logo{{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;letter-spacing:.15em;color:var(--mute);text-transform:uppercase;margin-bottom:8px}}
+    .model-name{{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:var(--text)}}
+    .meta-line{{font-size:11px;color:var(--mute);margin-top:6px}}
+    .grade-circle{{width:72px;height:72px;border-radius:50%;border:3px solid {grade_color};display:flex;align-items:center;justify-content:center;flex-shrink:0}}
+    .grade-letter{{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:{grade_color}}}
+    .stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:28px}}
+    .stat-card{{background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:14px 16px}}
+    .stat-label{{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--mute);margin-bottom:6px}}
+    .stat-value{{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700}}
+    .section{{background:var(--bg1);border:1px solid var(--line);border-radius:12px;margin-bottom:20px;overflow:hidden}}
+    .section-header{{padding:14px 16px;border-bottom:1px solid var(--line);font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--mid)}}
+    table{{width:100%;border-collapse:collapse}}
+    th{{padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);border-bottom:1px solid var(--line2)}}
+    .footer{{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--mute);flex-wrap:wrap;gap:8px}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <div class="header">
+    <div>
+      <div class="logo">AI Breaker Lab</div>
+      <div class="model-name">{model}</div>
+      <div class="meta-line">Report {report_id[:8]}... · {created}</div>
+    </div>
+    <div class="grade-circle"><div class="grade-letter">{grade}</div></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">Score</div>
+      <div class="stat-value" style="color:{grade_color}">{score:.1f}<span style="font-size:13px;color:var(--mute)">/10</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Tests Run</div>
+      <div class="stat-value" style="color:var(--text)">{total}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Failures</div>
+      <div class="stat-value" style="color:{'var(--red)' if failed > 0 else 'var(--green)'}">{failed}</div>
+    </div>
+    {agreement_html}
+  </div>
+
+  <div class="section">
+    <div class="section-header">Test Breakdown</div>
+    <table>
+      <thead><tr><th>Test Type</th><th>Count</th><th>Score</th><th>Result</th></tr></thead>
+      <tbody>{bd_rows}</tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-header">Red Flags</div>
+    <div style="padding:4px 16px 8px">{flags_html}</div>
+  </div>
+
+  <div class="footer">
+    <div>AI Breaker Lab · automated model evaluation</div>
+    <div style="color:var(--mute)">Powered by Groq · llama-3.3-70b-versatile</div>
+  </div>
+</div>
+</body>
 </html>
 """
 

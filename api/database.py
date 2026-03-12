@@ -424,28 +424,40 @@ def get_usage_slice(client_name: str, prefix: str | None) -> dict:
         cur = conn.cursor()
         if prefix:
             cur.execute(
-                f"SELECT COUNT(*) as runs, SUM(sample_count) as samples FROM usage_logs WHERE client_name={_P} AND timestamp LIKE {_P}",
+                f"""
+                SELECT
+                    COUNT(*) as req_count,
+                    COALESCE(SUM(u.sample_count), 0) as sample_count,
+                    COALESCE(SUM(r.total_tokens), 0) as total_tokens,
+                    COALESCE(SUM(r.total_cost_usd), 0) as total_cost_usd
+                FROM usage_logs u
+                LEFT JOIN evaluation_reports r ON r.report_id = u.report_id
+                WHERE u.client_name={_P} AND u.timestamp LIKE {_P}
+                """,
                 (client_name, f"{prefix}%"),
             )
         else:
             cur.execute(
-                f"SELECT COUNT(*) as runs, SUM(sample_count) as samples FROM usage_logs WHERE client_name={_P}",
+                f"""
+                SELECT
+                    COUNT(*) as req_count,
+                    COALESCE(SUM(u.sample_count), 0) as sample_count,
+                    COALESCE(SUM(r.total_tokens), 0) as total_tokens,
+                    COALESCE(SUM(r.total_cost_usd), 0) as total_cost_usd
+                FROM usage_logs u
+                LEFT JOIN evaluation_reports r ON r.report_id = u.report_id
+                WHERE u.client_name={_P}
+                """,
                 (client_name,),
             )
         row = _row_to_dict(cur.fetchone()) or {}
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        month_prefix = datetime.now(timezone.utc).strftime("%Y-%m")
-        cur.execute(
-            f"SELECT COUNT(*) as today_runs FROM usage_logs WHERE client_name={_P} AND timestamp LIKE {_P}",
-            (client_name, f"{today}%",),
-        )
-        today_row = _row_to_dict(cur.fetchone()) or {}
-        cur.execute(
-            f"SELECT COUNT(*) as month_runs FROM usage_logs WHERE client_name={_P} AND timestamp LIKE {_P}",
-            (client_name, f"{month_prefix}%",),
-        )
 
-    return {"today": today, "month": month_prefix, "overall": row}
+    return {
+        "req_count": int(row.get("req_count") or 0),
+        "sample_count": int(row.get("sample_count") or 0),
+        "total_tokens": int(row.get("total_tokens") or 0),
+        "total_cost_usd": float(row.get("total_cost_usd") or 0),
+    }
 
 
 # ── Evaluation runs ───────────────────────────────────────────────────────────
@@ -650,7 +662,7 @@ def list_reports_for_client(client_name: str) -> list[dict]:
         cur.execute(
             f"""
             SELECT report_id, share_token, status, judge_model, sample_count, dataset_id,
-                   model_version, created_at, updated_at, error
+                   model_version, created_at, updated_at, metrics_json, error
             FROM evaluation_reports
             WHERE client_name={_P}
             ORDER BY created_at DESC

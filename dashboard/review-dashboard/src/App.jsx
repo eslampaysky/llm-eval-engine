@@ -31,7 +31,8 @@ import JudgeConfigPanel from './components/JudgeConfigPanel';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL
   || 'https://llm-eval-engine-production.up.railway.app';
-const SHARE_BASE = import.meta.env.VITE_SHARE_BASE_URL || API_BASE;
+const SHARE_BASE = import.meta.env.VITE_SHARE_BASE_URL
+  || 'https://llm-eval-engine-production.up.railway.app';
 
 const STAGES = [
   { id: 'init',     label: 'Initialising',          icon: '◈', detail: 'Connecting to target model' },
@@ -174,13 +175,14 @@ function overallScore(report) {
   return parseFloat(
     report?.metrics?.average_score
     ?? report?.metrics?.overall_score
+    ?? report?.average_score
     ?? report?.score
     ?? 0
   );
 }
 
 function breakdownFromReport(report) {
-  const bd = report?.metrics?.breakdown || report?.metrics?.test_type_breakdown || {};
+  const bd = report?.metrics?.breakdown_by_type || report?.metrics?.breakdown || report?.metrics?.test_type_breakdown || {};
   return Object.entries(bd).map(([type, v]) => ({
     type,
     score:    parseFloat(v.avg_score ?? v.average_score ?? 0),
@@ -2137,7 +2139,9 @@ function HistoryPage({ onLoadReport }) {
                 </thead>
                 <tbody>
                   {rows.map(r => {
-                    const sc = parseFloat(r.metrics_json ? JSON.parse(r.metrics_json).average_score ?? 0 : 0);
+                    let parsedMetrics = null;
+                    try { parsedMetrics = r.metrics_json ? JSON.parse(r.metrics_json) : null; } catch {}
+                    const sc = parseFloat(parsedMetrics?.average_score ?? parsedMetrics?.overall_score ?? 0);
                     const g  = grade(sc);
                     return (
                       <tr key={r.report_id} style={{ cursor: 'pointer' }} onClick={() => onLoadReport(r)}>
@@ -2180,10 +2184,17 @@ function HistoryPage({ onLoadReport }) {
 function UsagePage() {
   const [data, setData]   = useState(null);
   const [loading, setL]   = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => { api.getUsage().then(setData).finally(() => setL(false)); }, []);
+  useEffect(() => {
+    api.getUsage()
+      .then(setData)
+      .catch(e => setError(e.message))
+      .finally(() => setL(false));
+  }, []);
 
   if (loading) return <div className="page"><div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div></div>;
+  if (error) return <div className="page"><div className="empty">{error}</div></div>;
 
   return (
     <div className="page fade-in">
