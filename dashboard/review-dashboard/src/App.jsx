@@ -1275,6 +1275,14 @@ function ReportPage({ report, persona }) {
         <div className="kpi"><div className="kpi-label">Tests</div><div className="kpi-value">{report.sample_count || results.length}</div></div>
         <div className="kpi"><div className="kpi-label">Failures</div><div className="kpi-value" style={{ color: tf.length ? 'var(--red)' : 'var(--green)' }}>{tf.length}</div></div>
         <div className="kpi"><div className="kpi-label">Hallucinations</div><div className="kpi-value" style={{ color: (report.metrics?.hallucinations_detected || 0) ? 'var(--red)' : 'var(--green)' }}>{report.metrics?.hallucinations_detected ?? '—'}</div></div>
+        {report.metrics?.judges_agreement !== undefined && (
+          <div className="kpi">
+            <div className="kpi-label">Judge agreement</div>
+            <div className="kpi-value" style={{ color: report.metrics.judges_agreement >= 0.7 ? 'var(--green)' : 'var(--amber)' }}>
+              {Math.round(report.metrics.judges_agreement * 100)}%
+            </div>
+          </div>
+        )}
       </div>
 
       {rf.length > 0 && (
@@ -1366,6 +1374,31 @@ function ReportPage({ report, persona }) {
                               <div style={{ fontSize: 11.5, color: 'var(--mute)' }}>{r.reason || '—'}</div>
                             </div>
                           </div>
+                          {r.judges && Object.keys(r.judges).length > 1 && (
+                            <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(255,255,255,.03)', borderRadius: 6, border: '1px solid var(--line2)' }}>
+                              <div style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--mute)', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 8 }}>
+                                Judge breakdown
+                                {!r._judge_agreed && <span style={{ color: 'var(--amber)', marginLeft: 6 }}>⚠ disagreement ({r._judge_gap?.toFixed(1)} gap)</span>}
+                              </div>
+                              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                {Object.entries(r.judges).map(([name, j]) => (
+                                  <div key={name} style={{ flex: '1 1 180px', padding: '8px 12px', background: 'var(--bg1)', border: `1px solid ${j.available ? 'var(--line2)' : 'var(--red)'}`, borderRadius: 6 }}>
+                                    <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--blue)', fontWeight: 600, marginBottom: 6 }}>{name}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--mute)', display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>Correctness</span><span style={{ color: 'var(--text)' }}>{j.correctness?.toFixed(1) ?? '—'}</span>
+                                    </div>
+                                    <div style={{ fontSize: 11, color: 'var(--mute)', display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>Relevance</span><span style={{ color: 'var(--text)' }}>{j.relevance?.toFixed(1) ?? '—'}</span>
+                                    </div>
+                                    <div style={{ fontSize: 11, color: 'var(--mute)', display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>Hallucination</span><span style={{ color: j.hallucination ? 'var(--red)' : 'var(--green)' }}>{j.hallucination ? 'yes' : 'no'}</span>
+                                    </div>
+                                    {j.reason && <div style={{ fontSize: 10, color: 'var(--mute)', marginTop: 5, borderTop: '1px solid var(--line2)', paddingTop: 5 }}>{j.reason}</div>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ),
