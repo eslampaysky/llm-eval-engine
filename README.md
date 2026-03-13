@@ -112,6 +112,8 @@ API_KEYS=client_key
 
 # Optional overrides
 # MAX_WORKERS=4
+STRIPE_SECRET_KEY=
+STRIPE_PRO_PRICE_ID=
 OLLAMA_URL=http://host.docker.internal:11434
 PERSPECTIVE_API_KEY=
 ```

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import secrets
 import smtplib
@@ -73,6 +74,8 @@ router = APIRouter()
 MAX_WORKERS = int(os.getenv("MAX_WORKERS", "4"))
 _API_KEY_MAP: dict[str, str] = {}
 
+logger = logging.getLogger(__name__)
+
 # ── Persistent paths ──────────────────────────────────────────────────────────
 _DATA_DIR         = Path(os.getenv("DATA_DIR", "/app/data"))
 REPORT_DIR        = _DATA_DIR / "reports"
@@ -108,6 +111,17 @@ class NotifyRequest(BaseModel):
     email: str | None = None
     slack_enabled: bool = False
     email_enabled: bool = False
+
+
+class CreateCheckoutSessionRequest(BaseModel):
+    plan: str = Field(..., min_length=1)
+
+
+class ContactSalesRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    email: str = Field(..., min_length=3, max_length=320)
+    company: str = Field(..., min_length=1, max_length=200)
+    use_case: str = Field(..., min_length=1, max_length=4000)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -378,6 +392,68 @@ def validate_api_key(
         register_client(name=client_name, api_key=x_api_key)
         client = get_client_by_api_key(x_api_key)
     return {"api_key": x_api_key, "client_name": client_name, "client": client}
+
+
+@router.post("/create-checkout-session")
+def create_checkout_session(
+    request: Request,
+    payload: CreateCheckoutSessionRequest,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, str]:
+    plan = str(payload.plan or "").strip().lower()
+    if plan != "pro":
+        raise HTTPException(status_code=400, detail="Unsupported plan")
+
+    secret_key = os.getenv("STRIPE_SECRET_KEY", "").strip()
+    if not secret_key:
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured in .env")
+
+    pro_price_id = os.getenv("STRIPE_PRO_PRICE_ID", "").strip()
+    if not pro_price_id:
+        raise HTTPException(status_code=500, detail="STRIPE_PRO_PRICE_ID is not configured in .env")
+
+    try:
+        import stripe  # type: ignore
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Stripe SDK not available: {exc}") from exc
+
+    stripe.api_key = secret_key
+
+    origin = (request.headers.get("origin") or "").strip()
+    if not origin:
+        host = request.headers.get("host") or ""
+        scheme = request.headers.get("x-forwarded-proto") or request.url.scheme
+        origin = f"{scheme}://{host}" if host else ""
+
+    if not origin:
+        origin = "http://localhost:5173"
+
+    success_url = f"{origin}/?checkout=success&session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin}/?checkout=cancel"
+
+    session = stripe.checkout.sessions.create(
+        mode="subscription",
+        line_items=[{"price": pro_price_id, "quantity": 1}],
+        success_url=success_url,
+        cancel_url=cancel_url,
+        client_reference_id=str(auth_ctx.get("client_name") or ""),
+    )
+    url = getattr(session, "url", None)
+    if not url:
+        raise HTTPException(status_code=500, detail="Stripe session did not return a checkout URL")
+    return {"url": str(url)}
+
+
+@router.post("/contact-sales")
+def contact_sales(payload: ContactSalesRequest) -> dict[str, str]:
+    logger.info(
+        "[ContactSales] name=%r email=%r company=%r use_case_len=%d",
+        payload.name,
+        payload.email,
+        payload.company,
+        len(payload.use_case or ""),
+    )
+    return {"status": "received"}
 
 
 def _do_insert_report(*, report_id, auth_ctx, sample_count, judge_model,

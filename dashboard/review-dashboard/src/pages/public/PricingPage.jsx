@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+
+import { API_BASE, getApiKey } from '../../App.jsx';
 
 const PLANS = [
   {
@@ -54,12 +57,62 @@ const PLANS = [
       'SLA guarantee',
     ],
     cta: 'Contact Sales',
-    ctaTo: 'mailto:sales@aibreakerlabs.com',
+    ctaTo: '',
     highlight: false,
   },
 ];
 
 export default function PricingPage() {
+  const [proLoading, setProLoading] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactSubmitting, setContactSubmitting] = useState(false);
+  const [contactSuccess, setContactSuccess] = useState(false);
+  const [contactError, setContactError] = useState('');
+  const [contactForm, setContactForm] = useState({ name: '', email: '', company: '', use_case: '' });
+
+  async function startProCheckout() {
+    if (proLoading) return;
+    setProLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': getApiKey(),
+        },
+        body: JSON.stringify({ plan: 'pro' }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.detail || `Request failed (${res.status})`);
+      if (!body?.url) throw new Error('Missing checkout URL');
+      window.location.href = body.url;
+    } catch (e) {
+      alert(e?.message || 'Failed to start checkout');
+      setProLoading(false);
+    }
+  }
+
+  async function submitContactSales(e) {
+    e.preventDefault();
+    if (contactSubmitting) return;
+    setContactSubmitting(true);
+    setContactError('');
+    try {
+      const res = await fetch(`${API_BASE}/contact-sales`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactForm),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.detail || `Request failed (${res.status})`);
+      setContactSuccess(true);
+    } catch (err) {
+      setContactError(err?.message || 'Failed to submit.');
+    } finally {
+      setContactSubmitting(false);
+    }
+  }
+
   return (
     <section className="page fade-in" style={{ maxWidth: 980, margin: '0 auto' }}>
       <div className="page-header">
@@ -110,16 +163,137 @@ export default function PricingPage() {
               ))}
             </ul>
 
-            <Link
-              className={`btn ${plan.highlight ? 'btn-primary' : 'btn-ghost'}`}
-              to={plan.ctaTo}
-              style={{ marginTop: 'auto', textAlign: 'center' }}
-            >
-              {plan.cta}
-            </Link>
+            {plan.key === 'pro' ? (
+              <button
+                type="button"
+                className={`btn ${plan.highlight ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={startProCheckout}
+                disabled={proLoading}
+                style={{ marginTop: 'auto', textAlign: 'center' }}
+              >
+                {proLoading ? 'Creating checkout...' : plan.cta}
+              </button>
+            ) : plan.key === 'enterprise' ? (
+              <button
+                type="button"
+                className={`btn ${plan.highlight ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => {
+                  setContactOpen(true);
+                  setContactSuccess(false);
+                  setContactError('');
+                }}
+                style={{ marginTop: 'auto', textAlign: 'center' }}
+              >
+                {plan.cta}
+              </button>
+            ) : (
+              <Link
+                className={`btn ${plan.highlight ? 'btn-primary' : 'btn-ghost'}`}
+                to={plan.ctaTo}
+                style={{ marginTop: 'auto', textAlign: 'center' }}
+              >
+                {plan.cta}
+              </Link>
+            )}
           </div>
         ))}
       </div>
+
+      {contactOpen && (
+        <div
+          className="card"
+          style={{
+            marginTop: 16,
+            minHeight: 400,
+            padding: 18,
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid var(--line)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+            <div>
+              <div className="card-label">Contact Sales</div>
+              <div style={{ fontSize: 13, color: 'var(--mid)' }}>Tell us what you’re building and we’ll follow up.</div>
+            </div>
+            <button type="button" className="btn btn-ghost" onClick={() => setContactOpen(false)} style={{ whiteSpace: 'nowrap' }}>
+              Close
+            </button>
+          </div>
+
+          {contactSuccess ? (
+            <div style={{ padding: '14px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r)', background: 'var(--bg2)' }}>
+              <div style={{ fontWeight: 800, color: 'var(--hi)', marginBottom: 6 }}>Received</div>
+              <div style={{ fontSize: 13, color: 'var(--mid)' }}>We'll reach out within 1 business day.</div>
+            </div>
+          ) : (
+            <form onSubmit={submitContactSales} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginTop: 10 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Name</span>
+                <input
+                  value={contactForm.name}
+                  onChange={(e) => setContactForm((s) => ({ ...s, name: e.target.value }))}
+                  required
+                  style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)', color: 'var(--hi)' }}
+                />
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Work email</span>
+                <input
+                  type="email"
+                  value={contactForm.email}
+                  onChange={(e) => setContactForm((s) => ({ ...s, email: e.target.value }))}
+                  required
+                  style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)', color: 'var(--hi)' }}
+                />
+              </label>
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Company</span>
+                <input
+                  value={contactForm.company}
+                  onChange={(e) => setContactForm((s) => ({ ...s, company: e.target.value }))}
+                  required
+                  style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)', color: 'var(--hi)' }}
+                />
+              </label>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Plan</span>
+                <div style={{ fontSize: 13, color: 'var(--hi)', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)' }}>
+                  Enterprise
+                </div>
+              </div>
+
+              <label style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Tell us about your use case</span>
+                <textarea
+                  value={contactForm.use_case}
+                  onChange={(e) => setContactForm((s) => ({ ...s, use_case: e.target.value }))}
+                  required
+                  rows={6}
+                  style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)', color: 'var(--hi)', resize: 'vertical' }}
+                />
+              </label>
+
+              {contactError && (
+                <div style={{ gridColumn: '1 / -1', fontSize: 13, color: '#ff7b91' }}>
+                  {contactError}
+                </div>
+              )}
+
+              <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+                <button type="button" className="btn btn-ghost" onClick={() => setContactOpen(false)} disabled={contactSubmitting}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={contactSubmitting}>
+                  {contactSubmitting ? 'Sending…' : 'Send'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
 
       <div style={{ marginTop: 32, padding: '20px 24px', border: '1px solid var(--line)', borderRadius: 'var(--r)', background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>

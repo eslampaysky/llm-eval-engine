@@ -4,7 +4,7 @@
  * - Three plan cards (Free/Pro/Enterprise) with upgrade placeholder CTAs
  */
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '../../../App.jsx';
+import { api, API_BASE, getApiKey } from '../../../App.jsx';
 
 const S = {
   card: {
@@ -78,11 +78,18 @@ const PLANS = [
   {
     key: 'pro',
     name: 'Pro',
-    price: '$39',
+    price: '$29',
     period: '/month',
     color: 'var(--accent)',
     cta: 'Upgrade to Pro',
-    features: ['Unlimited break runs', '120 tests per run', 'CI regression checks', 'Priority support'],
+    features: [
+      '500 break runs / month',
+      '100 tests per run',
+      'PDF + HTML reports',
+      'Saved targets',
+      'Team sharing',
+      'Priority support',
+    ],
   },
   {
     key: 'enterprise',
@@ -96,6 +103,30 @@ const PLANS = [
 ];
 
 function PlanCard({ plan }) {
+  const [loading, setLoading] = useState(false);
+
+  async function startCheckout() {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': getApiKey(),
+        },
+        body: JSON.stringify({ plan: 'pro' }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.detail || `Request failed (${res.status})`);
+      if (!body?.url) throw new Error('Missing checkout URL');
+      window.location.href = body.url;
+    } catch (e) {
+      alert(e?.message || 'Failed to start checkout');
+      setLoading(false);
+    }
+  }
+
   return (
     <div
       style={{
@@ -139,7 +170,8 @@ function PlanCard({ plan }) {
       {!plan.current && plan.cta && (
         <button
           type="button"
-          onClick={() => alert(`${plan.cta} - Stripe integration coming soon.`)}
+          onClick={() => (plan.key === 'pro' ? startCheckout() : alert(`${plan.cta} - Stripe integration coming soon.`))}
+          disabled={loading}
           style={{
             marginTop: 'auto',
             padding: '9px',
@@ -160,7 +192,7 @@ function PlanCard({ plan }) {
             e.currentTarget.style.background = `${plan.color}14`;
           }}
         >
-          {plan.cta}
+          {plan.key === 'pro' && loading ? 'Creating checkout...' : plan.cta}
         </button>
       )}
     </div>
@@ -170,6 +202,7 @@ function PlanCard({ plan }) {
 export default function BillingPage() {
   const [usage, setUsage] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [topupLoading, setTopupLoading] = useState(false);
 
   useEffect(() => {
     api
@@ -182,6 +215,28 @@ export default function BillingPage() {
   const monthRuns = usage?.month?.req_count || 0;
   const monthSamples = usage?.month?.sample_count || 0;
   const totalRuns = usage?.overall?.req_count || 0;
+
+  async function startTopupCheckout() {
+    if (topupLoading) return;
+    setTopupLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': getApiKey(),
+        },
+        body: JSON.stringify({ plan: 'run_pack_100' }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.detail || `Request failed (${res.status})`);
+      if (!body?.url) throw new Error('Missing checkout URL');
+      window.location.href = body.url;
+    } catch (e) {
+      alert(e?.message || 'Failed to start checkout');
+      setTopupLoading(false);
+    }
+  }
 
   return (
     <div>
@@ -241,6 +296,34 @@ export default function BillingPage() {
       </div>
 
       <div style={S.card}>
+        <div style={S.sectionTitle}>Top-up Runs</div>
+        <div style={S.sectionDesc}>
+          Top-up runs never expire and stack with your monthly plan limit.
+        </div>
+
+        <button
+          type="button"
+          onClick={startTopupCheckout}
+          disabled={topupLoading}
+          style={{
+            padding: '10px 14px',
+            borderRadius: 10,
+            background: 'var(--accent-dim)',
+            border: '1px solid rgba(59,180,255,0.22)',
+            color: 'var(--accent)',
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 12,
+            fontWeight: 900,
+            cursor: topupLoading ? 'not-allowed' : 'pointer',
+            opacity: topupLoading ? 0.7 : 1,
+            transition: 'all 0.12s',
+          }}
+        >
+          {topupLoading ? 'Creating checkout...' : 'Buy 100 extra runs — $10'}
+        </button>
+      </div>
+
+      <div style={S.card}>
         <div style={S.sectionTitle}>Billing History</div>
         <div style={S.sectionDesc}>Invoices and payment history will appear here.</div>
         <div
@@ -259,4 +342,3 @@ export default function BillingPage() {
     </div>
   );
 }
-
