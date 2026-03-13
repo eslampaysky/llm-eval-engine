@@ -112,11 +112,18 @@ API_KEYS=client_key
 
 # Optional overrides
 # MAX_WORKERS=4
+# SENTRY_DSN=  # Get a free DSN at sentry.io
+# REPORTS_STORAGE=local  # local (default) or s3
+# AWS_ACCESS_KEY_ID=
+# AWS_SECRET_ACCESS_KEY=
+# AWS_S3_BUCKET=
+# AWS_S3_REGION=us-east-1
+# AWS_S3_ENDPOINT_URL=  # Optional (for S3-compatible providers like Cloudflare R2)
 STRIPE_SECRET_KEY=
 STRIPE_PRO_PRICE_ID=
 OLLAMA_URL=http://host.docker.internal:11434
 PERSPECTIVE_API_KEY=
-```
+``` 
 
 ## Local development
 
@@ -215,6 +222,16 @@ Notes:
 ### Backend on Railway
 
 `railway.toml` is already configured in repo root.
+
+Database:
+
+- Set `DATABASE_URL` to your Railway Postgres connection string.
+- Leave it unset for local SQLite.
+
+Reports:
+
+- By default, HTML reports are written to local disk under `reports/` (ephemeral on Railway).
+- For multi-instance / durable storage, set `REPORTS_STORAGE=s3` and configure the `AWS_*` S3 variables.
 
 Commands:
 

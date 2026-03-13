@@ -12,6 +12,95 @@ from html import escape
 from statistics import mean
 
 
+def _reports_storage_mode() -> str:
+    return (os.getenv("REPORTS_STORAGE", "local") or "local").strip().lower()
+
+
+def _s3_object_key_from_output_path(output_path: str) -> str:
+    normalized = (output_path or "").replace("\\", "/").strip()
+    if not normalized:
+        return "reports/report.html"
+
+    if normalized.startswith("reports/"):
+        return normalized
+    if normalized.startswith("/reports/"):
+        return normalized[1:]
+
+    marker = "/reports/"
+    if marker in normalized:
+        tail = normalized.split(marker, 1)[1].lstrip("/")
+        return f"reports/{tail}" if tail else "reports/report.html"
+
+    return f"reports/{Path(normalized).name}"
+
+
+def _store_html_report(report_html: str, output_path: str) -> str:
+    """
+    Persist HTML report and return its "path":
+      - local: filesystem path (existing behavior)
+      - s3: object key (e.g. reports/report_<id>.html)
+    """
+    mode = _reports_storage_mode()
+    if mode not in {"local", "s3"}:
+        raise ValueError("REPORTS_STORAGE must be 'local' or 's3'")
+
+    if mode == "local":
+        os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(report_html)
+        return output_path
+
+    # S3 / S3-compatible storage (e.g. Cloudflare R2)
+    try:
+        import boto3  # type: ignore
+        from botocore.exceptions import ClientError  # type: ignore
+    except Exception as exc:  # pragma: no cover
+        raise RuntimeError("REPORTS_STORAGE=s3 requires boto3") from exc
+
+    aws_access_key_id = (os.getenv("AWS_ACCESS_KEY_ID") or "").strip()
+    aws_secret_access_key = (os.getenv("AWS_SECRET_ACCESS_KEY") or "").strip()
+    bucket = (os.getenv("AWS_S3_BUCKET") or "").strip()
+    region = (os.getenv("AWS_S3_REGION") or "").strip()
+    endpoint_url = (os.getenv("AWS_S3_ENDPOINT_URL") or "").strip() or None
+
+    if not (aws_access_key_id and aws_secret_access_key and bucket and region):
+        raise RuntimeError(
+            "Missing S3 configuration: set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, "
+            "AWS_S3_BUCKET, AWS_S3_REGION"
+        )
+
+    key = _s3_object_key_from_output_path(output_path)
+
+    client = boto3.client(
+        "s3",
+        region_name=region,
+        endpoint_url=endpoint_url,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+    )
+
+    put_kwargs = {
+        "Bucket": bucket,
+        "Key": key,
+        "Body": report_html.encode("utf-8"),
+        "ContentType": "text/html",
+        "ACL": "private",
+    }
+
+    try:
+        client.put_object(**put_kwargs)
+    except ClientError as exc:
+        # Some S3-compatible providers (e.g. R2) may not support ACLs.
+        code = (exc.response or {}).get("Error", {}).get("Code", "")
+        if code in {"AccessControlListNotSupported", "NotImplemented"}:
+            put_kwargs.pop("ACL", None)
+            client.put_object(**put_kwargs)
+        else:
+            raise
+
+    return key
+
+
 def _weighted_score(correctness, relevance, cw=0.6, rw=0.4):
     if correctness is None or relevance is None:
         return None
@@ -43,8 +132,6 @@ def _provider_avgs(results: list[dict], providers: list[str]) -> dict[str, float
 
 
 def generate_html_report(metrics: dict, results: list[dict], output_path: str = "reports/report.html") -> str:
-    os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
-
     total = int(metrics.get("total_samples", 0))
     hallucinations = int(metrics.get("hallucinations_detected", 0))
     low_quality = int(metrics.get("low_quality_answers", 0))
@@ -340,10 +427,7 @@ async function copyShareLink() {{
 </body>
 </html>"""
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(html)
-
-    return output_path
+    return _store_html_report(html, output_path)
 
 
 class ReportGenerator:
@@ -586,6 +670,17 @@ class ReportGenerator:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(report_html, encoding="utf-8")
         return str(path)
+
+
+def generate_premium_report(
+    metrics: dict,
+    results: list[dict],
+    output_path: str,
+    metadata: dict | None = None,
+) -> str:
+    metadata = metadata or {}
+    report_html = _build_html(metrics, results, metadata)
+    return _store_html_report(report_html, output_path)
 
 
 def _e(text: str) -> str:

@@ -14,23 +14,41 @@ from __future__ import annotations
 import atexit
 import hashlib
 import json
+import logging
 import os
-import os as _os  
 import sqlite3
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Generator
 
+_log = logging.getLogger(__name__)
+
 # ── Config ────────────────────────────────────────────────────────────────────
 
-DATABASE_URL: str | None = os.getenv("DATABASE_URL")  # e.g. postgresql://user:pass@host/db
-_USE_PG = bool(DATABASE_URL)
+_RAW_DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
+
+def _is_postgres_url(url: str) -> bool:
+    return url.startswith("postgresql://") or url.startswith("postgres://")
+
+_USE_PG = _is_postgres_url(_RAW_DATABASE_URL)
+
+# Normalize scheme for compatibility (Railway commonly uses postgres://...).
+DATABASE_URL: str | None = None
+if _USE_PG:
+    DATABASE_URL = (
+        "postgresql://" + _RAW_DATABASE_URL[len("postgres://") :]
+        if _RAW_DATABASE_URL.startswith("postgres://")
+        else _RAW_DATABASE_URL
+    )
 
 # SQLite fallback path
-_DATA_DIR = os.getenv("DATA_DIR", "/app/data")
-os.makedirs(_DATA_DIR, exist_ok=True)
-_SQLITE_FILE = os.path.join(_DATA_DIR, "usage.db")
+_DATA_DIR = os.getenv("DATA_DIR")
+_SQLITE_FILE = (
+    os.path.join(_DATA_DIR, "usage.db")
+    if _DATA_DIR
+    else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "usage.db"))
+)
 
 # Backwards-compatibility alias — routes.py imports DB_FILE directly
 DB_FILE = _SQLITE_FILE
@@ -82,8 +100,19 @@ if _USE_PG:
     _P = "%s"
 
 else:
+    def _ensure_sqlite_dir() -> None:
+        db_dir = os.path.dirname(_SQLITE_FILE)
+        if not db_dir:
+            return
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+        except Exception:
+            # If we can't create it here, sqlite will raise a clearer error on connect.
+            pass
+
     @contextmanager
     def _get_conn() -> Generator:
+        _ensure_sqlite_dir()
         conn = sqlite3.connect(_SQLITE_FILE)
         conn.row_factory = sqlite3.Row
         try:
@@ -115,6 +144,10 @@ def _ph(n: int = 1) -> str:
 
 def init_db():
     """Create all tables if they don't exist. Safe to call on every startup."""
+    if _USE_PG:
+        _log.info("[DB] Initializing Postgres schema")
+    else:
+        _log.info("[DB] Initializing SQLite schema file=%s", _SQLITE_FILE)
     with _get_conn() as conn:
         cur = conn.cursor()
 
@@ -871,7 +904,7 @@ def save_test_suite_cache(description: str, num_tests: int, tests: list[dict]) -
 
   # already imported at top of file — this line is just for reference
  
-STUCK_AFTER_MINUTES: int = int(_os.getenv("STUCK_REPORT_MINUTES", "15"))
+STUCK_AFTER_MINUTES: int = int(os.getenv("STUCK_REPORT_MINUTES", "15"))
  
  
 def get_stuck_processing_reports(older_than_minutes: int = STUCK_AFTER_MINUTES) -> list[dict]:

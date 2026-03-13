@@ -56,7 +56,7 @@ from api.database import (
 from api.job_queue import enqueue_job
 from api.models import BreakRequest, BreakTarget, DemoBreakRequest, EvaluationRequest, JudgeConfig, TargetCreate
 from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ, limiter ,LIMIT_RETRY
-from reports.report_generator import ReportGenerator, generate_html_report
+from reports.report_generator import ReportGenerator, generate_html_report, generate_premium_report
 from src.llm_eval_engine.infrastructure.config_loader import load_project_config
 from src.llm_eval_engine.infrastructure.evaluator_factories import (
     build_default_evaluator_registry,
@@ -74,7 +74,8 @@ router = APIRouter()
 MAX_WORKERS = int(os.getenv("MAX_WORKERS", "4"))
 _API_KEY_MAP: dict[str, str] = {}
 
-logger = logging.getLogger(__name__)
+_log = logging.getLogger(__name__)
+logger = _log
 
 # ── Persistent paths ──────────────────────────────────────────────────────────
 _DATA_DIR         = Path(os.getenv("DATA_DIR", "/app/data"))
@@ -523,14 +524,29 @@ def _resolve_break_judges(
 
 
 def _process_evaluation_job(report_id, samples, judge_model):
+    _log.info(
+        "[Eval] Started report_id=%s samples=%d judge_model=%s",
+        report_id,
+        len(samples) if samples is not None else 0,
+        judge_model,
+    )
+    started = time.monotonic()
     try:
         results, metrics = _run_pipeline(samples=samples, judge_model=judge_model)
+        score = metrics.get("average_score") if isinstance(metrics, dict) else None
+        _log.info(
+            "[Eval] Completed report_id=%s score=%s elapsed_s=%.3f",
+            report_id,
+            score,
+            time.monotonic() - started,
+        )
         REPORT_DIR.mkdir(parents=True, exist_ok=True)
         html_path = str(REPORT_DIR / f"report_{report_id}.html")
-        generate_html_report(metrics=metrics, results=results, output_path=html_path)
+        html_path = generate_html_report(metrics=metrics, results=results, output_path=html_path)
         _finalize_report_success(report_id=report_id, results=results,
                                   metrics=metrics, html_path=html_path)
     except Exception as exc:
+        _log.error("[Eval] Failed report_id=%s: %s", report_id, exc, exc_info=True)
         _finalize_report_failure(report_id=report_id, error_message=str(exc))
 
 
@@ -665,12 +681,6 @@ class _RetryingGeminiDemoAdapter:
             raise RuntimeError(DEMO_RATE_LIMIT_ERROR) from last_exc
         raise RuntimeError(DEMO_RATE_LIMIT_ERROR)
 
-
-import logging as _logging
-_log = _logging.getLogger(__name__)
- 
- 
-
 def _process_break_job(report_id, target_cfg, description, num_tests,
                        groq_api_key, force_refresh=False, language="auto",
                        judges_config: list[dict[str, Any]] | None = None,
@@ -720,7 +730,7 @@ def _process_break_job(report_id, target_cfg, description, num_tests,
         judge_label = "+".join(j.name for j in judges)
         REPORT_DIR.mkdir(parents=True, exist_ok=True)
         html_path = str(REPORT_DIR / f"report_{report_id}.html")
-        ReportGenerator().generate(
+        html_path = generate_premium_report(
             metrics=metrics, results=results, output_path=html_path,
             metadata={"target_type": target_cfg.get("type", "unknown"),
                       "judge_model": judge_label},
@@ -780,21 +790,37 @@ async def evaluate(
         evaluation_date=datetime.now(timezone.utc).date().isoformat(),
     )
     if len(samples) > 20:
+        _log.info("[Eval] Enqueued report_id=%s samples=%d", report_id, len(samples))
         await enqueue_job(
             _process_evaluation_job, report_id, samples, payload.judge_model,
             job_id=report_id,
         )
         return {"report_id": report_id, "status": "processing", "results": [], "metrics": {}}
     try:
+        _log.info(
+            "[Eval] Started report_id=%s samples=%d judge_model=%s",
+            report_id,
+            len(samples),
+            payload.judge_model,
+        )
+        started = time.monotonic()
         results, metrics = _run_pipeline(samples=samples, judge_model=payload.judge_model)
+        score = metrics.get("average_score") if isinstance(metrics, dict) else None
+        _log.info(
+            "[Eval] Completed report_id=%s score=%s elapsed_s=%.3f",
+            report_id,
+            score,
+            time.monotonic() - started,
+        )
         REPORT_DIR.mkdir(parents=True, exist_ok=True)
         html_path = str(REPORT_DIR / f"report_{report_id}.html")
-        generate_html_report(metrics=metrics, results=results, output_path=html_path)
+        html_path = generate_html_report(metrics=metrics, results=results, output_path=html_path)
         _finalize_report_success(report_id=report_id, results=results,
                                   metrics=metrics, html_path=html_path)
         return {"report_id": report_id, "status": "done",
                 "results": results, "metrics": metrics}
     except Exception as exc:
+        _log.error("[Eval] Failed report_id=%s: %s", report_id, exc, exc_info=True)
         _finalize_report_failure(report_id=report_id, error_message=str(exc))
         raise HTTPException(status_code=500, detail=f"Evaluation failed: {exc}")
 

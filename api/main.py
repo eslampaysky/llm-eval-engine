@@ -9,9 +9,15 @@ Changes vs previous version:
 
 from __future__ import annotations
 
-import logging
+import logging, sys
 import os
 from contextlib import asynccontextmanager
+
+import sentry_sdk
+
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+if SENTRY_DSN:
+    sentry_sdk.init(dsn=SENTRY_DSN, traces_sample_rate=0.1)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,7 +30,7 @@ from api.rate_limit import limiter, rate_limit_exceeded_handler
 from api.routes import init_api_key_map, router
 from api.auth_routes import auth_router
 
-logger = logging.getLogger(__name__)
+_log = logging.getLogger(__name__)
 
 APP_VERSION = "1.0.0"
 STUCK_AFTER_MINUTES = int(os.getenv("STUCK_REPORT_MINUTES", "15"))
@@ -49,18 +55,19 @@ def _recover_stuck_reports() -> int:
         try:
             mark_report_stale(row["report_id"])
             recovered += 1
-            logger.warning(
+            _log.warning(
                 "[Recovery] Marked report %s as stale (was processing since %s)",
                 row["report_id"], row["updated_at"],
             )
         except Exception as exc:
-            logger.error(
+            _log.error(
                 "[Recovery] Failed to mark %s stale: %s",
                 row["report_id"], exc,
+                exc_info=True,
             )
 
     if recovered:
-        logger.warning(
+        _log.warning(
             "[Recovery] %d stuck report(s) marked stale. "
             "Clients can retry via POST /report/{id}/retry.",
             recovered,
@@ -71,6 +78,12 @@ def _recover_stuck_reports() -> int:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── Startup ──────────────────────────────────────────────────────────────
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        stream=sys.stdout,
+    )
+
     init_db()
     init_api_key_map()
 
@@ -93,6 +106,20 @@ app = FastAPI(
     description="AI model adversarial evaluation API",
     lifespan=lifespan,
 )
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    _log.info("Request received %s %s", request.method, request.url.path)
+    try:
+        return await call_next(request)
+    except Exception:
+        _log.error(
+            "Unhandled error while handling %s %s",
+            request.method,
+            request.url.path,
+            exc_info=True,
+        )
+        raise
 
 # ── Attach limiter to app state (required by slowapi) ─────────────────────────
 app.state.limiter = limiter
@@ -128,7 +155,7 @@ def health_details():
         stale = get_stuck_processing_reports(older_than_minutes=0)  # 0 = any stale
         stale_count = len([r for r in stale])
     except Exception as exc:
-        logger.error("[Health] Failed to query stale reports: %s", exc)
+        _log.error("[Health] Failed to query stale reports: %s", exc, exc_info=True)
         stale_count = 0
 
     return {
