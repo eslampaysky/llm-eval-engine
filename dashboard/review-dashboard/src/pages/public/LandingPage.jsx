@@ -1,12 +1,36 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
 export default function LandingPage() {
+  const isMobile = useIsMobile();
+
   return (
     <section className="page fade-in" style={{ maxWidth: 1180, margin: '0 auto', paddingTop: 56, paddingBottom: 56 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr .8fr', gap: 20, alignItems: 'start' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '1.2fr .8fr',
+        gap: 20,
+        alignItems: 'start',
+      }}>
         <div>
           <div className="page-eyebrow">// public · landing</div>
-          <h1 className="page-title" style={{ fontSize: 52, lineHeight: 1.02, marginBottom: 16 }}>Break your AI before users do.</h1>
+          <h1 className="page-title" style={{
+            fontSize: isMobile ? 32 : 52,
+            lineHeight: 1.02,
+            marginBottom: 16,
+          }}>
+            Break your AI before users do.
+          </h1>
           <div className="page-desc" style={{ maxWidth: 640, fontSize: 16 }}>
             AI Breaker Labs stress-tests LLM applications for hallucinations, safety failures, regressions, and prompt attacks so your team can ship with evidence instead of guesswork.
           </div>
@@ -26,7 +50,13 @@ export default function LandingPage() {
               'Scores outputs with judge models and detailed evidence.',
               'Tracks regressions across versions and releases.',
             ].map((item) => (
-              <div key={item} style={{ padding: '12px 14px', border: '1px solid var(--line)', borderRadius: 'var(--r)', background: 'var(--bg2)', color: 'var(--mid)' }}>
+              <div key={item} style={{
+                padding: '12px 14px',
+                border: '1px solid var(--line)',
+                borderRadius: 'var(--r)',
+                background: 'var(--bg2)',
+                color: 'var(--mid)',
+              }}>
                 {item}
               </div>
             ))}
@@ -34,7 +64,12 @@ export default function LandingPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14, marginTop: 26 }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))',
+        gap: 14,
+        marginTop: 26,
+      }}>
         {[
           ['Adversarial coverage', 'Probe jailbreaks, prompt injection, hallucinations, and unsafe edge cases.'],
           ['Operational insight', 'Compare runs, inspect failures, and build a repeatable review workflow.'],
