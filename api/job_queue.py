@@ -24,6 +24,7 @@ import logging
 import os
 import time
 import traceback
+import httpx
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -36,6 +37,29 @@ logger = logging.getLogger(__name__)
 NUM_WORKERS   = int(os.getenv("JOB_WORKERS", "4"))
 MAX_QUEUE_SIZE = int(os.getenv("JOB_QUEUE_SIZE", "100"))
 JOB_TIMEOUT   = int(os.getenv("JOB_TIMEOUT_SECONDS", "600"))  # 10 min max per job
+
+
+async def _keep_alive_loop(interval: int = 55) -> None:
+    """
+    Ping our own /health endpoint on a fixed interval.
+    Prevents Railway (and similar platforms) from sleeping the dyno
+    while a long-running job is in progress.
+    Set SELF_BASE_URL env var to the deployed app URL, e.g.
+    https://your-app.up.railway.app
+    If SELF_BASE_URL is not set this function exits immediately (safe for local dev).
+    """
+    base = os.getenv("SELF_BASE_URL", "").rstrip("/")
+    if not base:
+        return
+    url = f"{base}/health"
+    async with httpx.AsyncClient(timeout=10) as client:
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                await client.get(url)
+                logger.debug("[KeepAlive] Pinged %s", url)
+            except Exception as exc:
+                logger.warning("[KeepAlive] Ping failed: %s", exc)
 
 
 # ── Job data class ────────────────────────────────────────────────────────────
@@ -68,6 +92,7 @@ class _JobQueue:
             task = asyncio.create_task(self._worker(i), name=f"breaker-worker-{i}")
             self._workers.append(task)
         self._started = True
+        asyncio.create_task(_keep_alive_loop(), name="keep-alive-ping")
         logger.info(f"[JobQueue] Started {num_workers} workers (queue size={MAX_QUEUE_SIZE})")
 
     async def stop(self):

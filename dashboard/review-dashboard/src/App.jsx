@@ -117,36 +117,66 @@ export const api = {
 
 // ─── Poll store (survives tab switches) ──────────────────────────────────────
 
-export const POLL = { timerId: null, reportId: null, attempts: 0, numTests: 20, cbs: new Set(), fetchReport: api.getReport, mode: 'break' };
+export const POLL = {
+  timerId: null, reportId: null, attempts: 0, numTests: 20,
+  cbs: new Set(), fetchReport: api.getReport, mode: 'break'
+};
 export const pollSub    = (cb) => { POLL.cbs.add(cb); return () => POLL.cbs.delete(cb); };
-const pollNotify = (ev) => POLL.cbs.forEach(cb => cb(ev));
+const        pollNotify = (ev) => POLL.cbs.forEach(cb => cb(ev));
 export const pollActive = ()   => !!POLL.timerId;
 
 function stageFromAttempts(attempts, n) {
   const s = attempts * 3;
-  if (s < 5)                         return 0;
-  if (s < 12)                        return 1;
-  if (s < 12 + n * 5 * 0.5)         return 2;
-  if (s < 12 + n * 5 * 0.9)         return 3;
+  if (s < 5)                    return 0;
+  if (s < 12)                   return 1;
+  if (s < 12 + n * 5 * 0.5)    return 2;
+  if (s < 12 + n * 5 * 0.9)    return 3;
   return 4;
 }
 
 export function pollStart(reportId, numTests = 20, fetchReport = api.getReport, mode = 'break') {
-  if (POLL.timerId) clearInterval(POLL.timerId);
-  POLL.reportId = reportId; POLL.attempts = 0; POLL.numTests = numTests; POLL.fetchReport = fetchReport; POLL.mode = mode;
-  POLL.timerId = setInterval(async () => {
+  if (POLL.timerId) clearTimeout(POLL.timerId);
+  POLL.reportId = reportId;
+  POLL.attempts = 0;
+  POLL.numTests = numTests;
+  POLL.fetchReport = fetchReport;
+  POLL.mode = mode;
+
+  let consecutiveErrors = 0;
+  const MAX_CONSECUTIVE_ERRORS = 5;
+  const BASE_INTERVAL = 3000;
+  const MAX_INTERVAL = 30000;
+
+  async function tick() {
+    if (!POLL.timerId) return;
+
     POLL.attempts++;
+
+    if (POLL.attempts > 140) {
+      POLL.timerId = null;
+      pollNotify({ type: 'timeout', mode: POLL.mode });
+      return;
+    }
+
     try {
       const r = await POLL.fetchReport(reportId);
-      if (r.status === 'done' || r.status === 'stale') {
-        clearInterval(POLL.timerId); POLL.timerId = null;
+      consecutiveErrors = 0;
+
+      if (r.status === 'done') {
+        POLL.timerId = null;
         pollNotify({ type: 'done', report: r, mode: POLL.mode });
+        return;
+      } else if (r.status === 'stale') {
+        POLL.timerId = null;
+        pollNotify({ type: 'stale', report: r, mode: POLL.mode });
       } else if (r.status === 'canceled') {
-        clearInterval(POLL.timerId); POLL.timerId = null;
+        POLL.timerId = null;
         pollNotify({ type: 'canceled', report: r, mode: POLL.mode });
+        return;
       } else if (r.status === 'failed') {
-        clearInterval(POLL.timerId); POLL.timerId = null;
+        POLL.timerId = null;
         pollNotify({ type: 'failed', error: r.error || 'Evaluation failed', report: r, mode: POLL.mode });
+        return;
       } else {
         const stage = stageFromAttempts(POLL.attempts, numTests);
         const total = 12 + numTests * 5;
@@ -154,13 +184,30 @@ export function pollStart(reportId, numTests = 20, fetchReport = api.getReport, 
         pollNotify({ type: 'tick', attempts: POLL.attempts, stage, pct, mode: POLL.mode });
       }
     } catch (e) {
-      pollNotify({ type: 'error', error: e.message, mode: POLL.mode });
+      consecutiveErrors++;
+      if (consecutiveErrors === 1) {
+        pollNotify({ type: 'error', error: e.message, mode: POLL.mode });
+      }
+      if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        POLL.timerId = null;
+        pollNotify({
+          type: 'failed',
+          error: `Lost connection after ${MAX_CONSECUTIVE_ERRORS} retries. Check your network or the backend may be restarting.`,
+          report: null,
+          mode: POLL.mode,
+        });
+        return;
+      }
     }
-    if (POLL.attempts >= 140) {
-      clearInterval(POLL.timerId); POLL.timerId = null;
-      pollNotify({ type: 'timeout', mode: POLL.mode });
-    }
-  }, 3000);
+
+    const delay = consecutiveErrors > 0
+      ? Math.min(BASE_INTERVAL * Math.pow(2, consecutiveErrors - 1), MAX_INTERVAL)
+      : BASE_INTERVAL;
+
+    POLL.timerId = setTimeout(tick, delay);
+  }
+
+  POLL.timerId = setTimeout(tick, BASE_INTERVAL);
 }
 
 // ─── Data helpers ─────────────────────────────────────────────────────────────
@@ -1085,7 +1132,7 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
       await api.cancelReport(runId);
       ls.set('abl_active_run_id', null);
       if (POLL.timerId) {
-        clearInterval(POLL.timerId);
+        clearTimeout(POLL.timerId);
         POLL.timerId = null;
       }
       setPolling(false);
@@ -1284,6 +1331,7 @@ export function DemoPage({ report, onReportReady }) {
   const [error, setError] = useState('');
   const [errorStatus, setErrorStatus] = useState(null);
   const [retryableReport, setRetryableReport] = useState(null);
+  const [staleReport, setStaleReport] = useState(null);
   const [countdown, setCountdown] = useState(60);
   const [stopping, setStopping] = useState(false);
   const [logs, setLogs] = useState([]);
@@ -1313,6 +1361,12 @@ export function DemoPage({ report, onReportReady }) {
         setRetryableReport(null);
         setError('Demo run canceled');
         addLog('Stop requested. This demo run has been canceled.', 'info');
+      } else if (ev.type === 'stale') {
+        setStopping(false);
+        setPolling(false);
+        ls.set('abl_demo_active_run_id', null);
+        setStaleReport(ev.report);
+        addLog('⚠ Server restarted while your job was running. You can retry for free.', 'info');
       } else if (ev.type === 'failed') {
         setStopping(false);
         setPolling(false);
@@ -1346,7 +1400,7 @@ export function DemoPage({ report, onReportReady }) {
   }, [retryableReport, countdown, polling]);
 
   async function handleSubmit() {
-    setError(''); setErrorStatus(null); setRetryableReport(null); setCountdown(60); setStopping(false); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0));
+    setError(''); setErrorStatus(null); setRetryableReport(null); setStaleReport(null); setCountdown(60); setStopping(false); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0));
     try {
       addLog('Submitting public demo request…', 'info');
       const res = await api.demoBreak({
@@ -1376,7 +1430,7 @@ export function DemoPage({ report, onReportReady }) {
       await api.cancelDemoReport(runId);
       ls.set('abl_demo_active_run_id', null);
       if (POLL.timerId) {
-        clearInterval(POLL.timerId);
+        clearTimeout(POLL.timerId);
         POLL.timerId = null;
       }
       setPolling(false);
@@ -1435,6 +1489,49 @@ export function DemoPage({ report, onReportReady }) {
             </button>
             <button className="btn btn-ghost" onClick={() => setTimeout(() => { window.location.href = '/signup'; }, 0)}>
               Get Started
+            </button>
+          </div>
+        </div>
+      )}
+
+      {staleReport && !polling && (
+        <div className="card" style={{ marginBottom: 14, borderColor: 'rgba(77,158,255,.35)' }}>
+          <div className="card-label">Job interrupted</div>
+          <div style={{ color: 'var(--hi)', fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+            The server restarted while your demo was running.
+          </div>
+          <div style={{ color: 'var(--mid)', marginBottom: 12 }}>
+            Your quota was not used. Click below to re-run the exact same demo.
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-primary"
+              disabled={busy}
+              onClick={async () => {
+                setStaleReport(null);
+                setError('');
+                setLogs([]);
+                try {
+                  addLog('Retrying interrupted demo…', 'info');
+                  const res = await apiFetch(
+                    `/demo/report/${staleReport.report_id}/retry`,
+                    { method: 'POST' },
+                    false,
+                  );
+                  setRunId(res.report_id);
+                  ls.set('abl_demo_active_run_id', res.report_id);
+                  setPolling(true);
+                  pollStart(res.report_id, staleReport.sample_count || form.num_tests, api.getDemoReport, 'demo');
+                } catch (e) {
+                  setError(e.message);
+                  addLog(`✕ Retry failed: ${e.message}`, 'err');
+                }
+              }}
+            >
+              Retry demo
+            </button>
+            <button className="btn btn-ghost" onClick={() => setStaleReport(null)}>
+              Dismiss
             </button>
           </div>
         </div>

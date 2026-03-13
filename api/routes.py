@@ -483,9 +483,17 @@ def create_billing_checkout(
     if not api_key:
         raise HTTPException(status_code=500, detail="PADDLE_API_KEY is not configured in .env")
 
+    is_sandbox = api_key.startswith("test_")
+    logger.info("[Paddle] Using sandbox=%s endpoint", is_sandbox)
+
     success_url = os.getenv("PADDLE_SUCCESS_URL", "").strip()
     if not success_url:
-        raise HTTPException(status_code=500, detail="PADDLE_SUCCESS_URL is not configured in .env")
+        if is_sandbox:
+            success_url = "https://sandbox-checkout.paddle.com"
+        else:
+            raise HTTPException(status_code=500, detail="PADDLE_SUCCESS_URL is not configured in .env")
+
+    api_url = "https://sandbox-api.paddle.com/transactions" if is_sandbox else "https://api.paddle.com/transactions"
 
     payload_json = {
         "items": [{"price_id": price_id, "quantity": 1}],
@@ -493,7 +501,7 @@ def create_billing_checkout(
     }
     try:
         resp = requests.post(
-            "https://api.paddle.com/transactions",
+            api_url,
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
@@ -1243,6 +1251,41 @@ def get_demo_report(report_id: str) -> dict[str, Any]:
         "error":           row["error"],
         "retryable":       retryable,
     }
+
+
+@router.post("/demo/report/{report_id}/retry", status_code=202)
+async def retry_demo_report(report_id: str) -> dict[str, Any]:
+    """
+    Re-enqueue a stale demo report. No auth required (demo is public).
+    Only works if the report exists, belongs to the demo client, and is stale.
+    """
+    row = get_report_row(report_id)
+    if not row or row["client_name"] != "demo":
+        raise HTTPException(status_code=404, detail="Demo report not found")
+    if row["status"] != "stale":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Report is '{row['status']}', not stale. Cannot retry.",
+        )
+
+    gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    groq_api_key   = os.getenv("GROQ_API_KEY",   "").strip()
+    if not gemini_api_key or not groq_api_key:
+        raise HTTPException(status_code=500, detail="Server API keys not configured")
+
+    reset_report_for_retry(report_id, "demo")
+
+    await enqueue_job(
+        _process_demo_break_job,
+        report_id,
+        row["model_version"],
+        "",           # description is not stored; job regenerates from cache
+        row["sample_count"],
+        groq_api_key,
+        gemini_api_key,
+        job_id=report_id,
+    )
+    return {"report_id": report_id, "status": "processing"}
 
 
 @router.post("/demo/report/{report_id}/cancel", status_code=202)
