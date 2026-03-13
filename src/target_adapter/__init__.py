@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import json
-from abc import ABC, abstractmethod
 
 import requests
 
-
-class BaseTargetAdapter(ABC):
-    @abstractmethod
-    def call(self, question: str) -> str:
-        raise NotImplementedError
+from .base import BaseTargetAdapter
+from .langchain_adapter import LangChainAdapter
 
 
 class OpenAICompatibleAdapter(BaseTargetAdapter):
@@ -155,6 +151,12 @@ class AdapterFactory:
                 endpoint_url=str(config.get("endpoint_url", "")),
                 headers=config.get("headers", {}) or {},
                 payload_template=str(config.get("payload_template", "")),
+            )
+
+        if adapter_type == "langchain":
+            return LangChainAdapter(
+                chain_import_path=str(config.get("chain_import_path", "")),
+                invoke_key=str(config.get("invoke_key", "question")),
             )
 
         raise ValueError(f"Unsupported target adapter type: {adapter_type}")

@@ -5,7 +5,7 @@ export default function PublicLayout() {
   return (
     <>
       <style>{css}</style>
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ height: '100dvh', minHeight: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <header style={{ borderBottom: '1px solid var(--line)', background: 'rgba(12,15,26,.88)', backdropFilter: 'blur(10px)' }}>
           <div style={{ maxWidth: 1180, margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
             <Link to="/" style={{ textDecoration: 'none' }}>
@@ -21,7 +21,7 @@ export default function PublicLayout() {
             </div>
           </div>
         </header>
-        <main style={{ flex: 1, overflow: 'auto' }}>
+        <main style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
           <Outlet />
         </main>
       </div>

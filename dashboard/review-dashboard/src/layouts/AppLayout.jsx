@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { POLL, PersonaSwitcher, SidebarKey, css } from '../App.jsx';
 import { AppShellProvider, useAppShell } from '../context/AppShellContext.jsx';
@@ -17,12 +18,26 @@ function AppLayoutFrame() {
   const location = useLocation();
   const { logout } = useAuth();
   const { apiKey, setApiKey, groqApiKey, setGroqApiKey, persona, setPersona, running } = useAppShell();
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname]);
 
   return (
     <>
       <style>{css}</style>
       <div className="shell">
-        <aside className="sidebar">
+        <header className="mobilebar">
+          <button type="button" className="burger" onClick={() => setNavOpen(true)} aria-label="Open navigation">
+            ☰
+          </button>
+          <div className="mobilebar-title">AI Breaker Labs</div>
+        </header>
+
+        <div className={`scrim${navOpen ? ' on' : ''}`} onClick={() => setNavOpen(false)} />
+
+        <aside className={`sidebar${navOpen ? ' open' : ''}`}>
           <div className="logo-area">
             <div className="logo-mark">
               <div className="logo-dot" />
@@ -42,6 +57,7 @@ function AppLayoutFrame() {
                   to={item.to}
                   className={`nav-btn${isActive ? ' active' : ''}`}
                   style={{ textDecoration: 'none' }}
+                  onClick={() => setNavOpen(false)}
                 >
                   <span className="nav-icon">{item.icon}</span>
                   {item.label}
@@ -56,7 +72,14 @@ function AppLayoutFrame() {
             <SidebarKey value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
             <div className="key-label" style={{ marginTop: 12 }}>Groq API Key</div>
             <SidebarKey value={groqApiKey} onChange={(e) => setGroqApiKey(e.target.value)} />
-            <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={logout}>
+            <button
+              className="btn btn-ghost"
+              style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}
+              onClick={() => {
+                setNavOpen(false);
+                logout();
+              }}
+            >
               Log out
             </button>
           </div>

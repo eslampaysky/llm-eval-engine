@@ -119,6 +119,7 @@ API_KEYS=client_key
 # AWS_S3_BUCKET=
 # AWS_S3_REGION=us-east-1
 # AWS_S3_ENDPOINT_URL=  # Optional (for S3-compatible providers like Cloudflare R2)
+SLACK_WEBHOOK_URL=
 STRIPE_SECRET_KEY=
 STRIPE_PRO_PRICE_ID=
 OLLAMA_URL=http://host.docker.internal:11434

@@ -43,7 +43,7 @@ export default function SettingsLayout() {
   };
 
   return (
-    <div style={{ padding: '28px 34px', maxWidth: 1000 }}>
+    <div className="page fade-in" style={{ maxWidth: 1000 }}>
       <div style={{ marginBottom: 28 }}>
         <div
           style={{

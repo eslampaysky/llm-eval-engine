@@ -300,8 +300,8 @@ export default function WorkspacePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Toggle
             on={notifEnabled}
-            label="Slack alerts"
-            desc="Post run completion summaries to Slack."
+            label="Slack notifications"
+            desc="Post run completion summaries to Slack (requires backend SLACK_WEBHOOK_URL)."
             onChange={(v) => {
               setNotifEnabled(v);
               const next = { ...ls.get('abl_notif_cfg', {}), slack_enabled: v };
@@ -380,4 +380,3 @@ export default function WorkspacePage() {
     </div>
   );
 }
-

@@ -7,19 +7,31 @@ name = "aibreaker"
 version = "0.1.0"
 description = "Official Python SDK for AI Breaker Lab"
 readme = "README.md"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 requires-python = ">=3.9"
 keywords = ["llm", "evaluation", "adversarial", "testing", "ai"]
+authors = [{ name = "EslamSamy", email = "eslam.samy@paysky.io" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Testing",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = [
     "requests>=2.28",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "responses>=0.25", "pytest-cov"]
+dev = ["pytest>=7", "responses>=0.25", "pytest-cov", "build>=1.0.0"]
+langchain = ["langchain>=0.1"]
 
 [project.urls]
 Homepage = "https://llm-eval-engine-production.up.railway.app"
-Repository = "https://github.com/your-org/aibreaker"
+Repository = "https://github.com/eslampaysky/llm-eval-engine/tree/main/aibreaker"
 
 [tool.setuptools]
 packages = ["aibreaker"]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import requests
 import secrets
 import smtplib
 import uuid
@@ -200,6 +201,36 @@ def _send_email_notification(to_email: str, report: dict[str, Any]) -> None:
         smtp.starttls()
         smtp.login(user, password)
         smtp.send_message(msg)
+
+
+def _report_html_url(report_id: str) -> str:
+    base = (os.getenv("PUBLIC_BASE_URL") or os.getenv("APP_BASE_URL") or "").strip().rstrip("/")
+    if not base:
+        base = "https://llm-eval-engine-production.up.railway.app"
+    return f"{base}/report/{report_id}/html"
+
+
+def _notify_slack(report_id: str, score: float, passed: bool, report_url: str) -> None:
+    webhook_url = os.getenv("SLACK_WEBHOOK_URL", "").strip()
+    if not webhook_url:
+        return
+
+    score_text = f"{float(score):.1f}/10"
+    if passed:
+        text = f"✅ Passed: AI Breaker run `{report_id}` passed — score {score_text}. View report: {report_url}"
+    else:
+        text = f"❌ Failed: AI Breaker run `{report_id}` FAILED — score {score_text}. View report: {report_url}"
+
+    try:
+        resp = requests.post(webhook_url, json={"text": text}, timeout=5)
+        if resp.status_code >= 400:
+            _log.warning(
+                "[Slack] Webhook returned HTTP %s: %s",
+                resp.status_code,
+                (resp.text or "")[:300],
+            )
+    except Exception as exc:
+        _log.warning("[Slack] Notification failed: %s", exc)
 
 
 def build_public_html(row: dict[str, Any]) -> str:
@@ -502,6 +533,19 @@ def _finalize_report_success(report_id, results, metrics, html_path):
         total_tokens=total_tokens,
         total_cost=total_cost,
     )
+
+    try:
+        score = float((metrics or {}).get("average_score", 0) or 0)
+        threshold = float((metrics or {}).get("fail_threshold", 5.0) or 5.0)
+        passed = score >= threshold
+        _notify_slack(
+            report_id=str(report_id),
+            score=score,
+            passed=passed,
+            report_url=_report_html_url(str(report_id)),
+        )
+    except Exception as exc:
+        _log.warning("[Slack] Post-finalize hook failed: %s", exc)
 
 
 def _finalize_report_failure(report_id, error_message):

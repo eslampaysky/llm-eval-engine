@@ -462,7 +462,7 @@ td.empty, .panel.empty {
 .usage-grid strong { font-size: 1.2rem; }
 
 @media (max-width: 1024px) {
-  .app-shell { grid-template-columns: 1fr; }
+  .shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: 100dvh; }
   .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
   .nav-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .field-grid.two, .settings-grid, .kpi-grid { grid-template-columns: 1fr; }

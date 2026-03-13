@@ -568,7 +568,7 @@ export default function TargetsPage() {
   }
 
   return (
-    <div className="page fade-in" style={{ padding: '28px 34px', maxWidth: 1180 }}>
+    <div className="page fade-in">
       <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
