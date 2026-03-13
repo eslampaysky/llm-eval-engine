@@ -52,7 +52,18 @@ const PRESETS = [
 const DEMO_MODEL_OPTIONS = [
   { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash', hint: 'preview' },
   { value: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash Lite', hint: 'preview' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'unavailable', disabled: true },
 ];
+
+const DEMO_MODEL_RATE_LIMIT_KEY = 'abl_demo_rate_limit';
+const DEMO_MODEL_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function getDefaultDemoModel() {
+  const info = ls.get(DEMO_MODEL_RATE_LIMIT_KEY);
+  const limited = info && info.model === 'gemini-3-flash-preview'
+    && (Date.now() - info.at) < DEMO_MODEL_LIMIT_WINDOW_MS;
+  return limited ? 'gemini-3.1-flash-lite-preview' : 'gemini-3-flash-preview';
+}
 
 const DEMO_DESCRIPTION_SUGGESTIONS = [
   'A customer support chatbot for an e-commerce store',
@@ -1320,7 +1331,7 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
 export function DemoPage({ report, onReportReady }) {
   const [form, setForm] = useState({
     description: '',
-    model_name: DEMO_MODEL_OPTIONS[0].value,
+    model_name: getDefaultDemoModel(),
     num_tests: 5,
   });
   const [loading, setLoading] = useState(false);
@@ -1337,6 +1348,9 @@ export function DemoPage({ report, onReportReady }) {
   const [runId, setRunId] = useState(ls.get('abl_demo_active_run_id'));
   const [activeType, setActiveType] = useState(currentTestType(0, 0));
   const [fallbackUsed, setFallbackUsed] = useState(false);
+  const rateLimitInfo = ls.get(DEMO_MODEL_RATE_LIMIT_KEY);
+  const isFlashLimited = rateLimitInfo?.model === 'gemini-3-flash-preview'
+    && (Date.now() - rateLimitInfo.at) < DEMO_MODEL_LIMIT_WINDOW_MS;
   const logRef = useRef(null);
 
   const addLog = useCallback((msg, type = 'info') => {
@@ -1424,6 +1438,7 @@ export function DemoPage({ report, onReportReady }) {
         const isRateLimited = e?.status === 429 || /rate limit|quota|resource exhausted/i.test(msg);
         const fallbackModel = 'gemini-3.1-flash-lite-preview';
         if (!fallbackUsed && isRateLimited && form.model_name === 'gemini-3-flash-preview') {
+          ls.set(DEMO_MODEL_RATE_LIMIT_KEY, { model: 'gemini-3-flash-preview', at: Date.now() });
           setFallbackUsed(true);
           setForm((p) => ({ ...p, model_name: fallbackModel }));
           addLog('Gemini 3 Flash is rate limited. Switching to 3.1 Flash Lite…', 'info');
@@ -1601,13 +1616,18 @@ export function DemoPage({ report, onReportReady }) {
                   onChange={e => setForm(p => ({ ...p, model_name: e.target.value }))}
                   disabled={busy}
                 >
-                  {DEMO_MODEL_OPTIONS.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label} — {option.hint}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                {DEMO_MODEL_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label} — {option.hint}
+                  </option>
+                ))}
+              </select>
+              {isFlashLimited && (
+                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--mid)' }}>
+                  Gemini 3 Flash is near its daily limit. Defaulting to 3.1 Flash Lite.
+                </div>
+              )}
+            </div>
               <div className="field">
                 <label className="label">Number of tests</label>
                 <select
