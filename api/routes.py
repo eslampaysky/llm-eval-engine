@@ -83,7 +83,7 @@ DEMO_ALLOWED_MODELS = {
     "gemini-3-flash-preview",
     "gemini-3.1-flash-lite-preview",
 }
-DEMO_DAILY_LIMIT = 5
+DEMO_DAILY_LIMIT = 10
 DEMO_RATE_LIMIT_ERROR = "Gemini rate limit exceeded — please try again in a minute"
 
 

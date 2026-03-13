@@ -1,19 +1,132 @@
+import { Link } from 'react-router-dom';
+
+const PLANS = [
+  {
+    key: 'free',
+    name: 'Free',
+    price: '$0',
+    period: '/month',
+    desc: 'For individuals exploring AI testing.',
+    current: true,
+    features: [
+      '50 break runs / month',
+      '20 tests per run',
+      'HTML reports',
+      'Community support',
+      'Multi-provider support',
+    ],
+    cta: 'Get Started',
+    ctaTo: '/auth/signup',
+    highlight: false,
+  },
+  {
+    key: 'pro',
+    name: 'Pro',
+    price: '$29',
+    period: '/month',
+    desc: 'For teams shipping AI to production.',
+    current: false,
+    features: [
+      '500 break runs / month',
+      '100 tests per run',
+      'PDF + HTML reports',
+      'Saved targets',
+      'Team sharing',
+      'Priority support',
+    ],
+    cta: 'Upgrade to Pro',
+    ctaTo: '/auth/signup',
+    highlight: true,
+  },
+  {
+    key: 'enterprise',
+    name: 'Enterprise',
+    price: 'Custom',
+    period: '',
+    desc: 'For organizations with scale and compliance needs.',
+    current: false,
+    features: [
+      'Unlimited runs',
+      'Custom test suites',
+      'SSO / SAML',
+      'Audit logs',
+      'Dedicated support',
+      'SLA guarantee',
+    ],
+    cta: 'Contact Sales',
+    ctaTo: 'mailto:sales@aibreakerlabs.com',
+    highlight: false,
+  },
+];
+
 export default function PricingPage() {
   return (
     <section className="page fade-in" style={{ maxWidth: 980, margin: '0 auto' }}>
       <div className="page-header">
         <div className="page-eyebrow">// public · pricing</div>
-        <div className="page-title">Pricing</div>
-        <div className="page-desc">Placeholder pricing page for the SaaS architecture migration.</div>
+        <div className="page-title">Simple, transparent pricing</div>
+        <div className="page-desc">Start free. Upgrade when you need more runs, longer test suites, or team features.</div>
       </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
-        {['Starter', 'Growth', 'Enterprise'].map((plan) => (
-          <div key={plan} className="card">
-            <div className="card-label">{plan}</div>
-            <div style={{ fontSize: 28, color: 'var(--hi)', marginBottom: 8 }}>TBD</div>
-            <div style={{ color: 'var(--mid)' }}>Plan details will be filled in later. The route and layout are now ready.</div>
+        {PLANS.map((plan) => (
+          <div
+            key={plan.key}
+            className="card"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              border: plan.highlight ? '1px solid var(--accent, #3bb4ff)' : undefined,
+              position: 'relative',
+            }}
+          >
+            {plan.highlight && (
+              <div style={{
+                position: 'absolute', top: -1, left: '50%', transform: 'translateX(-50%)',
+                background: 'var(--accent, #3bb4ff)', color: '#000',
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+                padding: '3px 12px', borderRadius: '0 0 6px 6px',
+              }}>
+                MOST POPULAR
+              </div>
+            )}
+
+            <div>
+              <div className="card-label">{plan.name}</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, margin: '8px 0 4px' }}>
+                <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--hi)' }}>{plan.price}</span>
+                <span style={{ fontSize: 13, color: 'var(--mid)' }}>{plan.period}</span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--mid)' }}>{plan.desc}</div>
+            </div>
+
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {plan.features.map((f) => (
+                <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--mid)' }}>
+                  <span style={{ color: 'var(--accent, #3bb4ff)', flexShrink: 0 }}>✓</span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+
+            <Link
+              className={`btn ${plan.highlight ? 'btn-primary' : 'btn-ghost'}`}
+              to={plan.ctaTo}
+              style={{ marginTop: 'auto', textAlign: 'center' }}
+            >
+              {plan.cta}
+            </Link>
           </div>
         ))}
+      </div>
+
+      <div style={{ marginTop: 32, padding: '20px 24px', border: '1px solid var(--line)', borderRadius: 'var(--r)', background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div style={{ fontWeight: 700, color: 'var(--hi)', marginBottom: 4 }}>Not sure which plan fits?</div>
+          <div style={{ fontSize: 13, color: 'var(--mid)' }}>Try the live demo — no account needed.</div>
+        </div>
+        <Link className="btn btn-ghost" to="/demo">Try Live Demo →</Link>
       </div>
     </section>
   );

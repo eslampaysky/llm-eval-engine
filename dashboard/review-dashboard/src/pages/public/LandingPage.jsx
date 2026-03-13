@@ -14,6 +14,11 @@ export default function LandingPage() {
             <Link className="btn btn-primary" to="/auth/signup">Start Free</Link>
             <Link className="btn btn-ghost" to="/demo">Try Live Demo</Link>
           </div>
+          <div style={{ display: 'flex', gap: 12, marginTop: 22, flexWrap: 'wrap' }}>
+            <Link className="btn btn-primary" to="/auth/signup">Start Free</Link>
+            <Link className="btn btn-ghost" to="/demo">Try Live Demo</Link>
+            <Link className="btn btn-ghost" to="/pricing">View Pricing</Link>
+          </div>
         </div>
 
         <div className="card">
