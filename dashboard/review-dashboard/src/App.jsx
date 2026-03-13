@@ -1456,7 +1456,7 @@ export function DemoPage({ report, onReportReady }) {
   );
 }
 
-export function ReportPage({ report, persona }) {
+export function ReportPage({ report, persona, overviewExtra = null }) {
   const [tab, setTab]     = useState('overview');
   const [open, setOpen]   = useState(new Set());
   const [copied, setCopied] = useState(false);
@@ -1673,6 +1673,12 @@ export function ReportPage({ report, persona }) {
 
       {tab === 'overview' && (
         <div>
+          {overviewExtra && (
+            <div className="card" style={{ marginBottom: 14 }}>
+              <div className="card-label">Radar snapshot</div>
+              {overviewExtra}
+            </div>
+          )}
           {bd.length > 0 && (
             <div className="card" style={{ marginBottom: 14 }}>
               <div className="card-label">Breakdown by category</div>

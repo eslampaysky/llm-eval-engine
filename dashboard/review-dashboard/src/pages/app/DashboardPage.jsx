@@ -5,8 +5,23 @@ import { api, fmtDate, grade, overallScore } from '../../App.jsx';
 export default function DashboardPage() {
   const [runs, setRuns] = useState([]);
   const [usage, setUsage] = useState(null);
+  const [targetsCount, setTargetsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('abl_onboarding_dismissed') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [ciSetupDone, setCiSetupDone] = useState(() => {
+    try {
+      return localStorage.getItem('abl_ci_setup_done') === '1';
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     Promise.all([api.getReports(), api.getUsage()])
@@ -16,6 +31,10 @@ export default function DashboardPage() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+
+    api.getTargets()
+      .then((targets) => setTargetsCount(Array.isArray(targets) ? targets.length : 0))
+      .catch(() => setTargetsCount(0));
   }, []);
 
   const latestRun = runs[0] || null;
@@ -25,6 +44,11 @@ export default function DashboardPage() {
       latestScore = overallScore({ metrics: JSON.parse(latestRun.metrics_json) });
     } catch {}
   }
+
+  const setupTargetsDone = targetsCount > 0;
+  const setupRunDone = runs.length > 0;
+  const setupCiDone = ciSetupDone;
+  const allSetupDone = setupTargetsDone && setupRunDone && setupCiDone;
 
   return (
     <div className="page fade-in">
@@ -37,6 +61,75 @@ export default function DashboardPage() {
       {error && <div className="err-box">⚠ {error}</div>}
       {loading ? <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div> : (
         <>
+          {!onboardingDismissed && !allSetupDone && (
+            <div className="card" style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--hi)', marginBottom: 6 }}>
+                    Get started with AI Breaker
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--mid)', marginBottom: 12 }}>
+                    Complete these steps to finish your setup.
+                  </div>
+
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <Link
+                      className="btn btn-ghost"
+                      to="/app/targets"
+                      style={{ justifyContent: 'flex-start', gap: 10, width: '100%' }}
+                    >
+                      <span style={{ width: 18, textAlign: 'center', color: setupTargetsDone ? 'var(--accent2)' : 'var(--mid)' }}>
+                        {setupTargetsDone ? '✓' : '○'}
+                      </span>
+                      <span style={{ color: setupTargetsDone ? 'var(--mid)' : 'var(--hi)' }}>Add your first target model</span>
+                    </Link>
+
+                    <Link
+                      className="btn btn-ghost"
+                      to="/app/playground"
+                      style={{ justifyContent: 'flex-start', gap: 10, width: '100%' }}
+                    >
+                      <span style={{ width: 18, textAlign: 'center', color: setupRunDone ? 'var(--accent2)' : 'var(--mid)' }}>
+                        {setupRunDone ? '✓' : '○'}
+                      </span>
+                      <span style={{ color: setupRunDone ? 'var(--mid)' : 'var(--hi)' }}>Run your first evaluation</span>
+                    </Link>
+
+                    <Link
+                      className="btn btn-ghost"
+                      to="/docs"
+                      onClick={() => {
+                        try {
+                          localStorage.setItem('abl_ci_setup_done', '1');
+                        } catch {}
+                        setCiSetupDone(true);
+                      }}
+                      style={{ justifyContent: 'flex-start', gap: 10, width: '100%' }}
+                    >
+                      <span style={{ width: 18, textAlign: 'center', color: setupCiDone ? 'var(--accent2)' : 'var(--mid)' }}>
+                        {setupCiDone ? '✓' : '○'}
+                      </span>
+                      <span style={{ color: setupCiDone ? 'var(--mid)' : 'var(--hi)' }}>Set up CI integration</span>
+                    </Link>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    try {
+                      localStorage.setItem('abl_onboarding_dismissed', '1');
+                    } catch {}
+                    setOnboardingDismissed(true);
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="kpi-row">
             <div className="kpi"><div className="kpi-label">Total runs</div><div className="kpi-value">{runs.length}</div></div>
             <div className="kpi"><div className="kpi-label">Latest grade</div><div className="kpi-value">{latestRun ? grade(latestScore) : '—'}</div></div>
@@ -67,6 +160,23 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {runs.length === 0 && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+              <div className="card" style={{ width: '100%', maxWidth: 720, textAlign: 'center' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--hi)', marginBottom: 6 }}>
+                  Run your first evaluation
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--mid)', marginBottom: 14 }}>
+                  Point AI Breaker at any LLM and get a scored adversarial report in minutes.
+                </div>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <Link className="btn btn-primary" to="/app/playground">Open Playground</Link>
+                  <Link className="btn btn-ghost" to="/docs">Read the Docs</Link>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
