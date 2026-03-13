@@ -75,7 +75,7 @@ export function setApiKey(k) { ls.set('abl_api_key', k); }
 
 // ─── API layer ────────────────────────────────────────────────────────────────
 
-async function apiFetch(path, opts = {}, includeAuth = true) {
+export async function apiFetch(path, opts = {}, includeAuth = true) {
   const res = await fetch(`${API_BASE}${path}`, {
     ...opts,
     headers: {

@@ -8,6 +8,8 @@ import secrets
 import smtplib
 import uuid
 import time
+import hashlib
+import hmac
 from datetime import datetime, timezone
 from email.message import EmailMessage
 from html import escape
@@ -68,6 +70,13 @@ from src.target_adapter import AdapterFactory, GeminiDemoAdapter
 from src.test_generator import GroqJudgeClient, TestSuiteGenerator
 from src.use_cases.run_evaluation import EvaluationPipeline
 
+# Env vars (billing)
+# PADDLE_API_KEY=
+# PADDLE_PRO_PRICE_ID=
+# PADDLE_RUN_PACK_PRICE_ID=
+# PADDLE_WEBHOOK_SECRET=
+# PADDLE_SUCCESS_URL=https://your-dashboard.vercel.app/app/billing?success=true
+
 load_dotenv()
 
 router = APIRouter()
@@ -115,7 +124,7 @@ class NotifyRequest(BaseModel):
     email_enabled: bool = False
 
 
-class CreateCheckoutSessionRequest(BaseModel):
+class BillingCheckoutRequest(BaseModel):
     plan: str = Field(..., min_length=1)
 
 
@@ -130,6 +139,39 @@ class ContactSalesRequest(BaseModel):
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _paddle_price_id_for_plan(plan: str) -> str | None:
+    plan_key = (plan or "").strip().lower()
+    if plan_key == "pro":
+        return os.getenv("PADDLE_PRO_PRICE_ID", "").strip() or None
+    if plan_key == "run_pack_100":
+        return os.getenv("PADDLE_RUN_PACK_PRICE_ID", "").strip() or None
+    return None
+
+
+def _paddle_verify_signature(raw_body: bytes, signature_header: str, secret: str) -> bool:
+    if not signature_header or not secret:
+        return False
+    parts: dict[str, list[str]] = {}
+    for part in signature_header.split(";"):
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            continue
+        parts.setdefault(key, []).append(value)
+
+    ts = (parts.get("ts") or [None])[0]
+    signatures = parts.get("h1") or []
+    if not ts or not signatures:
+        return False
+
+    signed_payload = ts.encode("utf-8") + b":" + raw_body
+    expected = hmac.new(secret.encode("utf-8"), signed_payload, hashlib.sha256).hexdigest()
+    return any(hmac.compare_digest(expected, sig) for sig in signatures)
 
 
 def _get_targets_fernet() -> Fernet:
@@ -426,54 +468,95 @@ def validate_api_key(
     return {"api_key": x_api_key, "client_name": client_name, "client": client}
 
 
-@router.post("/create-checkout-session")
-def create_checkout_session(
+@router.post("/billing/checkout")
+def create_billing_checkout(
     request: Request,
-    payload: CreateCheckoutSessionRequest,
+    payload: BillingCheckoutRequest,
     auth_ctx: dict[str, Any] = Depends(validate_api_key),
 ) -> dict[str, str]:
     plan = str(payload.plan or "").strip().lower()
-    if plan != "pro":
+    price_id = _paddle_price_id_for_plan(plan)
+    if not price_id:
         raise HTTPException(status_code=400, detail="Unsupported plan")
 
-    secret_key = os.getenv("STRIPE_SECRET_KEY", "").strip()
-    if not secret_key:
-        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured in .env")
+    api_key = os.getenv("PADDLE_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=500, detail="PADDLE_API_KEY is not configured in .env")
 
-    pro_price_id = os.getenv("STRIPE_PRO_PRICE_ID", "").strip()
-    if not pro_price_id:
-        raise HTTPException(status_code=500, detail="STRIPE_PRO_PRICE_ID is not configured in .env")
+    success_url = os.getenv("PADDLE_SUCCESS_URL", "").strip()
+    if not success_url:
+        raise HTTPException(status_code=500, detail="PADDLE_SUCCESS_URL is not configured in .env")
 
+    payload_json = {
+        "items": [{"price_id": price_id, "quantity": 1}],
+        "checkout": {"url": success_url},
+    }
     try:
-        import stripe  # type: ignore
+        resp = requests.post(
+            "https://api.paddle.com/transactions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload_json,
+            timeout=10,
+        )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Stripe SDK not available: {exc}") from exc
+        logger.warning("[Paddle] Checkout request failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Paddle checkout request failed") from exc
 
-    stripe.api_key = secret_key
+    if resp.status_code >= 400:
+        logger.warning("[Paddle] Checkout API error %s: %s", resp.status_code, (resp.text or "")[:300])
+        raise HTTPException(status_code=502, detail="Paddle checkout API error")
 
-    origin = (request.headers.get("origin") or "").strip()
-    if not origin:
-        host = request.headers.get("host") or ""
-        scheme = request.headers.get("x-forwarded-proto") or request.url.scheme
-        origin = f"{scheme}://{host}" if host else ""
-
-    if not origin:
-        origin = "http://localhost:5173"
-
-    success_url = f"{origin}/?checkout=success&session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = f"{origin}/?checkout=cancel"
-
-    session = stripe.checkout.sessions.create(
-        mode="subscription",
-        line_items=[{"price": pro_price_id, "quantity": 1}],
-        success_url=success_url,
-        cancel_url=cancel_url,
-        client_reference_id=str(auth_ctx.get("client_name") or ""),
+    data = resp.json() if resp.content else {}
+    checkout_url = (
+        (data.get("data") or {}).get("checkout", {}).get("url")
+        or data.get("checkout_url")
     )
-    url = getattr(session, "url", None)
-    if not url:
-        raise HTTPException(status_code=500, detail="Stripe session did not return a checkout URL")
-    return {"url": str(url)}
+    if not checkout_url:
+        logger.warning("[Paddle] Checkout URL missing in response")
+        raise HTTPException(status_code=502, detail="Paddle checkout response missing URL")
+
+    logger.info(
+        "[Paddle] Created checkout for plan=%s client=%s",
+        plan,
+        auth_ctx.get("client_name"),
+    )
+    return {"checkout_url": str(checkout_url)}
+
+
+@router.post("/billing/webhook")
+async def paddle_webhook(request: Request) -> dict[str, str]:
+    try:
+        raw_body = await request.body()
+        signature = (
+            request.headers.get("Paddle-Signature")
+            or request.headers.get("paddle-signature")
+            or ""
+        )
+        secret = os.getenv("PADDLE_WEBHOOK_SECRET", "").strip()
+        if not secret:
+            logger.warning("[Paddle] Webhook secret not configured")
+            return {"status": "ok"}
+
+        if not _paddle_verify_signature(raw_body, signature, secret):
+            logger.warning("[Paddle] Webhook signature verification failed")
+            return {"status": "ok"}
+
+        payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+        event_type = payload.get("event_type")
+        if event_type == "transaction.completed":
+            data = payload.get("data") or {}
+            logger.info(
+                "[Paddle] transaction.completed id=%s customer_id=%s subscription_id=%s",
+                data.get("id"),
+                data.get("customer_id"),
+                data.get("subscription_id"),
+            )
+    except Exception as exc:
+        logger.warning("[Paddle] Webhook processing error: %s", exc)
+    return {"status": "ok"}
 
 
 @router.post("/contact-sales")

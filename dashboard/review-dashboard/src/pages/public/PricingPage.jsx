@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { API_BASE, getApiKey } from '../../App.jsx';
+import { apiFetch } from '../../App.jsx';
 
 const PLANS = [
   {
@@ -63,32 +63,29 @@ const PLANS = [
 ];
 
 export default function PricingPage() {
-  const [proLoading, setProLoading] = useState(false);
+  const [planLoading, setPlanLoading] = useState({});
+  const [planError, setPlanError] = useState({});
   const [contactOpen, setContactOpen] = useState(false);
   const [contactSubmitting, setContactSubmitting] = useState(false);
   const [contactSuccess, setContactSuccess] = useState(false);
   const [contactError, setContactError] = useState('');
   const [contactForm, setContactForm] = useState({ name: '', email: '', company: '', use_case: '' });
 
-  async function startProCheckout() {
-    if (proLoading) return;
-    setProLoading(true);
+  async function startPlanCheckout(planKey) {
+    if (planLoading[planKey]) return;
+    setPlanLoading((prev) => ({ ...prev, [planKey]: true }));
+    setPlanError((prev) => ({ ...prev, [planKey]: '' }));
     try {
-      const res = await fetch(`${API_BASE}/create-checkout-session`, {
+      const data = await apiFetch('/billing/checkout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-KEY': getApiKey(),
-        },
-        body: JSON.stringify({ plan: 'pro' }),
+        body: JSON.stringify({ plan: planKey }),
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.detail || `Request failed (${res.status})`);
-      if (!body?.url) throw new Error('Missing checkout URL');
-      window.location.href = body.url;
+      if (!data?.checkout_url) throw new Error('Missing checkout URL');
+      window.location.href = data.checkout_url;
     } catch (e) {
-      alert(e?.message || 'Failed to start checkout');
-      setProLoading(false);
+      setPlanError((prev) => ({ ...prev, [planKey]: e?.message || 'Failed to start checkout' }));
+    } finally {
+      setPlanLoading((prev) => ({ ...prev, [planKey]: false }));
     }
   }
 
@@ -167,11 +164,11 @@ export default function PricingPage() {
               <button
                 type="button"
                 className={`btn ${plan.highlight ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={startProCheckout}
-                disabled={proLoading}
+                onClick={() => startPlanCheckout(plan.key)}
+                disabled={!!planLoading[plan.key]}
                 style={{ marginTop: 'auto', textAlign: 'center' }}
               >
-                {proLoading ? 'Creating checkout...' : plan.cta}
+                {planLoading[plan.key] ? 'Redirecting to checkout...' : plan.cta}
               </button>
             ) : plan.key === 'enterprise' ? (
               <button
@@ -194,6 +191,11 @@ export default function PricingPage() {
               >
                 {plan.cta}
               </Link>
+            )}
+            {plan.key === 'pro' && planError[plan.key] && (
+              <div style={{ marginTop: 8, fontSize: 12, color: '#ff7b91' }}>
+                {planError[plan.key]}
+              </div>
             )}
           </div>
         ))}

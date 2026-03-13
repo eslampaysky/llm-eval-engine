@@ -4,7 +4,7 @@
  * - Three plan cards (Free/Pro/Enterprise) with upgrade placeholder CTAs
  */
 import { useEffect, useMemo, useState } from 'react';
-import { api, API_BASE, getApiKey } from '../../../App.jsx';
+import { api, apiFetch, API_BASE, getApiKey } from '../../../App.jsx';
 
 const S = {
   card: {
@@ -102,31 +102,7 @@ const PLANS = [
   },
 ];
 
-function PlanCard({ plan }) {
-  const [loading, setLoading] = useState(false);
-
-  async function startCheckout() {
-    if (loading) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/create-checkout-session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-KEY': getApiKey(),
-        },
-        body: JSON.stringify({ plan: 'pro' }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.detail || `Request failed (${res.status})`);
-      if (!body?.url) throw new Error('Missing checkout URL');
-      window.location.href = body.url;
-    } catch (e) {
-      alert(e?.message || 'Failed to start checkout');
-      setLoading(false);
-    }
-  }
-
+function PlanCard({ plan, loading, error, onCheckout }) {
   return (
     <div
       style={{
@@ -170,7 +146,7 @@ function PlanCard({ plan }) {
       {!plan.current && plan.cta && (
         <button
           type="button"
-          onClick={() => (plan.key === 'pro' ? startCheckout() : alert(`${plan.cta} - Stripe integration coming soon.`))}
+          onClick={() => onCheckout(plan.key)}
           disabled={loading}
           style={{
             marginTop: 'auto',
@@ -192,8 +168,13 @@ function PlanCard({ plan }) {
             e.currentTarget.style.background = `${plan.color}14`;
           }}
         >
-          {plan.key === 'pro' && loading ? 'Creating checkout...' : plan.cta}
+          {loading ? 'Redirecting to checkout...' : plan.cta}
         </button>
+      )}
+      {!!error && (
+        <div style={{ marginTop: 8, fontSize: 11, color: '#ff7b91' }}>
+          {error}
+        </div>
       )}
     </div>
   );
@@ -203,6 +184,8 @@ export default function BillingPage() {
   const [usage, setUsage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [topupLoading, setTopupLoading] = useState(false);
+  const [planLoading, setPlanLoading] = useState({});
+  const [planError, setPlanError] = useState({});
 
   useEffect(() => {
     api
@@ -215,6 +198,24 @@ export default function BillingPage() {
   const monthRuns = usage?.month?.req_count || 0;
   const monthSamples = usage?.month?.sample_count || 0;
   const totalRuns = usage?.overall?.req_count || 0;
+
+  async function startPlanCheckout(planKey) {
+    if (planLoading[planKey]) return;
+    setPlanLoading((prev) => ({ ...prev, [planKey]: true }));
+    setPlanError((prev) => ({ ...prev, [planKey]: '' }));
+    try {
+      const data = await apiFetch('/billing/checkout', {
+        method: 'POST',
+        body: JSON.stringify({ plan: planKey }),
+      });
+      if (!data?.checkout_url) throw new Error('Missing checkout URL');
+      window.location.href = data.checkout_url;
+    } catch (e) {
+      setPlanError((prev) => ({ ...prev, [planKey]: e?.message || 'Failed to start checkout' }));
+    } finally {
+      setPlanLoading((prev) => ({ ...prev, [planKey]: false }));
+    }
+  }
 
   async function startTopupCheckout() {
     if (topupLoading) return;
@@ -290,7 +291,13 @@ export default function BillingPage() {
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {PLANS.map((plan) => (
-            <PlanCard key={plan.key} plan={plan} />
+            <PlanCard
+              key={plan.key}
+              plan={plan}
+              loading={!!planLoading[plan.key]}
+              error={planError[plan.key]}
+              onCheckout={startPlanCheckout}
+            />
           ))}
         </div>
       </div>
