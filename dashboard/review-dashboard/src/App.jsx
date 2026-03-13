@@ -1336,6 +1336,7 @@ export function DemoPage({ report, onReportReady }) {
   const [logs, setLogs] = useState([]);
   const [runId, setRunId] = useState(ls.get('abl_demo_active_run_id'));
   const [activeType, setActiveType] = useState(currentTestType(0, 0));
+  const [fallbackUsed, setFallbackUsed] = useState(false);
   const logRef = useRef(null);
 
   const addLog = useCallback((msg, type = 'info') => {
@@ -1399,20 +1400,38 @@ export function DemoPage({ report, onReportReady }) {
   }, [retryableReport, countdown, polling]);
 
   async function handleSubmit() {
-    setError(''); setErrorStatus(null); setRetryableReport(null); setStaleReport(null); setCountdown(60); setStopping(false); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0));
+    setError(''); setErrorStatus(null); setRetryableReport(null); setStaleReport(null); setCountdown(60); setStopping(false); setLogs([]); setLoading(true); setStage(0); setPct(0); setActiveType(currentTestType(0, 0)); setFallbackUsed(false);
     try {
-      addLog('Submitting public demo request…', 'info');
-      const res = await api.demoBreak({
-        description: form.description,
-        model_name: form.model_name,
-        num_tests: +form.num_tests,
-      });
-      addLog(`✓ Job queued · ID: ${res.report_id}`, 'ok');
-      addLog(`Generating ${form.num_tests} adversarial tests…`, 'info');
-      setRunId(res.report_id);
-      ls.set('abl_demo_active_run_id', res.report_id);
-      setPolling(true);
-      pollStart(res.report_id, +form.num_tests, api.getDemoReport, 'demo');
+      const submitDemo = async (modelName) => {
+        addLog('Submitting public demo request…', 'info');
+        const res = await api.demoBreak({
+          description: form.description,
+          model_name: modelName,
+          num_tests: +form.num_tests,
+        });
+        addLog(`✓ Job queued · ID: ${res.report_id}`, 'ok');
+        addLog(`Generating ${form.num_tests} adversarial tests…`, 'info');
+        setRunId(res.report_id);
+        ls.set('abl_demo_active_run_id', res.report_id);
+        setPolling(true);
+        pollStart(res.report_id, +form.num_tests, api.getDemoReport, 'demo');
+      };
+
+      try {
+        await submitDemo(form.model_name);
+      } catch (e) {
+        const msg = e?.message || '';
+        const isRateLimited = e?.status === 429 || /rate limit|quota|resource exhausted/i.test(msg);
+        const fallbackModel = 'gemini-3.1-flash-lite-preview';
+        if (!fallbackUsed && isRateLimited && form.model_name === 'gemini-3-flash-preview') {
+          setFallbackUsed(true);
+          setForm((p) => ({ ...p, model_name: fallbackModel }));
+          addLog('Gemini 3 Flash is rate limited. Switching to 3.1 Flash Lite…', 'info');
+          await submitDemo(fallbackModel);
+          return;
+        }
+        throw e;
+      }
     } catch (e) {
       setErrorStatus(e.status || null);
       setError(e.message);

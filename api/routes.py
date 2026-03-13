@@ -806,8 +806,25 @@ class _GroqAnswerJudge:
 
 
 class _RetryingGeminiDemoAdapter:
-    def __init__(self, inner: GeminiDemoAdapter) -> None:
-        self._inner = inner
+    def __init__(
+        self,
+        api_key: str,
+        model_name: str,
+        fallback_model_name: str | None = None,
+    ) -> None:
+        self._api_key = api_key
+        self._model_name = model_name
+        self._fallback_model_name = fallback_model_name
+        self._using_fallback = False
+        self._inner = GeminiDemoAdapter(api_key=api_key, model_name=model_name)
+
+    def _switch_to_fallback(self) -> bool:
+        if self._using_fallback or not self._fallback_model_name:
+            return False
+        self._inner = GeminiDemoAdapter(api_key=self._api_key, model_name=self._fallback_model_name)
+        self._using_fallback = True
+        _log.info("[Demo] Switching to fallback model %s", self._fallback_model_name)
+        return True
 
     def call(self, question: str) -> str:
         delays = [20, 40, 60]
@@ -822,6 +839,8 @@ class _RetryingGeminiDemoAdapter:
                 is_rate_limited = status_code == 429 or "429" in message or "rate limit" in message or "resource exhausted" in body_text.lower()
                 if not is_rate_limited:
                     raise
+                if self._switch_to_fallback():
+                    continue
                 last_exc = exc
                 if attempt >= len(delays):
                     raise RuntimeError(DEMO_RATE_LIMIT_ERROR) from exc
@@ -915,8 +934,11 @@ def _process_demo_break_job(report_id, model_name, description, num_tests, groq_
             except Exception as cache_err:
                 _log.warning("Cache write failed (non-fatal): %s", cache_err)
 
+        fallback_model = "gemini-3.1-flash-lite-preview" if model_name == "gemini-3-flash-preview" else None
         adapter = _RetryingGeminiDemoAdapter(
-            GeminiDemoAdapter(api_key=gemini_api_key, model_name=model_name)
+            api_key=gemini_api_key,
+            model_name=model_name,
+            fallback_model_name=fallback_model,
         )
         judges = _build_demo_judges(groq_api_key)
 
