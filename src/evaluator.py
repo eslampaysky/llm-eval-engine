@@ -4,6 +4,8 @@ This module keeps the original public function `run_evaluation` while delegating
 execution to the Clean Architecture pipeline.
 """
 
+import os
+
 try:
     from src.llm_eval_engine.application.pipeline import EvaluationPipeline
     from src.llm_eval_engine.infrastructure.config_loader import load_project_config
@@ -13,7 +15,7 @@ except ImportError:
     from llm_eval_engine.infrastructure.config_loader import load_project_config
     from llm_eval_engine.infrastructure.evaluator_factories import build_default_evaluator_registry
 
-MAX_WORKERS = 1
+MAX_WORKERS = int(os.getenv("MAX_WORKERS", "4"))
 
 
 def run_evaluation(

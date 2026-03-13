@@ -111,6 +111,7 @@ GEMINI_API_KEY=
 API_KEYS=client_key
 
 # Optional overrides
+# MAX_WORKERS=4
 OLLAMA_URL=http://host.docker.internal:11434
 PERSPECTIVE_API_KEY=
 ```
@@ -124,8 +125,10 @@ python -m venv .venv
 # Windows PowerShell
 . .venv/Scripts/Activate.ps1
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+uvicorn api.main:app --reload --port 8000
 ```
+
+Note: `usage.db` is a local SQLite file that is auto-created on first run (usage tracking). It is a runtime artifact and should not be committed to git.
 
 Docs: `http://127.0.0.1:8000/docs`
 
@@ -255,4 +258,3 @@ vercel --prod
 - Script: `scripts/quality_gate.py`
 - Workflow: `.github/workflows/ai-quality-gate.yml`
 - Fails pipeline when configured correctness threshold is not met.
-

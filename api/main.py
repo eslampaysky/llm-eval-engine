@@ -21,11 +21,12 @@ from slowapi.middleware import SlowAPIMiddleware
 from api.database import init_db, get_stuck_processing_reports, mark_report_stale
 from api.job_queue import JobQueue, start_workers, stop_workers
 from api.rate_limit import limiter, rate_limit_exceeded_handler
-from api.routes import router
+from api.routes import init_api_key_map, router
 from api.auth_routes import auth_router
 
 logger = logging.getLogger(__name__)
 
+APP_VERSION = "1.0.0"
 STUCK_AFTER_MINUTES = int(os.getenv("STUCK_REPORT_MINUTES", "15"))
 
 
@@ -71,6 +72,7 @@ def _recover_stuck_reports() -> int:
 async def lifespan(app: FastAPI):
     # ── Startup ──────────────────────────────────────────────────────────────
     init_db()
+    init_api_key_map()
 
     # Recover any reports that were in-flight when the previous dyno died
     recovered = _recover_stuck_reports()
@@ -87,7 +89,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Breaker Lab API",
-    version="2.1.0",
+    version=APP_VERSION,
     description="AI model adversarial evaluation API",
     lifespan=lifespan,
 )
@@ -116,13 +118,25 @@ app.include_router(auth_router)
 
 @app.get("/health")
 def health():
-    stale = get_stuck_processing_reports(older_than_minutes=0)  # 0 = any stale
+    # Must remain stable for Railway healthchecks.
+    return {"status": "ok", "version": APP_VERSION}
+
+
+@app.get("/health/details")
+def health_details():
+    try:
+        stale = get_stuck_processing_reports(older_than_minutes=0)  # 0 = any stale
+        stale_count = len([r for r in stale])
+    except Exception as exc:
+        logger.error("[Health] Failed to query stale reports: %s", exc)
+        stale_count = 0
+
     return {
         "status": "ok",
-        "version": "2.1.0",
+        "version": APP_VERSION,
         "queue": {
             "healthy":     JobQueue.is_healthy,
             "queued_jobs": JobQueue.queue_size,
         },
-        "stale_reports": len([r for r in stale]),
+        "stale_reports": stale_count,
     }

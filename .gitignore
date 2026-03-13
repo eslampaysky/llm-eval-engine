@@ -16,6 +16,15 @@ env/
 reports/*.json
 reports/*.html
 
+# SQLite / local runtime state
+usage.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Local scratch data
+.tmp-data/
+
 # IDE
 .vscode/
 .idea/

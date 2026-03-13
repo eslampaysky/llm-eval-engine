@@ -172,7 +172,120 @@ class BreakerClient:
     def _poll(self, report_id: str) -> dict[str, Any]:
         deadline = time.monotonic() + self._timeout
         while True:
-            row = self._get(f"/report/{report_id}")
+            path = f"/report/{report_id}"
+            url = f"{self._base}{path}"
+
+            delays = [2, 4, 8]
+            last_exc: Exception | None = None
+            last_resp: requests.Response | None = None
+            row: dict[str, Any] | None = None
+
+            for attempt in range(len(delays) + 1):
+                last_exc = None
+                last_resp = None
+
+                try:
+                    resp = requests.request(
+                        "GET",
+                        url,
+                        headers=self._headers,
+                        timeout=30,
+                    )
+                    last_resp = resp
+                except (requests.ConnectionError, requests.Timeout) as exc:
+                    last_exc = exc
+                    if attempt >= len(delays):
+                        raise BreakerError(f"GET {url} network error: {exc}") from exc
+
+                    wait_s = delays[attempt]
+                    _log.warning(
+                        "[aibreaker] Poll transient network error; retrying in %ss  "
+                        "report_id=%s  attempt=%d/%d  error=%s",
+                        wait_s,
+                        report_id,
+                        attempt + 1,
+                        len(delays),
+                        exc,
+                    )
+
+                    if time.monotonic() + wait_s >= deadline:
+                        raise BreakerError(
+                            f"Timed out waiting for report {report_id} after {self._timeout}s "
+                            f"(last error: {exc})"
+                        ) from exc
+
+                    time.sleep(wait_s)
+                    continue
+
+                if 200 <= resp.status_code < 300:
+                    row = resp.json()
+                    break
+
+                if resp.status_code == 429:
+                    if attempt >= len(delays):
+                        raise BreakerError(f"GET {url} \u2192 429: {resp.text[:300]}")
+
+                    retry_after = resp.headers.get("Retry-After", "").strip()
+                    try:
+                        wait_s = int(retry_after) if retry_after else 60
+                    except ValueError:
+                        wait_s = 60
+
+                    _log.warning(
+                        "[aibreaker] Poll rate limited (429); retrying in %ss  "
+                        "report_id=%s  attempt=%d/%d",
+                        wait_s,
+                        report_id,
+                        attempt + 1,
+                        len(delays),
+                    )
+
+                    if time.monotonic() + wait_s >= deadline:
+                        raise BreakerError(
+                            f"Timed out waiting for report {report_id} after {self._timeout}s "
+                            f"(last status: 429)"
+                        )
+
+                    time.sleep(wait_s)
+                    continue
+
+                if 500 <= resp.status_code <= 599:
+                    if attempt >= len(delays):
+                        raise BreakerError(f"GET {url} \u2192 {resp.status_code}: {resp.text[:300]}")
+
+                    wait_s = delays[attempt]
+                    _log.warning(
+                        "[aibreaker] Poll transient HTTP %d; retrying in %ss  "
+                        "report_id=%s  attempt=%d/%d",
+                        resp.status_code,
+                        wait_s,
+                        report_id,
+                        attempt + 1,
+                        len(delays),
+                    )
+
+                    if time.monotonic() + wait_s >= deadline:
+                        raise BreakerError(
+                            f"Timed out waiting for report {report_id} after {self._timeout}s "
+                            f"(last status: {resp.status_code})"
+                        )
+
+                    time.sleep(wait_s)
+                    continue
+
+                # Permanent errors: 4xx except 429.
+                if 400 <= resp.status_code <= 499:
+                    raise BreakerError(f"GET {url} \u2192 {resp.status_code}: {resp.text[:300]}")
+
+                raise BreakerError(f"GET {url} \u2192 {resp.status_code}: {resp.text[:300]}")
+
+            if row is None:
+                if last_exc is not None:
+                    raise BreakerError(f"GET {url} network error: {last_exc}") from last_exc
+                if last_resp is not None:
+                    raise BreakerError(f"GET {url} \u2192 {last_resp.status_code}: {last_resp.text[:300]}")
+                raise BreakerError(f"GET {url} failed unexpectedly")
+
             status = row.get("status")
 
             if status == "done":

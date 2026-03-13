@@ -1,10 +1,12 @@
 """Core evaluator API wrapper."""
 
+import os
+
 from src.llm_eval_engine.infrastructure.config_loader import load_project_config
 from core.pipeline import EvaluationPipeline
 from core.providers import build_default_evaluator_registry
 
-MAX_WORKERS = 1
+MAX_WORKERS = int(os.getenv("MAX_WORKERS", "4"))
 
 
 def run_evaluation(

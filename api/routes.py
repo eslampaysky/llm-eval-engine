@@ -70,6 +70,9 @@ load_dotenv()
 
 router = APIRouter()
 
+MAX_WORKERS = int(os.getenv("MAX_WORKERS", "4"))
+_API_KEY_MAP: dict[str, str] = {}
+
 # ── Persistent paths ──────────────────────────────────────────────────────────
 _DATA_DIR         = Path(os.getenv("DATA_DIR", "/app/data"))
 REPORT_DIR        = _DATA_DIR / "reports"
@@ -356,10 +359,15 @@ def _api_keys_from_env() -> dict[str, str]:
     return keys
 
 
+def init_api_key_map() -> None:
+    global _API_KEY_MAP
+    _API_KEY_MAP = _api_keys_from_env()
+
+
 def validate_api_key(
     x_api_key: Annotated[str, Header(..., alias="X-API-KEY")],
 ) -> dict[str, Any]:
-    key_map = _api_keys_from_env()
+    key_map = _API_KEY_MAP
     if not key_map:
         raise HTTPException(status_code=500, detail="API_KEYS is not configured in .env")
     if x_api_key not in key_map:
@@ -426,7 +434,7 @@ def _finalize_report_failure(report_id, error_message):
 def _run_pipeline(samples, judge_model):
     config   = load_project_config()
     registry = build_default_evaluator_registry()
-    pipeline = EvaluationPipeline(config=config, evaluator_registry=registry, max_workers=1)
+    pipeline = EvaluationPipeline(config=config, evaluator_registry=registry, max_workers=MAX_WORKERS)
     results  = pipeline.run(samples=samples, judge_model=judge_model)
     return results, compute_metrics(results)
 
