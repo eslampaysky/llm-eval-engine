@@ -50,7 +50,6 @@ const PRESETS = [
 ];
 
 const DEMO_MODEL_OPTIONS = [
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'stable' },
   { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash', hint: 'preview' },
   { value: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash Lite', hint: 'preview' },
 ];
