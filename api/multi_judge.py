@@ -287,7 +287,9 @@ def score_answers(
     tests: list[dict],
     target_adapter: Any,
     judges: list[_Judge],
+    is_demo: bool = False,
     call_delay_seconds: float = 5.0,
+    should_cancel: Any | None = None,
 ) -> list[dict]:
     """
     Score all tests using the tiered judge strategy.
@@ -314,6 +316,12 @@ def score_answers(
     ]
     if secondary is not None and arbiter is not None:
         extra.insert(0, secondary)
+
+    if is_demo:
+        call_delay_seconds = 0.0
+        tiered_arbiter = None
+        safety_judge = None
+        extra = []
 
     rows: list[dict] = []
 
@@ -375,6 +383,8 @@ def score_answers(
                 **scored,
             }
         )
+        if should_cancel and should_cancel():
+            break
 
     return rows
 

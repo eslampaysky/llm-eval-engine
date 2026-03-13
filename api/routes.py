@@ -20,6 +20,8 @@ from api.multi_judge import (
     build_judges_from_request,
     score_answers,
     compute_agreement_rate,
+    _Judge,
+    GROQ_MODEL,
 )
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -658,6 +660,18 @@ def _resolve_break_judges(
     return build_judges_from_request(groq_api_key, judges_config)
 
 
+def _build_demo_judges(groq_api_key: str) -> list[_Judge]:
+    return [
+        _Judge(
+            name="groq",
+            api_key=groq_api_key,
+            base_url=GROQ_BASE_URL,
+            model=GROQ_MODEL,
+            role="primary",
+        )
+    ]
+
+
 def _process_evaluation_job(report_id, samples, judge_model):
     _log.info(
         "[Eval] Started report_id=%s samples=%d judge_model=%s",
@@ -878,21 +892,67 @@ def _process_break_job(report_id, target_cfg, description, num_tests,
 
 def _process_demo_break_job(report_id, model_name, description, num_tests, groq_api_key, gemini_api_key):
     try:
+        judge_client = GroqJudgeClient(
+            api_key=groq_api_key, base_url=GROQ_BASE_URL, model=GROQ_JUDGE_MODEL,
+        )
+        resolved_lang = detect_language(description)
+
+        tests = get_cached_test_suite(description=description, num_tests=num_tests)
+        if tests is None:
+            if resolved_lang == "ar":
+                generator = ArabicTestGenerator(judge_client=judge_client)
+                tests = generator.generate_arabic_suite(
+                    description=description, num_tests=num_tests,
+                )
+            else:
+                generator = TestSuiteGenerator(judge_client=judge_client)
+                tests = generator.generate_from_description(
+                    description=description, num_tests=num_tests,
+                )
+            try:
+                save_test_suite_cache(description=description,
+                                      num_tests=num_tests, tests=tests)
+            except Exception as cache_err:
+                _log.warning("Cache write failed (non-fatal): %s", cache_err)
+
         adapter = _RetryingGeminiDemoAdapter(
             GeminiDemoAdapter(api_key=gemini_api_key, model_name=model_name)
         )
-        _process_break_job(
-            report_id,
-            {"type": "openai", "model_name": model_name},
-            description,
-            num_tests,
-            groq_api_key,
-            False,
-            "auto",
-            [],
-            None,
+        judges = _build_demo_judges(groq_api_key)
+
+        def _is_canceled() -> bool:
+            row = get_report_row(report_id)
+            return bool(row and row.get("status") == "canceled")
+
+        results = score_answers(
+            tests,
             adapter,
+            judges,
+            is_demo=True,
+            should_cancel=_is_canceled,
         )
+        if _is_canceled():
+            return
+
+        agreement_rate = compute_agreement_rate(results)
+        metrics = compute_metrics(results)
+        metrics["judges_agreement"] = agreement_rate
+        if agreement_rate < 0.7 and len(judges) > 1:
+            metrics.setdefault("red_flags", []).append(
+                f"Judges disagreed on {round((1 - agreement_rate)*100, 1)}% of tests "
+                f"— results may be uncertain."
+            )
+
+        judge_label = "+".join(j.name for j in judges)
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        html_path = str(REPORT_DIR / f"report_{report_id}.html")
+        html_path = generate_premium_report(
+            metrics=metrics, results=results, output_path=html_path,
+            metadata={"target_type": "demo",
+                      "judge_model": judge_label},
+        )
+        _finalize_report_success(report_id=report_id, results=results,
+                                  metrics=metrics, html_path=html_path)
     except Exception as exc:
         error_message = str(exc)
         if "rate limit" in error_message.lower() or "429" in error_message:
