@@ -43,6 +43,10 @@ ARBITER_API_KEY = os.getenv("OPENAI_API_KEY", "")
 ARBITER_BASE_URL = os.getenv("ARBITER_BASE_URL", "https://api.openai.com/v1")
 ARBITER_MODEL = os.getenv("ARBITER_MODEL", "gpt-4o-mini")
 
+SECOND_JUDGE_API_KEY = os.getenv("SECOND_JUDGE_API_KEY", "")
+SECOND_JUDGE_BASE_URL = os.getenv("SECOND_JUDGE_BASE_URL", "https://api.openai.com/v1")
+SECOND_JUDGE_MODEL = os.getenv("SECOND_JUDGE_MODEL", "gpt-4o-mini")
+
 SAFETY_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 SAFETY_BASE_URL = os.getenv("SAFETY_BASE_URL", "https://api.anthropic.com/v1")
 SAFETY_MODEL = os.getenv("SAFETY_MODEL", "claude-haiku-4-5-20251001")
@@ -169,6 +173,7 @@ def _is_confident(score: float) -> bool:
 
 
 def _build_row(final: dict, judge_results: dict, escalated: bool, judge_used: str) -> dict:
+    agreed, gap = _agreement(judge_results)
     return {
         "correctness": final["correctness"],
         "relevance": final["relevance"],
@@ -177,8 +182,8 @@ def _build_row(final: dict, judge_results: dict, escalated: bool, judge_used: st
         "judges": judge_results,
         "_escalated": escalated,
         "_judge_used": judge_used,
-        "_judge_agreed": True,
-        "_judge_gap": 0.0,
+        "_judge_agreed": agreed,
+        "_judge_gap": gap,
     }
 
 
@@ -194,6 +199,25 @@ def score_one_tiered(
 ) -> dict:
     is_safety = test_type.lower() in SAFETY_TEST_TYPES
     judge_results: dict[str, dict] = {}
+
+    if arbiter and arbiter.role != "arbiter" and arbiter.api_key:
+        primary_result = primary.score(question, ground_truth, model_answer)
+        secondary_result = arbiter.score(question, ground_truth, model_answer)
+        judge_results[primary.name] = primary_result
+        judge_results[arbiter.name] = secondary_result
+        c, r, hall, reason = _consensus(judge_results)
+        return _build_row(
+            {
+                "correctness": c,
+                "relevance": r,
+                "hallucination": hall,
+                "reason": reason,
+                "available": True,
+            },
+            judge_results,
+            escalated=False,
+            judge_used="consensus",
+        )
 
     if is_safety and safety_judge and safety_judge.api_key:
         safety_result = safety_judge.score(question, ground_truth, model_answer, safety=True)
@@ -268,16 +292,28 @@ def score_answers(
     """
     Score all tests using the tiered judge strategy.
 
-    judges list convention:
-      index 0 -> primary
-      index 1 -> arbiter
-      index 2 -> safety
-      index 3+ -> extra judges
+    Selection is role-based:
+      - primary: always judges[0]
+      - secondary: role=="secondary" (or name=="secondary")
+      - arbiter: role=="arbiter"
+      - safety: role=="safety"
     """
     primary = judges[0]
-    arbiter = judges[1] if len(judges) > 1 else None
-    safety_judge = judges[2] if len(judges) > 2 else None
-    extra = judges[3:] if len(judges) > 3 else []
+    secondary = next(
+        (j for j in judges[1:] if getattr(j, "role", "") == "secondary" or j.name == "secondary"),
+        None,
+    )
+    arbiter = next((j for j in judges[1:] if getattr(j, "role", "") == "arbiter"), None)
+    safety_judge = next((j for j in judges[1:] if getattr(j, "role", "") == "safety"), None)
+    tiered_arbiter = arbiter if arbiter is not None else secondary
+    extra = [
+        j
+        for j in judges[1:]
+        if j not in (secondary, arbiter, safety_judge)
+        and getattr(j, "role", "") not in ("secondary", "arbiter", "safety")
+    ]
+    if secondary is not None and arbiter is not None:
+        extra.insert(0, secondary)
 
     rows: list[dict] = []
 
@@ -326,7 +362,7 @@ def score_answers(
             model_answer,
             test_type,
             primary,
-            arbiter,
+            tiered_arbiter,
             safety_judge,
             extra,
         )
@@ -353,6 +389,18 @@ def build_judges(groq_api_key: str) -> list[_Judge]:
             role="primary",
         )
     ]
+
+    if SECOND_JUDGE_API_KEY.strip():
+        judges.append(
+            _Judge(
+                name="secondary",
+                api_key=SECOND_JUDGE_API_KEY,
+                base_url=SECOND_JUDGE_BASE_URL,
+                model=SECOND_JUDGE_MODEL,
+                role="secondary",
+            )
+        )
+        _log.info("[Judges] Secondary: %s @ %s", SECOND_JUDGE_MODEL, SECOND_JUDGE_BASE_URL)
 
     if ARBITER_API_KEY.strip():
         judges.append(
@@ -398,7 +446,17 @@ def build_judges_from_request(groq_api_key: str, judges_config: list | None) -> 
         if getattr(judge, "role", "custom") not in ("arbiter", "safety")
     ]
 
-    result: list[_Judge] = [base_judges[0]]
+    base_primary = base_judges[0]
+    base_secondary = next(
+        (j for j in base_judges[1:] if getattr(j, "role", "") == "secondary" or j.name == "secondary"),
+        None,
+    )
+    base_arbiter = next((j for j in base_judges[1:] if getattr(j, "role", "") == "arbiter"), None)
+    base_safety = next((j for j in base_judges[1:] if getattr(j, "role", "") == "safety"), None)
+
+    result: list[_Judge] = [base_primary]
+    if base_secondary is not None:
+        result.append(base_secondary)
 
     if user_arbiters:
         judge = user_arbiters[0]
@@ -411,8 +469,8 @@ def build_judges_from_request(groq_api_key: str, judges_config: list | None) -> 
                 role="arbiter",
             )
         )
-    elif len(base_judges) > 1:
-        result.append(base_judges[1])
+    elif base_arbiter is not None:
+        result.append(base_arbiter)
 
     if user_safety:
         judge = user_safety[0]
@@ -425,8 +483,8 @@ def build_judges_from_request(groq_api_key: str, judges_config: list | None) -> 
                 role="safety",
             )
         )
-    elif len(base_judges) > 2:
-        result.append(base_judges[2])
+    elif base_safety is not None:
+        result.append(base_safety)
 
     for judge in user_extra:
         result.append(
@@ -444,9 +502,12 @@ def build_judges_from_request(groq_api_key: str, judges_config: list | None) -> 
 
 
 def compute_agreement_rate(results: list[dict]) -> float:
-    """Fraction of rows that did not escalate."""
+    """Fraction of rows where judges agreed (or no second judge was used)."""
     if not results:
         return 1.0
+    if any("_judge_agreed" in row for row in results):
+        agreed = sum(1 for row in results if row.get("_judge_agreed", True))
+        return round(agreed / len(results), 4)
     not_escalated = sum(1 for row in results if not row.get("_escalated", False))
     return round(not_escalated / len(results), 4)
 

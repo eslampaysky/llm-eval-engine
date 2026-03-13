@@ -5,8 +5,9 @@ from __future__ import annotations
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
-import responses
+import json
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE not in sys.path:
@@ -14,6 +15,23 @@ if BASE not in sys.path:
 
 from aibreaker.client import BreakerClient, BreakerError
 from aibreaker.models import Report
+
+
+class _FakeResponse:
+    def __init__(self, *, status: int, json_body: dict | None = None, text: str | None = None, headers: dict | None = None):
+        self.status_code = status
+        self._json_body = json_body
+        self.headers = headers or {}
+        if text is not None:
+            self.text = text
+        else:
+            self.text = json.dumps(json_body) if json_body is not None else ""
+        self.ok = 200 <= status < 300
+
+    def json(self):
+        if self._json_body is None:
+            raise ValueError("No JSON body set")
+        return self._json_body
 
 
 def _report_row(*, report_id: str, status: str, average_score: float) -> dict:
@@ -49,7 +67,6 @@ def _report_row(*, report_id: str, status: str, average_score: float) -> dict:
 
 
 class TestBreakerClient(unittest.TestCase):
-    @responses.activate
     def test_break_model_success_polls_until_done(self):
         base = "https://example.com"
         client = BreakerClient(
@@ -59,102 +76,98 @@ class TestBreakerClient(unittest.TestCase):
             timeout=5,
         )
 
-        responses.add(
-            responses.POST,
-            f"{base}/break",
-            json={"report_id": "r1"},
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            f"{base}/report/r1",
-            json=_report_row(report_id="r1", status="processing", average_score=0.0),
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            f"{base}/report/r1",
-            json=_report_row(report_id="r1", status="done", average_score=7.0),
-            status=200,
-        )
+        expected = [
+            ("POST", f"{base}/break", _FakeResponse(status=200, json_body={"report_id": "r1"})),
+            ("GET", f"{base}/report/r1", _FakeResponse(status=200, json_body=_report_row(report_id="r1", status="processing", average_score=0.0))),
+            ("GET", f"{base}/report/r1", _FakeResponse(status=200, json_body=_report_row(report_id="r1", status="done", average_score=7.0))),
+        ]
+        expected_calls = expected.copy()
 
-        report = client.break_model(
-            target={"type": "openai", "model_name": "gpt-4o-mini"},
-            description="test",
-            num_tests=6,
-        )
+        def _side_effect(method, url, **_kwargs):
+            exp_method, exp_url, resp = expected_calls.pop(0)
+            self.assertEqual(method, exp_method)
+            self.assertEqual(url, exp_url)
+            return resp
+
+        with patch("aibreaker.client.requests.request", side_effect=_side_effect):
+            report = client.break_model(
+                target={"type": "openai", "model_name": "gpt-4o-mini"},
+                description="test",
+                num_tests=6,
+            )
+
         self.assertIsInstance(report, Report)
         self.assertEqual(report.report_id, "r1")
         self.assertTrue(report.passed)
+        self.assertEqual(expected_calls, [])
 
-    @responses.activate
     def test_break_model_raises_on_4xx_from_break(self):
         base = "https://example.com"
         client = BreakerClient(api_key="k", endpoint=base, poll_interval=0, timeout=5)
 
-        responses.add(
-            responses.POST,
-            f"{base}/break",
-            body="bad request",
-            status=400,
-        )
+        expected_calls = [
+            ("POST", f"{base}/break", _FakeResponse(status=400, text="bad request")),
+        ]
 
-        with self.assertRaises(BreakerError):
-            client.break_model(
-                target={"type": "openai", "model_name": "gpt-4o-mini"},
-                description="test",
-                num_tests=6,
-            )
+        def _side_effect(method, url, **_kwargs):
+            exp_method, exp_url, resp = expected_calls.pop(0)
+            self.assertEqual(method, exp_method)
+            self.assertEqual(url, exp_url)
+            return resp
 
-    @responses.activate
+        with patch("aibreaker.client.requests.request", side_effect=_side_effect):
+            with self.assertRaises(BreakerError):
+                client.break_model(
+                    target={"type": "openai", "model_name": "gpt-4o-mini"},
+                    description="test",
+                    num_tests=6,
+                )
+
     def test_break_model_raises_on_poll_timeout(self):
         base = "https://example.com"
         client = BreakerClient(api_key="k", endpoint=base, poll_interval=0, timeout=0)
 
-        responses.add(
-            responses.POST,
-            f"{base}/break",
-            json={"report_id": "r2"},
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            f"{base}/report/r2",
-            json=_report_row(report_id="r2", status="processing", average_score=0.0),
-            status=200,
-        )
+        expected_calls = [
+            ("POST", f"{base}/break", _FakeResponse(status=200, json_body={"report_id": "r2"})),
+            ("GET", f"{base}/report/r2", _FakeResponse(status=200, json_body=_report_row(report_id="r2", status="processing", average_score=0.0))),
+        ]
 
-        with self.assertRaises(BreakerError):
-            client.break_model(
-                target={"type": "openai", "model_name": "gpt-4o-mini"},
-                description="test",
-                num_tests=6,
-            )
+        def _side_effect(method, url, **_kwargs):
+            exp_method, exp_url, resp = expected_calls.pop(0)
+            self.assertEqual(method, exp_method)
+            self.assertEqual(url, exp_url)
+            return resp
 
-    @responses.activate
+        with patch("aibreaker.client.requests.request", side_effect=_side_effect):
+            with self.assertRaises(BreakerError):
+                client.break_model(
+                    target={"type": "openai", "model_name": "gpt-4o-mini"},
+                    description="test",
+                    num_tests=6,
+                )
+
     def test_break_model_fail_threshold_marks_report_failed(self):
         base = "https://example.com"
         client = BreakerClient(api_key="k", endpoint=base, poll_interval=0, timeout=5)
 
-        responses.add(
-            responses.POST,
-            f"{base}/break",
-            json={"report_id": "r3"},
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            f"{base}/report/r3",
-            json=_report_row(report_id="r3", status="done", average_score=4.0),
-            status=200,
-        )
+        expected_calls = [
+            ("POST", f"{base}/break", _FakeResponse(status=200, json_body={"report_id": "r3"})),
+            ("GET", f"{base}/report/r3", _FakeResponse(status=200, json_body=_report_row(report_id="r3", status="done", average_score=4.0))),
+        ]
 
-        report = client.break_model(
-            target={"type": "openai", "model_name": "gpt-4o-mini"},
-            description="test",
-            num_tests=6,
-            fail_threshold=5.0,
-        )
+        def _side_effect(method, url, **_kwargs):
+            exp_method, exp_url, resp = expected_calls.pop(0)
+            self.assertEqual(method, exp_method)
+            self.assertEqual(url, exp_url)
+            return resp
+
+        with patch("aibreaker.client.requests.request", side_effect=_side_effect):
+            report = client.break_model(
+                target={"type": "openai", "model_name": "gpt-4o-mini"},
+                description="test",
+                num_tests=6,
+                fail_threshold=5.0,
+            )
         self.assertFalse(report.passed)
 
 
@@ -173,4 +186,3 @@ class TestReportFromApi(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-
