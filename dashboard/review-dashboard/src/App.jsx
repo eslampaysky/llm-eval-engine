@@ -444,7 +444,7 @@ body {
 .shell {
   display: grid;
   grid-template-columns: var(--sw) minmax(0, 1fr);
-  grid-template-rows: 1fr;
+  grid-template-rows: minmax(0, 1fr);
   height: 100dvh;
   min-height: 100vh;
   overflow: hidden;
@@ -549,7 +549,7 @@ body {
 .eye-btn:hover { color:var(--text); }
 
 /* ── Main ────────────────────────────────────────────────────── */
-.main { overflow-y: auto; overflow-x: hidden; background: var(--bg0); min-height: 0; }
+.main { overflow-y: auto; overflow-x: hidden; background: var(--bg0); min-height: 0; height: 100%; }
 .page { padding: 28px 34px; max-width: 1180px; width: 100%; margin: 0 auto; min-height: 100%; }
 
 /* ── Page header ─────────────────────────────────────────────── */
@@ -2759,6 +2759,8 @@ export function LegacyApp() {
   const [persona,     setPersona]  = useState('dev');
   const [apiKey,      setApiKeyS]  = useState(getApiKey());
   const [running,     setRunning]  = useState(pollActive());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const currentNav = NAV.find(n => n.key === page);
 
   useEffect(() => {
     let mounted = true;
@@ -2820,6 +2822,7 @@ export function LegacyApp() {
   function navigate(key) {
     setPage(key);
     window.history.replaceState({}, '', key === 'demo' ? '/demo' : '/');
+    setSidebarOpen(false);
   }
 
   function handleReportReady(r) {
@@ -2848,8 +2851,21 @@ export function LegacyApp() {
     <>
       <style>{css}</style>
       <div className="shell">
+        <div className={`scrim${sidebarOpen ? ' on' : ''}`} onClick={() => setSidebarOpen(false)} />
+        <div className="mobilebar">
+          <button
+            className="burger"
+            type="button"
+            aria-label="Toggle navigation"
+            onClick={() => setSidebarOpen(open => !open)}
+          >
+            ☰
+          </button>
+          <div className="mobilebar-title">{currentNav?.label || 'AI Breaker Lab'}</div>
+          <div style={{ minWidth: 38 }} />
+        </div>
         {/* ── Sidebar ── */}
-        <aside className="sidebar">
+        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="logo-area">
             <div className="logo-mark">
               <div className="logo-dot" />

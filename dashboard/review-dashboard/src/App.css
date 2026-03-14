@@ -35,13 +35,15 @@ body {
       transparent 48px
     ),
     #060810;
+  overflow-x: hidden;
 }
 
 a { color: var(--accent); }
 
-.app-shell {
+.shell {
   display: grid;
   grid-template-columns: 270px 1fr;
+  grid-template-rows: minmax(0, 1fr);
   min-height: 100vh;
 }
 
