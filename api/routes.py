@@ -721,7 +721,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 def require_report_auth(
-    x_api_key: Annotated[str | None, Header(None, alias="X-API-KEY")] = None,
+    x_api_key: Annotated[str | None, Header(alias="X-API-KEY")] = None,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
 ) -> dict[str, Any]:
     if x_api_key:
