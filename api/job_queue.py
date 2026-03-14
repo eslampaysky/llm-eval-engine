@@ -80,6 +80,7 @@ class _JobQueue:
         self._queue: asyncio.Queue[Job] | None = None
         self._executor = ThreadPoolExecutor(max_workers=NUM_WORKERS, thread_name_prefix="breaker-worker")
         self._workers: list[asyncio.Task] = []
+        self._keep_alive_task: asyncio.Task | None = None
         self._started = False
         # In-memory job status map: job_id -> {"status", "error", "started_at", "finished_at"}
         self._status: dict[str, dict] = {}
@@ -92,18 +93,46 @@ class _JobQueue:
             task = asyncio.create_task(self._worker(i), name=f"breaker-worker-{i}")
             self._workers.append(task)
         self._started = True
-        asyncio.create_task(_keep_alive_loop(), name="keep-alive-ping")
+        self._keep_alive_task = asyncio.create_task(_keep_alive_loop(), name="keep-alive-ping")
         logger.info(f"[JobQueue] Started {num_workers} workers (queue size={MAX_QUEUE_SIZE})")
 
     async def stop(self):
         if not self._started:
             return
+        # If the event loop is already closed (e.g., test teardown), avoid awaiting.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is None or loop.is_closed():
+            for task in self._workers:
+                task.cancel()
+            if self._keep_alive_task and not self._keep_alive_task.done():
+                self._keep_alive_task.cancel()
+            self._workers.clear()
+            self._queue = None
+            self._executor.shutdown(wait=False)
+            self._started = False
+            logger.info("[JobQueue] Stopped (loop closed)")
+            return
+
         # Drain queue with sentinel values
         for _ in self._workers:
             await self._queue.put(None)  # type: ignore[arg-type]
-        await asyncio.gather(*self._workers, return_exceptions=True)
-        self._executor.shutdown(wait=False)
-        self._started = False
+        if self._keep_alive_task and not self._keep_alive_task.done():
+            self._keep_alive_task.cancel()
+        try:
+            await asyncio.gather(*self._workers, return_exceptions=True)
+        except RuntimeError:
+            # Defensive: loop may be closing during shutdown
+            for task in self._workers:
+                task.cancel()
+            logger.info("[JobQueue] Stopped (loop closing)")
+        finally:
+            self._executor.shutdown(wait=False)
+            self._started = False
+            self._workers.clear()
+            self._queue = None
         logger.info("[JobQueue] Stopped")
 
     async def enqueue(self, fn: Callable, *args, job_id: str | None = None, **kwargs) -> str | None:
