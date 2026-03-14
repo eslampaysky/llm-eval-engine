@@ -1,6 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { API_BASE, grade, overallScore } from '../../App.jsx';
+import {
+  api,
+  currentTestType,
+  grade,
+  LiveProgress,
+  ls,
+  overallScore,
+  pollStart,
+  pollSub,
+  ts,
+} from '../../App.jsx';
 
 const COUNTER_TARGETS = {
   models: 1847,
@@ -8,50 +18,32 @@ const COUNTER_TARGETS = {
   redFlags: 4201,
 };
 
-const STATUS_STEPS = [
-  'Generating adversarial test cases...',
-  'Testing hallucination resistance...',
-  'Probing for prompt injection...',
-  'Evaluating reasoning consistency...',
-  'Compiling your report...',
-];
+const DEFAULT_DESCRIPTION = 'Customer support chatbot for an e-commerce platform';
 
 function formatNumber(num) {
   return Number(num || 0).toLocaleString();
 }
 
-function pctColor(pct) {
-  if (pct >= 90) return '#f87171';
-  if (pct >= 60) return '#fbbf24';
-  return '#4ade80';
-}
-
 export default function DemoPage() {
   const [description, setDescription] = useState('');
-  const [running, setRunning] = useState(false);
-  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const [stage, setStage] = useState(0);
+  const [pct, setPct] = useState(0);
   const [error, setError] = useState('');
-  const [progress, setProgress] = useState({
-    progress_pct: 0,
-    current_step: STATUS_STEPS[0],
-    steps_done: 0,
-    steps_total: 0,
-    elapsed_seconds: 0,
-  });
-  const [statusIndex, setStatusIndex] = useState(0);
+  const [report, setReport] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [runId, setRunId] = useState(ls.get('abl_demo_active_run_id'));
+  const [activeType, setActiveType] = useState(currentTestType(0, 0));
   const [shareMsg, setShareMsg] = useState('');
   const [counters, setCounters] = useState({ models: 0, failures: 0, redFlags: 0 });
+  const logRef = useRef(null);
 
-  const progressTimer = useRef(null);
-  const reportTimer = useRef(null);
-  const statusTimer = useRef(null);
-
-  useEffect(() => {
-    return () => {
-      if (progressTimer.current) clearInterval(progressTimer.current);
-      if (reportTimer.current) clearInterval(reportTimer.current);
-      if (statusTimer.current) clearInterval(statusTimer.current);
-    };
+  const addLog = useCallback((msg, type = 'info') => {
+    setLogs((p) => [...p, { msg, type, t: ts() }]);
+    setTimeout(() => {
+      if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+    }, 40);
   }, []);
 
   useEffect(() => {
@@ -76,128 +68,118 @@ export default function DemoPage() {
   }, []);
 
   useEffect(() => {
-    if (!running) return;
-    statusTimer.current = setInterval(() => {
-      setStatusIndex((idx) => (idx + 1) % STATUS_STEPS.length);
-    }, 2200);
-    return () => {
-      if (statusTimer.current) clearInterval(statusTimer.current);
-      statusTimer.current = null;
-    };
-  }, [running]);
+    let mounted = true;
 
-  const statusMessage = progress.current_step || STATUS_STEPS[statusIndex];
+    async function reattachIfStillProcessing() {
+      const savedId = ls.get('abl_demo_active_run_id');
+      if (!savedId) return;
+      try {
+        const savedReport = await api.getDemoReport(savedId);
+        if (!mounted) return;
+        if (savedReport?.status === 'processing') {
+          setPolling(true);
+          setRunId(savedId);
+          pollStart(savedId, savedReport.sample_count || 20, api.getDemoReport, 'demo');
+          addLog('Resumed demo run after refresh.', 'info');
+        } else if (savedReport?.status === 'done') {
+          setReport(savedReport);
+          setPolling(false);
+          ls.set('abl_demo_active_run_id', null);
+        } else {
+          ls.set('abl_demo_active_run_id', null);
+        }
+      } catch {
+        ls.set('abl_demo_active_run_id', null);
+      }
+    }
+
+    reattachIfStillProcessing();
+
+    const unsub = pollSub((ev) => {
+      if (ev.mode !== 'demo') return;
+      if (ev.type === 'done') {
+        setPolling(false);
+        setPct(100);
+        ls.set('abl_demo_active_run_id', null);
+        addLog(`Demo complete - ${ev.report.results?.length || ev.report.sample_count || 0} tests completed.`, 'ok');
+        setTimeout(() => setReport(ev.report), 200);
+      } else if (ev.type === 'failed') {
+        setPolling(false);
+        ls.set('abl_demo_active_run_id', null);
+        setError(ev.error || 'Demo run failed.');
+        addLog(`Failed: ${ev.error}`, 'err');
+      } else if (ev.type === 'timeout') {
+        setPolling(false);
+        ls.set('abl_demo_active_run_id', null);
+        setError('Timed out after 7 minutes.');
+        addLog('Timed out.', 'err');
+      } else if (ev.type === 'error') {
+        addLog(`Poll error: ${ev.error}`, 'err');
+      } else if (ev.type === 'tick') {
+        setStage(ev.stage ?? 0);
+        setPct(ev.pct ?? 0);
+        setActiveType(currentTestType(ev.stage ?? 0, ev.pct ?? 0));
+        if ((ev.attempts || 0) % 5 === 0) {
+          addLog(`Stage update: ${ev.attempts * 3}s elapsed.`, 'info');
+        }
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsub();
+    };
+  }, [addLog]);
 
   const derivedMetrics = useMemo(() => {
     const breakdown = report?.metrics?.breakdown_by_type || report?.metrics?.breakdown || report?.metrics?.test_type_breakdown || {};
-    const hallucinations = breakdown?.Hallucination?.failures ?? breakdown?.Hallucination?.failed ?? null;
-    const failures = Array.isArray(report?.metrics?.failed_rows) ? report.metrics.failed_rows.length : null;
-    const adversarialScore = breakdown?.Adversarial?.avg_score ?? breakdown?.Adversarial?.average_score ?? report?.metrics?.adversarial_score ?? null;
+    const hallucinations = report?.metrics?.hallucinations_detected
+      ?? breakdown?.hallucination?.failures
+      ?? breakdown?.hallucination?.failed
+      ?? null;
+    const failures = Array.isArray(report?.metrics?.failed_rows)
+      ? report.metrics.failed_rows.length
+      : null;
+    const adversarialScore = breakdown?.adversarial?.avg_score
+      ?? breakdown?.adversarial?.average_score
+      ?? report?.metrics?.adversarial_score
+      ?? null;
     return { hallucinations, failures, adversarialScore };
   }, [report]);
 
   const score = overallScore(report || {});
   const letter = grade(score || 0);
 
-  const runDemo = async () => {
-    if (running) return;
+  async function handleSubmit() {
+    if (loading || polling) return;
     setError('');
     setReport(null);
-    setRunning(true);
-    setProgress({
-      progress_pct: 0,
-      current_step: STATUS_STEPS[0],
-      steps_done: 0,
-      steps_total: 20,
-      elapsed_seconds: 0,
-    });
-
-    let reportId = null;
+    setLogs([]);
+    setStage(0);
+    setPct(0);
+    setActiveType(currentTestType(0, 0));
+    setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/demo/break`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: description.trim() || 'Customer support chatbot for an e-commerce platform',
-          model_name: 'gemini-3-flash-preview',
-          num_tests: 20,
-        }),
+      addLog('Submitting public demo request...', 'info');
+      const res = await api.demoBreak({
+        description: description.trim() || DEFAULT_DESCRIPTION,
+        model_name: 'gemini-3-flash-preview',
+        num_tests: 20,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.detail || 'Demo request failed.');
-      reportId = data.report_id;
-      if (!reportId) throw new Error('No report id returned.');
-    } catch (err) {
-      setError(err?.message || 'Unable to start demo run.');
-      setRunning(false);
-      return;
+      addLog(`Job queued - ID: ${res.report_id}`, 'ok');
+      addLog('Generating adversarial tests...', 'info');
+      setRunId(res.report_id);
+      ls.set('abl_demo_active_run_id', res.report_id);
+      setPolling(true);
+      pollStart(res.report_id, res.num_tests || 20, api.getDemoReport, 'demo');
+    } catch (e) {
+      setError(e.message || 'Unable to start demo run.');
+      addLog(`Failed: ${e.message || 'unknown error'}`, 'err');
+    } finally {
+      setLoading(false);
     }
-
-    const startedAt = Date.now();
-
-    const pollProgress = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/report/${encodeURIComponent(reportId)}/progress`);
-        if (!res.ok) throw new Error('progress failed');
-        const data = await res.json();
-        if (data?.progress_pct != null) {
-          setProgress({
-            progress_pct: data.progress_pct,
-            current_step: data.current_step || STATUS_STEPS[statusIndex],
-            steps_done: data.steps_done ?? 0,
-            steps_total: data.steps_total ?? 0,
-            elapsed_seconds: data.elapsed_seconds ?? (Date.now() - startedAt) / 1000,
-          });
-        }
-      } catch {
-        setProgress((prev) => {
-          const nextPct = Math.min(95, Math.max(prev.progress_pct, Math.min(95, prev.progress_pct + 4)));
-          return {
-            ...prev,
-            progress_pct: nextPct,
-            elapsed_seconds: (Date.now() - startedAt) / 1000,
-          };
-        });
-      }
-    };
-
-    const pollReport = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/demo/report/${encodeURIComponent(reportId)}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.detail || 'Demo report failed.');
-        if (data.status === 'done') {
-          setReport(data);
-          setRunning(false);
-          setProgress((prev) => ({
-            ...prev,
-            progress_pct: 100,
-            steps_done: prev.steps_total || data.sample_count || 0,
-            current_step: 'Completed',
-          }));
-          if (progressTimer.current) clearInterval(progressTimer.current);
-          if (reportTimer.current) clearInterval(reportTimer.current);
-        }
-        if (data.status === 'failed') {
-          setError(data?.error || 'Demo run failed.');
-          setRunning(false);
-          if (progressTimer.current) clearInterval(progressTimer.current);
-          if (reportTimer.current) clearInterval(reportTimer.current);
-        }
-      } catch (err) {
-        setError(err?.message || 'Unable to fetch demo report.');
-        setRunning(false);
-        if (progressTimer.current) clearInterval(progressTimer.current);
-        if (reportTimer.current) clearInterval(reportTimer.current);
-      }
-    };
-
-    progressTimer.current = setInterval(pollProgress, 2000);
-    reportTimer.current = setInterval(pollReport, 3000);
-    pollProgress();
-    pollReport();
-  };
+  }
 
   const shareReport = async () => {
     if (!report?.report_id) return;
@@ -262,8 +244,8 @@ export default function DemoPage() {
             fontFamily: 'var(--sans)',
           }}
         />
-        <button className="btn btn-primary" onClick={runDemo} disabled={running}>
-          {running ? 'Running...' : 'Run Free Test'}
+        <button className="btn btn-primary" onClick={handleSubmit} disabled={loading || polling}>
+          {loading || polling ? 'Running...' : 'Run Free Test'}
         </button>
         <div style={{ marginTop: 10, fontSize: 11, color: 'var(--mute)' }}>
           Takes ~30 seconds - 20 adversarial tests - Free forever
@@ -275,27 +257,19 @@ export default function DemoPage() {
         )}
       </div>
 
-      {running && (
-        <div className="card" style={{ padding: 22, marginBottom: 22 }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mute)', marginBottom: 8 }}>
-            Live run progress
-          </div>
-          <div style={{ height: 8, borderRadius: 999, background: 'var(--bg2)', overflow: 'hidden' }}>
-            <div style={{
-              width: `${progress.progress_pct || 0}%`,
-              height: '100%',
-              background: pctColor(progress.progress_pct || 0),
-              transition: 'width 0.4s ease',
-            }} />
-          </div>
-          <div style={{ marginTop: 10, color: 'var(--hi)' }}>{statusMessage}</div>
-          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--mute)' }}>
-            Step {progress.steps_done || 0} of {progress.steps_total || 20} - {Math.round(progress.elapsed_seconds || 0)}s elapsed
-          </div>
-        </div>
+      {polling && (
+        <LiveProgress
+          stage={stage}
+          pct={pct}
+          logs={logs}
+          logRef={logRef}
+          done={false}
+          reportId={runId}
+          activeType={activeType}
+        />
       )}
 
-      {!running && report && (
+      {!polling && report && (
         <div className="card" style={{ padding: 26 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 260px)', gap: 24, alignItems: 'center' }}>
             <div>
@@ -345,6 +319,7 @@ export default function DemoPage() {
 
           <div style={{ display: 'flex', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
             <button className="btn btn-ghost" onClick={shareReport}>Share This Report</button>
+            <Link className="btn btn-ghost" to={`/report/${report.report_id}`}>View Full Report</Link>
             <Link className="btn btn-primary" to="/auth/signup">Get Full Access</Link>
             {shareMsg && <span style={{ fontSize: 11, color: 'var(--accent)' }}>{shareMsg}</span>}
           </div>
