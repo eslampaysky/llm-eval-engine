@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/app/targets', label: 'Targets', icon: '◈' },
   { to: '/app/runs', label: 'Runs', icon: '◷' },
   { to: '/app/playground', label: 'Playground', icon: '⚡' },
+  { to: '/app/agentic', label: 'Agentic', icon: '*' },
   { to: '/app/compare', label: 'Compare', icon: '⇌' },
   { to: '/app/api-keys', label: 'API Keys', icon: '⌘' },
   { to: '/app/settings', label: 'Settings', icon: '⚙' },

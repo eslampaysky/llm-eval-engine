@@ -32,12 +32,15 @@ from api.database import (
     deactivate_user,
     get_user_by_email,
     get_user_by_id,
+    get_user_plan,
+    get_usage_count,
     create_password_reset_token,
     get_password_reset_token,
     mark_password_reset_token_used,
     update_user_password,
     update_user_profile,
 )
+from api.plans import get_plan_limits, resolve_plan
 from api.user_auth import (
     create_access_token,
     decode_access_token,
@@ -224,11 +227,27 @@ def me(current_user: Annotated[dict, Depends(get_current_user)]) -> dict:
     Return the profile of the currently authenticated user.
     Requires a valid Bearer token in the Authorization header.
     """
+    plan_row = get_user_plan(current_user["user_id"])
+    plan = resolve_plan(plan_row.get("plan"), plan_row.get("plan_expires_at"))
+    limits = get_plan_limits(plan)
+    client_name = current_user.get("email") or ""
+    month_prefix = datetime.now(timezone.utc).strftime("%Y-%m")
+    runs_this_month = get_usage_count(client_name, month_prefix)
+    total_runs_all_time = get_usage_count(client_name, None)
+    run_limit = limits.get("runs_per_month", 0)
+    tests_per_run_limit = limits.get("tests_per_run", 0)
     return {
         "user_id": current_user["user_id"],
         "name": current_user["name"],
         "email": current_user["email"],
         "created_at": current_user["created_at"],
+        "plan": plan,
+        "plan_expires_at": plan_row.get("plan_expires_at"),
+        "runs_this_month": int(runs_this_month or 0),
+        "run_limit": None if int(run_limit or 0) < 0 else int(run_limit or 0),
+        "tests_per_run_limit": None if int(tests_per_run_limit or 0) < 0 else int(tests_per_run_limit or 0),
+        "agentic_enabled": bool(limits.get("agentic", False)),
+        "total_runs_all_time": int(total_runs_all_time or 0),
     }
 
 

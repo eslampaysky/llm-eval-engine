@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ReportPage, SHARE_BASE, api } from '../../App.jsx';
+import { API_BASE, ReportPage, SHARE_BASE, api, getApiKey } from '../../App.jsx';
+import { getAuthHeader } from '../../context/AuthContext.jsx';
 import { useAppShell } from '../../context/AppShellContext.jsx';
 import RadarChart from '../../components/RadarChart.jsx';
 
@@ -18,6 +19,9 @@ export default function RunDetailPage() {
   const [shareCopied, setShareCopied] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareError, setShareError] = useState('');
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState('');
+  const [progress, setProgress] = useState(null);
 
   useEffect(() => {
     if (report?.report_id === runId) {
@@ -34,6 +38,29 @@ export default function RunDetailPage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [runId, report?.report_id, setReport]);
+
+  useEffect(() => {
+    if (!report || report.status !== 'processing') {
+      setProgress(null);
+      return;
+    }
+    let active = true;
+    const tick = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/report/${encodeURIComponent(runId)}/progress`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!active) return;
+        setProgress(data);
+      } catch {}
+    };
+    tick();
+    const timer = setInterval(tick, 2000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [report, runId]);
 
   if (loading) return <div className="page"><div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div></div>;
   if (error) return <div className="page"><div className="err-box">⚠ {error}</div></div>;
@@ -85,8 +112,62 @@ export default function RunDetailPage() {
     }
   };
 
+  const downloadPdf = async () => {
+    if (!report?.report_id || pdfBusy) return;
+    setPdfBusy(true);
+    setPdfError('');
+    try {
+      const res = await fetch(`${API_BASE}/report/${encodeURIComponent(report.report_id)}/pdf`, {
+        headers: {
+          ...getAuthHeader(),
+          'X-API-KEY': getApiKey(),
+        },
+      });
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      const blob = await res.blob();
+      const disposition = res.headers.get('content-disposition') || '';
+      const match = disposition.match(/filename=([^;]+)/i);
+      const filename = match ? match[1].replace(/\"/g, '') : `aibreaker-audit-${report.report_id}.pdf`;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setPdfError(err?.message || 'Failed to download PDF.');
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   return (
     <>
+      {report.status === 'processing' && progress && (
+        <div className="page fade-in" style={{ paddingBottom: 0 }}>
+          <div className="card">
+            <div className="card-label">Run progress</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--mid)', marginBottom: 8 }}>
+              {progress.current_step || 'Processing'} 
+            </div>
+            <div style={{ height: 6, borderRadius: 999, background: 'var(--bg0)', overflow: 'hidden' }}>
+              <div
+                style={{
+                  height: '100%',
+                  width: `${progress.progress_pct || 0}%`,
+                  background: 'var(--accent)',
+                  transition: 'width 0.4s ease',
+                }}
+              />
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--mid)', marginTop: 8 }}>
+              Step {progress.steps_done || 0} of {progress.steps_total || 0} · {progress.elapsed_seconds || 0}s elapsed
+            </div>
+          </div>
+        </div>
+      )}
       {report.status === 'done' && (
         <div className="page fade-in" style={{ paddingBottom: 0 }}>
           <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
@@ -102,6 +183,22 @@ export default function RunDetailPage() {
         </div>
       )}
       <ReportPage report={report} persona={persona} overviewExtra={<RadarChart summary={summary} />} />
+      {report.status === 'done' && (
+        <div className="page fade-in" style={{ paddingTop: 0 }}>
+          <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            <div>
+              <div className="card-label">Audit export</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--mid)' }}>
+                Download a PDF version for enterprise audits.
+              </div>
+              {pdfError && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 6 }}>{pdfError}</div>}
+            </div>
+            <button className="btn btn-primary" onClick={downloadPdf} disabled={pdfBusy}>
+              {pdfBusy ? 'Downloading...' : 'Download PDF Audit Report'}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

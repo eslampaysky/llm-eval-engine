@@ -17,6 +17,7 @@ import TargetDetailPage from '../pages/app/TargetDetailPage.jsx';
 import RunsPage from '../pages/app/RunsPage.jsx';
 import RunDetailPage from '../pages/app/RunDetailPage.jsx';
 import PlaygroundPage from '../pages/app/PlaygroundPage.jsx';
+import AgenticPage from '../pages/app/AgenticPage.jsx';
 import ComparePage from '../pages/app/ComparePage.jsx';
 import ApiKeysPage from '../pages/app/ApiKeysPage.jsx';
 import SettingsLayout from '../pages/app/settings/SettingsLayout.jsx';
@@ -56,6 +57,7 @@ const router = createBrowserRouter([
       { path: 'runs', element: <RunsPage /> },
       { path: 'runs/:runId', element: <RunDetailPage /> },
       { path: 'playground', element: <PlaygroundPage /> },
+      { path: 'agentic', element: <AgenticPage /> },
       { path: 'compare', element: <ComparePage /> },
       { path: 'api-keys', element: <ApiKeysPage /> },
       {

@@ -237,6 +237,10 @@ def init_db():
                     email TEXT NOT NULL UNIQUE,
                     password_hash TEXT NOT NULL,
                     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    plan TEXT NOT NULL DEFAULT 'free',
+                    plan_expires_at TEXT,
+                    paddle_customer_id TEXT,
+                    paddle_subscription_id TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 )
@@ -267,6 +271,17 @@ def init_db():
                     run_date TEXT NOT NULL,
                     run_count INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY (ip_hash, run_date)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sales_leads (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL,
+                    company TEXT NOT NULL,
+                    use_case TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    contacted BOOLEAN NOT NULL DEFAULT FALSE
                 )
             """)
             # ── Test suite cache ──────────────────────────────────────────────
@@ -308,6 +323,22 @@ def init_db():
                 existing.add("target_id")
             if "target_id" in existing:
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
+
+            # Users table migrations
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'users'
+            """)
+            existing_users = {row["column_name"] for row in cur.fetchall()}
+            if "plan" not in existing_users:
+                cur.execute("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'")
+            if "plan_expires_at" not in existing_users:
+                cur.execute("ALTER TABLE users ADD COLUMN plan_expires_at TEXT")
+            if "paddle_customer_id" not in existing_users:
+                cur.execute("ALTER TABLE users ADD COLUMN paddle_customer_id TEXT")
+            if "paddle_subscription_id" not in existing_users:
+                cur.execute("ALTER TABLE users ADD COLUMN paddle_subscription_id TEXT")
 
         else:
             # --- SQLite DDL (unchanged from original) -------------------------
@@ -395,6 +426,10 @@ def init_db():
                     email TEXT NOT NULL UNIQUE,
                     password_hash TEXT NOT NULL,
                     is_active INTEGER NOT NULL DEFAULT 1,
+                    plan TEXT NOT NULL DEFAULT 'free',
+                    plan_expires_at TEXT,
+                    paddle_customer_id TEXT,
+                    paddle_subscription_id TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 )
@@ -425,6 +460,17 @@ def init_db():
                     run_date TEXT NOT NULL,
                     run_count INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY (ip_hash, run_date)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sales_leads (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL,
+                    company TEXT NOT NULL,
+                    use_case TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    contacted INTEGER NOT NULL DEFAULT 0
                 )
             """)
             # ── Test suite cache ──────────────────────────────────────────────
@@ -460,6 +506,18 @@ def init_db():
             cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date ON demo_runs(run_date)")
             if "target_id" in existing:
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
+
+            # Migrate: add billing columns to users if missing
+            cur.execute("PRAGMA table_info(users)")
+            existing_users = {row[1] for row in cur.fetchall()}
+            if "plan" not in existing_users:
+                cur.execute("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'")
+            if "plan_expires_at" not in existing_users:
+                cur.execute("ALTER TABLE users ADD COLUMN plan_expires_at TEXT")
+            if "paddle_customer_id" not in existing_users:
+                cur.execute("ALTER TABLE users ADD COLUMN paddle_customer_id TEXT")
+            if "paddle_subscription_id" not in existing_users:
+                cur.execute("ALTER TABLE users ADD COLUMN paddle_subscription_id TEXT")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_targets_client ON targets(client_name)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_reset_tokens_user_id ON password_reset_tokens(user_id)")
@@ -588,6 +646,11 @@ def get_usage_slice(client_name: str, prefix: str | None) -> dict:
         "total_tokens": int(row.get("total_tokens") or 0),
         "total_cost_usd": float(row.get("total_cost_usd") or 0),
     }
+
+
+def get_usage_count(client_name: str, prefix: str | None) -> int:
+    """Return number of runs for the given client and optional timestamp prefix."""
+    return int(get_usage_slice(client_name, prefix).get("req_count", 0))
 
 
 # ── Evaluation runs ───────────────────────────────────────────────────────────
@@ -1229,6 +1292,90 @@ def get_user_by_id(user_id: str) -> dict | None:
         return _row_to_dict(cur.fetchone())
 
 
+def get_user_by_paddle_customer_id(customer_id: str) -> dict | None:
+    if not customer_id:
+        return None
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            SELECT id, user_id, name, email, is_active, created_at,
+                   plan, plan_expires_at, paddle_customer_id, paddle_subscription_id
+            FROM users
+            WHERE paddle_customer_id = {_P}
+            """,
+            (customer_id,),
+        )
+        return _row_to_dict(cur.fetchone())
+
+
+def get_user_plan(user_id: str) -> dict:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT plan, plan_expires_at FROM users WHERE user_id = {_P}",
+            (user_id,),
+        )
+        row = _row_to_dict(cur.fetchone()) or {}
+    return {
+        "plan": row.get("plan") or "free",
+        "plan_expires_at": row.get("plan_expires_at"),
+    }
+
+
+def set_user_plan(user_id: str, plan: str, expires_at: str | None) -> bool:
+    now = _utc_now()
+    plan_value = (plan or "free").strip().lower() or "free"
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if _USE_PG:
+            cur.execute(
+                "UPDATE users SET plan=%s, plan_expires_at=%s, updated_at=%s WHERE user_id=%s",
+                (plan_value, expires_at, now, user_id),
+            )
+        else:
+            cur.execute(
+                "UPDATE users SET plan=?, plan_expires_at=?, updated_at=? WHERE user_id=?",
+                (plan_value, expires_at, now, user_id),
+            )
+        return (cur.rowcount or 0) > 0
+
+
+def set_user_billing_ids(
+    user_id: str,
+    customer_id: str | None,
+    subscription_id: str | None,
+) -> bool:
+    if not user_id:
+        return False
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if _USE_PG:
+            cur.execute(
+                """
+                UPDATE users
+                   SET paddle_customer_id=%s,
+                       paddle_subscription_id=%s,
+                       updated_at=%s
+                 WHERE user_id=%s
+                """,
+                (customer_id, subscription_id, now, user_id),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE users
+                   SET paddle_customer_id=?,
+                       paddle_subscription_id=?,
+                       updated_at=?
+                 WHERE user_id=?
+                """,
+                (customer_id, subscription_id, now, user_id),
+            )
+        return (cur.rowcount or 0) > 0
+
+
 def update_user_profile(user_id: str, name: str, email: str) -> dict | None:
     """Update name and email. Returns updated user or None if not found."""
     now = _utc_now()
@@ -1332,5 +1479,96 @@ def mark_password_reset_token_used(token: str) -> bool:
             cur.execute(
                 "UPDATE password_reset_tokens SET used=1 WHERE token=?",
                 (token,),
+            )
+        return (cur.rowcount or 0) > 0
+
+
+# -- Sales leads -----------------------------------------------------------
+
+def create_lead(*, name: str, email: str, company: str, use_case: str) -> dict:
+    lead = {
+        "name": (name or "").strip(),
+        "email": (email or "").strip(),
+        "company": (company or "").strip(),
+        "use_case": (use_case or "").strip(),
+    }
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if _USE_PG:
+            cur.execute(
+                """
+                INSERT INTO sales_leads (name, email, company, use_case, created_at, contacted)
+                VALUES (%s, %s, %s, %s, %s, FALSE)
+                RETURNING id
+                """,
+                (lead["name"], lead["email"], lead["company"], lead["use_case"], now),
+            )
+            row = _row_to_dict(cur.fetchone()) or {}
+            lead_id = row.get("id")
+        else:
+            cur.execute(
+                """
+                INSERT INTO sales_leads (name, email, company, use_case, created_at, contacted)
+                VALUES (?, ?, ?, ?, ?, 0)
+                """,
+                (lead["name"], lead["email"], lead["company"], lead["use_case"], now),
+            )
+            lead_id = cur.lastrowid
+    return {
+        "id": lead_id,
+        **lead,
+        "created_at": now,
+        "contacted": False,
+    }
+
+
+def list_leads(contacted: bool | None = None) -> list[dict]:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if contacted is None:
+            cur.execute(
+                """
+                SELECT id, name, email, company, use_case, created_at, contacted
+                FROM sales_leads
+                ORDER BY created_at DESC
+                """,
+            )
+        else:
+            if _USE_PG:
+                cur.execute(
+                    """
+                    SELECT id, name, email, company, use_case, created_at, contacted
+                    FROM sales_leads
+                    WHERE contacted = %s
+                    ORDER BY created_at DESC
+                    """,
+                    (bool(contacted),),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT id, name, email, company, use_case, created_at, contacted
+                    FROM sales_leads
+                    WHERE contacted = ?
+                    ORDER BY created_at DESC
+                    """,
+                    (1 if contacted else 0,),
+                )
+        return [_row_to_dict(r) for r in cur.fetchall()]
+
+
+def mark_lead_contacted(lead_id: int) -> bool:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if _USE_PG:
+            cur.execute(
+                "UPDATE sales_leads SET contacted=TRUE WHERE id=%s",
+                (lead_id,),
+            )
+        else:
+            cur.execute(
+                "UPDATE sales_leads SET contacted=1 WHERE id=?",
+                (lead_id,),
             )
         return (cur.rowcount or 0) > 0

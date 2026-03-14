@@ -10,6 +10,7 @@ import uuid
 import time
 import hashlib
 import hmac
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from datetime import datetime, timezone
 from email.message import EmailMessage
@@ -17,6 +18,7 @@ from html import escape
 from pathlib import Path
 from typing import Annotated, Any
 from cryptography.fernet import Fernet
+import jwt as _jwt
 from core.agentic_evaluator import AgentEvaluator, AgentScenario
 from api.multi_judge import (
     build_judges_from_request,
@@ -26,8 +28,9 @@ from api.multi_judge import (
     GROQ_MODEL,
 )
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from api.database import (
@@ -41,6 +44,10 @@ from api.database import (
     finalize_report_failure,
     finalize_report_success,
     get_client_by_api_key,
+    get_user_by_id,
+    get_user_by_email,
+    get_user_by_paddle_customer_id,
+    get_user_plan,
     hash_ip,
     reset_report_for_retry,     
     get_stuck_processing_reports,
@@ -57,6 +64,10 @@ from api.database import (
     log_usage,
     register_client,
     save_human_reviews,
+    create_lead,
+    list_leads,
+    set_user_billing_ids,
+    set_user_plan,
     set_report_shared,
     set_report_share_token,
     upsert_demo_run,
@@ -64,6 +75,8 @@ from api.database import (
 from api.job_queue import enqueue_job
 from api.models import BreakRequest, BreakTarget, DemoBreakRequest, EvaluationRequest, JudgeConfig, TargetCreate
 from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ, limiter ,LIMIT_RETRY
+from api.plans import get_plan_limits, resolve_plan
+from api.user_auth import decode_access_token
 from reports.report_generator import ReportGenerator, generate_html_report, generate_premium_report
 from src.llm_eval_engine.infrastructure.config_loader import load_project_config
 from src.llm_eval_engine.infrastructure.evaluator_factories import (
@@ -107,6 +120,9 @@ DEMO_ALLOWED_MODELS = {
 }
 DEMO_DAILY_LIMIT = 20
 DEMO_RATE_LIMIT_ERROR = "Gemini rate limit exceeded — please try again in a minute"
+
+# In-memory progress tracker (report_id -> progress dict)
+_REPORT_PROGRESS: dict[str, dict[str, Any]] = {}
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
@@ -179,6 +195,78 @@ def _extract_json_payload(raw_text: str) -> dict[str, Any]:
             return {}
 
 
+def _init_progress(report_id: str, steps_total: int) -> None:
+    _REPORT_PROGRESS[report_id] = {
+        "started_at": time.monotonic(),
+        "steps_total": int(steps_total or 0),
+        "steps_done": 0,
+        "current_step": "Queued",
+        "status": "processing",
+    }
+
+
+def _update_progress(report_id: str, steps_done: int, steps_total: int, current_step: str) -> None:
+    entry = _REPORT_PROGRESS.get(report_id)
+    if not entry:
+        _init_progress(report_id, steps_total)
+        entry = _REPORT_PROGRESS.get(report_id)
+    if not entry:
+        return
+    entry["steps_done"] = int(steps_done or 0)
+    entry["steps_total"] = int(steps_total or 0)
+    entry["current_step"] = current_step
+    entry["status"] = "processing"
+
+
+def _finish_progress(report_id: str, status: str) -> None:
+    entry = _REPORT_PROGRESS.get(report_id)
+    if not entry:
+        return
+    entry["status"] = status
+
+
+def _resolve_plan_for_client(client_name: str | None) -> tuple[str, dict[str, Any]]:
+    if not client_name:
+        return "free", get_plan_limits("free")
+    user = get_user_by_email(client_name)
+    if not user:
+        return "free", get_plan_limits("free")
+    plan_row = get_user_plan(user["user_id"])
+    plan = resolve_plan(plan_row.get("plan"), plan_row.get("plan_expires_at"))
+    return plan, get_plan_limits(plan)
+
+
+def _runs_this_month(client_name: str | None) -> int:
+    if not client_name:
+        return 0
+    prefix = datetime.now(timezone.utc).strftime("%Y-%m")
+    return int(get_usage_slice(client_name, prefix).get("req_count", 0))
+
+
+def _enforce_monthly_run_limit(client_name: str | None) -> JSONResponse | None:
+    plan, limits = _resolve_plan_for_client(client_name)
+    run_limit = int(limits.get("runs_per_month", 0))
+    if run_limit < 0:
+        return None
+    runs_this_month = _runs_this_month(client_name)
+    if runs_this_month >= run_limit:
+        logger.info(
+            "[Plan] Monthly limit reached plan=%s client=%s used=%d limit=%d",
+            plan,
+            client_name,
+            runs_this_month,
+            run_limit,
+        )
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": "Monthly run limit reached. Upgrade to Pro.",
+                "upgrade_url": "/pricing",
+            },
+        )
+    return None
+
+
 def _build_agent_tool_definitions(
     scenarios: list["AgentScenarioRequest"],
 ) -> list[dict[str, Any]]:
@@ -242,8 +330,23 @@ def _paddle_price_id_for_plan(plan: str) -> str | None:
     plan_key = (plan or "").strip().lower()
     if plan_key == "pro":
         return os.getenv("PADDLE_PRO_PRICE_ID", "").strip() or None
+    if plan_key == "enterprise":
+        return os.getenv("PADDLE_ENTERPRISE_PRICE_ID", "").strip() or None
     if plan_key == "run_pack_100":
         return os.getenv("PADDLE_RUN_PACK_PRICE_ID", "").strip() or None
+    return None
+
+
+def _plan_for_paddle_price_id(price_id: str | None) -> str | None:
+    pid = (price_id or "").strip()
+    if not pid:
+        return None
+    if pid == (os.getenv("PADDLE_PRO_PRICE_ID", "").strip() or ""):
+        return "pro"
+    if pid == (os.getenv("PADDLE_ENTERPRISE_PRICE_ID", "").strip() or ""):
+        return "enterprise"
+    if pid == (os.getenv("PADDLE_RUN_PACK_PRICE_ID", "").strip() or ""):
+        return "run_pack_100"
     return None
 
 
@@ -372,6 +475,22 @@ def _notify_slack(report_id: str, score: float, passed: bool, report_url: str) -
         _log.warning("[Slack] Notification failed: %s", exc)
 
 
+def _render_pdf_from_html(html_content: str) -> bytes | None:
+    try:
+        from weasyprint import HTML
+
+        return HTML(string=html_content).write_pdf()
+    except Exception:
+        pass
+
+    try:
+        import pdfkit
+
+        return pdfkit.from_string(html_content, False)
+    except Exception:
+        return None
+
+
 def build_public_html(row: dict[str, Any]) -> str:
     metrics = json.loads(row["metrics_json"]) if row["metrics_json"] else {}
     score = float(metrics.get("average_score", 0))
@@ -476,6 +595,13 @@ def build_public_html(row: dict[str, Any]) -> str:
     table{{width:100%;border-collapse:collapse}}
     th{{padding:10px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);border-bottom:1px solid var(--line2)}}
     .footer{{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--mute);flex-wrap:wrap;gap:8px}}
+    .cover{{background:linear-gradient(135deg,#0C1428,#0B1020);border:1px solid var(--line2);border-radius:14px;padding:20px 22px;margin-bottom:24px}}
+    .cover-title{{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:var(--text)}}
+    .cover-subtitle{{font-size:12px;color:var(--mid);margin-top:4px}}
+    .cover-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:16px}}
+    .cover-label{{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--mute);margin-bottom:4px}}
+    .cover-value{{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text)}}
+    .cover-disclaimer{{margin-top:16px;font-size:11px;color:var(--mute);line-height:1.5}}
   </style>
 </head>
 <body>
@@ -487,6 +613,32 @@ def build_public_html(row: dict[str, Any]) -> str:
       <div class="meta-line">Report {report_id[:8]}... · {created}</div>
     </div>
     <div class="grade-circle"><div class="grade-letter">{grade}</div></div>
+  </div>
+
+  <div class="cover">
+    <div class="cover-title">AI Model Security Audit Report</div>
+    <div class="cover-subtitle">Generated by AI Breaker Lab</div>
+    <div class="cover-grid">
+      <div>
+        <div class="cover-label">Report ID</div>
+        <div class="cover-value">{report_id}</div>
+      </div>
+      <div>
+        <div class="cover-label">Date</div>
+        <div class="cover-value">{created}</div>
+      </div>
+      <div>
+        <div class="cover-label">Model Tested</div>
+        <div class="cover-value">{model}</div>
+      </div>
+      <div>
+        <div class="cover-label">Overall Score</div>
+        <div class="cover-value">{score:.1f}/10 (Grade {grade})</div>
+      </div>
+    </div>
+    <div class="cover-disclaimer">
+      This report reflects automated adversarial testing only and does not constitute a formal security certification.
+    </div>
   </div>
 
   <div class="stats">
@@ -563,6 +715,32 @@ def validate_api_key(
         register_client(name=client_name, api_key=x_api_key)
         client = get_client_by_api_key(x_api_key)
     return {"api_key": x_api_key, "client_name": client_name, "client": client}
+
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+def require_report_auth(
+    x_api_key: Annotated[str | None, Header(None, alias="X-API-KEY")] = None,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
+) -> dict[str, Any]:
+    if x_api_key:
+        return validate_api_key(x_api_key)
+    if credentials:
+        try:
+            payload = decode_access_token(credentials.credentials)
+        except _jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Token has expired.")
+        except _jwt.InvalidTokenError as exc:
+            raise HTTPException(status_code=401, detail=f"Invalid token: {exc}")
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token payload.")
+        user = get_user_by_id(user_id)
+        if not user or not user.get("is_active"):
+            raise HTTPException(status_code=403, detail="User account not found or inactive.")
+        return {"user": user}
+    raise HTTPException(status_code=401, detail="Authorization required.")
 
 
 @router.post("/billing/checkout")
@@ -653,12 +831,69 @@ async def paddle_webhook(request: Request) -> dict[str, str]:
         event_type = payload.get("event_type")
         if event_type == "transaction.completed":
             data = payload.get("data") or {}
-            logger.info(
-                "[Paddle] transaction.completed id=%s customer_id=%s subscription_id=%s",
-                data.get("id"),
-                data.get("customer_id"),
-                data.get("subscription_id"),
+            customer_id = data.get("customer_id") or (data.get("customer") or {}).get("id")
+            subscription_id = data.get("subscription_id") or (data.get("subscription") or {}).get("id")
+            items = data.get("items") or []
+            first_item = items[0] if items else {}
+            price_id = (
+                first_item.get("price_id")
+                or (first_item.get("price") or {}).get("id")
+                or first_item.get("price")
+                or data.get("price_id")
             )
+            plan = _plan_for_paddle_price_id(price_id)
+            customer_email = (
+                data.get("customer_email")
+                or (data.get("customer") or {}).get("email")
+                or (data.get("customer") or {}).get("email_address")
+            )
+            custom_data = data.get("custom_data") or {}
+            user_id = custom_data.get("user_id")
+            user = None
+            if user_id:
+                user = get_user_by_id(str(user_id))
+            if not user and customer_id:
+                user = get_user_by_paddle_customer_id(str(customer_id))
+            if not user and customer_email:
+                user = get_user_by_email(str(customer_email))
+
+            expires_at = (
+                (data.get("billing_period") or {}).get("ends_at")
+                or (data.get("current_billing_period") or {}).get("ends_at")
+                or data.get("next_billed_at")
+            )
+
+            logger.info(
+                "[Paddle] transaction.completed id=%s customer_id=%s subscription_id=%s price_id=%s plan=%s",
+                data.get("id"),
+                customer_id,
+                subscription_id,
+                price_id,
+                plan,
+            )
+
+            if plan in ("pro", "enterprise"):
+                if user:
+                    set_user_billing_ids(user["user_id"], customer_id, subscription_id)
+                    set_user_plan(user["user_id"], plan, expires_at)
+                    logger.info(
+                        "[Paddle] Upgraded user=%s plan=%s expires_at=%s",
+                        user.get("user_id"),
+                        plan,
+                        expires_at,
+                    )
+                else:
+                    logger.warning(
+                        "[Paddle] No matching user for customer_id=%s email=%s",
+                        customer_id,
+                        customer_email,
+                    )
+            elif plan == "run_pack_100":
+                logger.info(
+                    "[Paddle] Run pack purchase customer_id=%s subscription_id=%s",
+                    customer_id,
+                    subscription_id,
+                )
     except Exception as exc:
         logger.warning("[Paddle] Webhook processing error: %s", exc)
     return {"status": "ok"}
@@ -666,14 +901,60 @@ async def paddle_webhook(request: Request) -> dict[str, str]:
 
 @router.post("/contact-sales")
 def contact_sales(payload: ContactSalesRequest) -> dict[str, str]:
+    lead = create_lead(
+        name=payload.name,
+        email=payload.email,
+        company=payload.company,
+        use_case=payload.use_case,
+    )
     logger.info(
-        "[ContactSales] name=%r email=%r company=%r use_case_len=%d",
+        "[ContactSales] lead_id=%s name=%r email=%r company=%r use_case_len=%d",
+        lead.get("id"),
         payload.name,
         payload.email,
         payload.company,
         len(payload.use_case or ""),
     )
-    return {"status": "received"}
+
+    slack_url = os.getenv("SLACK_WEBHOOK_URL", "").strip()
+    if slack_url:
+        text = (
+            "🔥 New Enterprise Lead\n"
+            f"*Company:* {payload.company}\n"
+            f"*Contact:* {payload.name} <{payload.email}>\n"
+            f"*Use case:* {payload.use_case}"
+        )
+        try:
+            resp = requests.post(slack_url, json={"text": text}, timeout=5)
+            if resp.status_code >= 400:
+                logger.warning(
+                    "[ContactSales] Slack webhook returned %s: %s",
+                    resp.status_code,
+                    (resp.text or "")[:300],
+                )
+        except Exception as exc:
+            logger.warning("[ContactSales] Slack notification failed: %s", exc)
+
+    return {"message": "Thanks! We'll reach out within 24 hours."}
+
+
+@router.get("/admin/leads")
+def admin_list_leads(
+    request: Request,
+    contacted: str | None = None,
+    x_admin_key: Annotated[str | None, Header(None, alias="X-ADMIN-KEY")] = None,
+) -> list[dict[str, Any]]:
+    expected = os.getenv("ADMIN_API_KEY", "").strip()
+    if not expected or not x_admin_key or x_admin_key.strip() != expected:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    contacted_filter: bool | None
+    if contacted is None:
+        contacted_filter = None
+    else:
+        contacted_filter = str(contacted).strip().lower() in ("1", "true", "yes")
+
+    return list_leads(contacted=contacted_filter)
 
 
 def _do_insert_report(*, report_id, auth_ctx, sample_count, judge_model,
@@ -775,8 +1056,45 @@ def _process_evaluation_job(report_id, samples, judge_model):
         judge_model,
     )
     started = time.monotonic()
+    total = len(samples) if samples is not None else 0
+    _init_progress(report_id, total)
+    _update_progress(report_id, 0, total, f"Queued (0/{total})")
     try:
-        results, metrics = _run_pipeline(samples=samples, judge_model=judge_model)
+        config = load_project_config()
+        registry = build_default_evaluator_registry()
+        pipeline = EvaluationPipeline(config=config, evaluator_registry=registry, max_workers=MAX_WORKERS)
+        providers = pipeline._resolve_providers(judge_model)
+        evaluators, skipped = pipeline._load_evaluators(providers)
+        if not evaluators:
+            raise RuntimeError(
+                "No providers could be loaded. "
+                f"Skipped: {[provider for provider, _ in skipped]}."
+            )
+
+        evaluation_samples = pipeline._load_samples(samples=samples)
+        results: list[dict] = [None] * len(evaluation_samples)
+        completed = 0
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {
+                executor.submit(
+                    pipeline._evaluate_single_sample,
+                    sample,
+                    evaluators,
+                    skipped,
+                ): idx
+                for idx, sample in enumerate(evaluation_samples)
+            }
+            for future in as_completed(futures):
+                results[futures[future]] = asdict(future.result())
+                completed += 1
+                _update_progress(
+                    report_id,
+                    completed,
+                    total,
+                    f"Scoring samples ({completed}/{total})",
+                )
+
+        metrics = compute_metrics(results)
         score = metrics.get("average_score") if isinstance(metrics, dict) else None
         _log.info(
             "[Eval] Completed report_id=%s score=%s elapsed_s=%.3f",
@@ -789,9 +1107,11 @@ def _process_evaluation_job(report_id, samples, judge_model):
         html_path = generate_html_report(metrics=metrics, results=results, output_path=html_path)
         _finalize_report_success(report_id=report_id, results=results,
                                   metrics=metrics, html_path=html_path)
+        _finish_progress(report_id, "done")
     except Exception as exc:
         _log.error("[Eval] Failed report_id=%s: %s", report_id, exc, exc_info=True)
         _finalize_report_failure(report_id=report_id, error_message=str(exc))
+        _finish_progress(report_id, "failed")
 
 
 def _load_review_rules():
@@ -1089,6 +1409,9 @@ async def evaluate(
     if not samples:
         raise HTTPException(status_code=422,
                             detail="Request body must include non-empty 'samples'")
+    limit_response = _enforce_monthly_run_limit(auth_ctx.get("client_name"))
+    if limit_response:
+        return limit_response
     report_id = str(uuid.uuid4())
     _do_insert_report(
         report_id=report_id, auth_ctx=auth_ctx, sample_count=len(samples),
@@ -1215,6 +1538,9 @@ async def break_model(
     if not groq_api_key:
         raise HTTPException(status_code=422,
                             detail="groq_api_key is required (or set GROQ_API_KEY env var)")
+    limit_response = _enforce_monthly_run_limit(auth_ctx.get("client_name"))
+    if limit_response:
+        return limit_response
     target_id = (payload.target_id or "").strip() or None
     if target_id:
         target_row = get_target_by_id(target_id)
@@ -1756,6 +2082,43 @@ def list_stale_reports(
     ]
  
 
+@router.get("/report/{report_id}/progress")
+def report_progress(report_id: str) -> dict[str, Any]:
+    row = get_report_row(report_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    status = row.get("status") or "processing"
+    entry = _REPORT_PROGRESS.get(report_id)
+    if entry:
+        steps_total = int(entry.get("steps_total") or 0)
+        steps_done = int(entry.get("steps_done") or 0)
+        progress_pct = int((steps_done / steps_total) * 100) if steps_total else (100 if status == "done" else 0)
+        elapsed_seconds = max(0.0, time.monotonic() - float(entry.get("started_at") or time.monotonic()))
+        return {
+            "report_id": report_id,
+            "status": status,
+            "progress_pct": progress_pct,
+            "current_step": entry.get("current_step") or "Processing",
+            "steps_done": steps_done,
+            "steps_total": steps_total,
+            "elapsed_seconds": round(elapsed_seconds, 2),
+        }
+
+    steps_total = int(row.get("sample_count") or 0)
+    steps_done = steps_total if status == "done" else 0
+    progress_pct = 100 if status == "done" else 0
+    return {
+        "report_id": report_id,
+        "status": status,
+        "progress_pct": progress_pct,
+        "current_step": "Processing",
+        "steps_done": steps_done,
+        "steps_total": steps_total,
+        "elapsed_seconds": 0.0,
+    }
+
+
 @router.get("/report/{report_id}/html", response_class=HTMLResponse)
 @limiter.limit(LIMIT_READ)
 def get_report_html(
@@ -1796,6 +2159,46 @@ def get_report_html(
             raise HTTPException(status_code=404, detail="Could not generate HTML report")
 
     return HTMLResponse(content=html_content)
+
+
+@router.get("/report/{report_id}/pdf")
+def get_report_pdf(
+    report_id: str,
+    auth_ctx: dict[str, Any] = Depends(require_report_auth),
+):
+    row = get_report_row(report_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if row.get("status") != "done":
+        raise HTTPException(status_code=404, detail="Report not available")
+
+    html_content = row.get("html_content") or build_public_html(row)
+    pdf_bytes = _render_pdf_from_html(html_content)
+    filename = f"aibreaker-audit-{report_id}"
+
+    logger.info(
+        "[PDF] Download report_id=%s client=%s user=%s",
+        report_id,
+        auth_ctx.get("client_name"),
+        (auth_ctx.get("user") or {}).get("email"),
+    )
+
+    if pdf_bytes:
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}.pdf",
+            },
+        )
+
+    return Response(
+        content=html_content,
+        media_type="text/html",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}.html",
+        },
+    )
 
 
 @router.post("/notify")

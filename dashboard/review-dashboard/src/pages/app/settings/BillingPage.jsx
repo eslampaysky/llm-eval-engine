@@ -3,8 +3,8 @@
  * - Uses existing GET /usage/summary endpoint for usage meters
  * - Three plan cards (Free/Pro/Enterprise) with upgrade placeholder CTAs
  */
-import { useEffect, useMemo, useState } from 'react';
-import { api, apiFetch } from '../../../App.jsx';
+import { useEffect, useState } from 'react';
+import { apiFetch } from '../../../App.jsx';
 
 const S = {
   card: {
@@ -29,34 +29,33 @@ const S = {
   },
 };
 
-function UsageMeter({ label, used, limit, unit = '' }) {
-  const pct = limit ? Math.min((used / limit) * 100, 100) : 0;
-  const unlimited = !limit;
-
-  const barBg = useMemo(() => {
-    if (unlimited) return 'none';
-    if (pct > 85) return 'linear-gradient(90deg, rgba(255,77,109,0.7), #ff4d6d)';
-    if (pct > 60) return 'linear-gradient(90deg, var(--accent), var(--accent2))';
-    return 'linear-gradient(90deg, rgba(38,240,185,0.55), var(--accent2))';
-  }, [pct, unlimited]);
+function RunsUsageBar({ used, limit }) {
+  const unlimited = limit == null;
+  const pct = unlimited || limit === 0 ? 0 : Math.min((used / limit) * 100, 100);
+  const color = pct >= 90 ? '#ff4d6d' : pct >= 60 ? '#f0a500' : '#26f0b9';
+  const bg = pct >= 90
+    ? 'linear-gradient(90deg, rgba(255,77,109,0.7), #ff4d6d)'
+    : pct >= 60
+      ? 'linear-gradient(90deg, rgba(240,165,0,0.7), #f0a500)'
+      : 'linear-gradient(90deg, rgba(38,240,185,0.55), var(--accent2))';
 
   return (
     <div style={{ marginBottom: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
         <span style={{ fontSize: 12, color: 'rgba(232,244,255,0.8)', fontFamily: "'Space Grotesk', sans-serif" }}>
-          {label}
+          Monthly Runs
         </span>
-        <span style={{ fontSize: 11, color: 'rgba(142,168,199,0.7)', fontFamily: "'JetBrains Mono', monospace" }}>
-          {unlimited ? `${used}${unit} / inf` : `${used}${unit} / ${limit}${unit}`}
+        <span style={{ fontSize: 11, color, fontFamily: "'JetBrains Mono', monospace" }}>
+          {unlimited ? `${used} / inf` : `${used} / ${limit} runs used this month`}
         </span>
       </div>
-      <div style={{ height: 5, borderRadius: 3, background: 'rgba(33,57,90,0.8)', overflow: 'hidden' }}>
+      <div style={{ height: 6, borderRadius: 999, background: 'rgba(33,57,90,0.8)', overflow: 'hidden' }}>
         <div
           style={{
             height: '100%',
-            borderRadius: 3,
+            borderRadius: 999,
             width: unlimited ? '0%' : `${pct}%`,
-            background: barBg,
+            background: bg,
             transition: 'width 0.4s ease',
           }}
         />
@@ -72,7 +71,6 @@ const PLANS = [
     price: '$0',
     period: '/month',
     color: 'rgba(142,168,199,0.65)',
-    current: true,
     features: ['50 break runs/month', '20 tests per run', 'Community support', 'Multi-provider support'],
   },
   {
@@ -188,22 +186,36 @@ function PlanCard({ plan, loading, error, onCheckout }) {
 }
 
 export default function BillingPage() {
-  const [usage, setUsage] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [planLoading, setPlanLoading] = useState({});
   const [planError, setPlanError] = useState({});
 
   useEffect(() => {
-    api
-      .getUsageSummary()
-      .then(setUsage)
+    apiFetch('/auth/me')
+      .then(setProfile)
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const monthRuns = usage?.month?.req_count || 0;
-  const monthSamples = usage?.month?.sample_count || 0;
-  const totalRuns = usage?.overall?.req_count || 0;
+  const monthRuns = profile?.runs_this_month || 0;
+  const totalRuns = profile?.total_runs_all_time || 0;
+  const planKey = (profile?.plan || 'free').toLowerCase();
+  const planLabel = planKey ? `${planKey[0].toUpperCase()}${planKey.slice(1)}` : 'Free';
+  const planRunLimit = Number.isFinite(profile?.run_limit)
+    ? profile.run_limit
+    : null;
+  const plansWithCurrent = PLANS.map((plan) => ({ ...plan, current: plan.key === planKey }));
+  const expiresAt = profile?.plan_expires_at ? new Date(profile.plan_expires_at) : null;
+  const expiresText = expiresAt && !Number.isNaN(expiresAt.getTime())
+    ? expiresAt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })
+    : null;
+  const badgeStyles = {
+    free: { background: 'rgba(142,168,199,0.12)', border: '1px solid rgba(142,168,199,0.3)', color: '#8ea8c7' },
+    pro: { background: 'rgba(59,180,255,0.12)', border: '1px solid rgba(59,180,255,0.35)', color: '#3bb4ff' },
+    enterprise: { background: 'rgba(168,85,247,0.16)', border: '1px solid rgba(168,85,247,0.4)', color: '#a855f7' },
+  };
+  const badgeStyle = badgeStyles[planKey] || badgeStyles.free;
 
   async function startPlanCheckout(planKey) {
     if (planLoading[planKey]) return;
@@ -232,20 +244,20 @@ export default function BillingPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
             <div style={S.sectionTitle}>Current Plan</div>
-            <div style={S.sectionDesc}>You are on the Free plan.</div>
+            <div style={S.sectionDesc}>
+              {loading ? 'Loading plan...' : `You are on the ${planLabel} plan.`}
+            </div>
           </div>
           <div
             style={{
               padding: '6px 14px',
               borderRadius: 20,
-              background: 'var(--accent-dim)',
-              border: '1px solid rgba(59,180,255,0.22)',
               fontSize: 12,
               fontFamily: "'JetBrains Mono', monospace",
-              color: 'var(--accent)',
+              ...badgeStyle,
             }}
           >
-            Free
+            {planLabel}
           </div>
         </div>
 
@@ -253,9 +265,10 @@ export default function BillingPage() {
           <div style={{ color: 'rgba(142,168,199,0.5)', fontSize: 12 }}>Loading usage...</div>
         ) : (
           <>
-            <UsageMeter label="Break Runs This Month" used={monthRuns} limit={50} />
-            <UsageMeter label="Tests Run This Month" used={monthSamples} limit={1000} />
-            <UsageMeter label="Total Runs (All Time)" used={totalRuns} limit={null} />
+            <RunsUsageBar used={monthRuns} limit={planRunLimit} />
+            <div style={{ fontSize: 11, color: 'rgba(142,168,199,0.6)', fontFamily: "'JetBrains Mono', monospace" }}>
+              Total runs (all time): {totalRuns}
+            </div>
           </>
         )}
 
@@ -271,13 +284,56 @@ export default function BillingPage() {
         </div>
       </div>
 
+      {!loading && planKey === 'free' && (
+        <div style={{ ...S.card, border: '1px solid rgba(59,180,255,0.35)', background: 'rgba(59,180,255,0.06)' }}>
+          <div style={{ ...S.sectionTitle, marginBottom: 6 }}>Upgrade to Pro</div>
+          <div style={{ ...S.sectionDesc, marginBottom: 14 }}>
+            Unlock 500 monthly runs, longer test suites, and priority support.
+          </div>
+          <button
+            type="button"
+            onClick={() => startPlanCheckout('pro')}
+            disabled={!!planLoading.pro}
+            style={{
+              padding: '10px 14px',
+              borderRadius: 10,
+              background: 'var(--accent-dim)',
+              border: '1px solid rgba(59,180,255,0.35)',
+              color: 'var(--accent)',
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 12,
+              fontWeight: 900,
+              cursor: planLoading.pro ? 'not-allowed' : 'pointer',
+              opacity: planLoading.pro ? 0.7 : 1,
+              transition: 'all 0.12s',
+            }}
+          >
+            {planLoading.pro ? 'Redirecting...' : 'Upgrade to Pro'}
+          </button>
+          {!!planError.pro && (
+            <div style={{ marginTop: 8, fontSize: 11, color: '#ff7b91' }}>
+              {planError.pro}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!loading && planKey !== 'free' && (
+        <div style={S.card}>
+          <div style={S.sectionTitle}>{planLabel} Plan — active</div>
+          <div style={S.sectionDesc}>
+            {expiresText ? `Active until ${expiresText}.` : 'Active subscription on file.'}
+          </div>
+        </div>
+      )}
+
       <div style={S.card}>
         <div style={S.sectionTitle}>Plans</div>
         <div style={{ ...S.sectionDesc, marginBottom: 16 }}>
           Upgrade for more runs, longer test suites, and team features.
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {PLANS.map((plan) => (
+          {plansWithCurrent.map((plan) => (
             <PlanCard
               key={plan.key}
               plan={plan}
