@@ -110,17 +110,63 @@ export default function PublicReportPage() {
             </button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
-            <div className="card" style={{ padding: 18 }}>
-              <div className="card-label">Explore plans</div>
-              <div style={{ color: 'var(--mid)', marginBottom: 12 }}>
-                Compare Pro and Enterprise features, billing, and limits.
+            <div className="card" style={{
+              padding: 20,
+              background: 'linear-gradient(135deg, rgba(91,155,245,0.12), rgba(17,21,32,0.95))',
+              borderColor: 'rgba(91,155,245,0.35)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 8,
+                  display: 'grid', placeItems: 'center',
+                  background: 'rgba(91,155,245,0.18)', color: '#9cc4ff',
+                  fontFamily: 'var(--mono)', fontSize: 11,
+                }}>PLAN</div>
+                <div>
+                  <div className="card-label" style={{ marginBottom: 2 }}>Explore plans</div>
+                  <div style={{ fontSize: 12, color: 'var(--mid)' }}>
+                    Compare Pro and Enterprise features, billing, and limits.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gap: 6, marginBottom: 12, fontSize: 12, color: 'var(--mid)' }}>
+                <span>Unlimited runs and higher test caps</span>
+                <span>Team sharing and audit exports</span>
+                <span>Priority support and SLAs</span>
               </div>
               <a className="btn btn-ghost" href="/pricing">View Pricing</a>
             </div>
-            <div className="card" style={{ padding: 18, borderColor: 'rgba(38,240,185,0.4)', background: 'rgba(38,240,185,0.08)' }}>
-              <div className="card-label">Get Full Access</div>
-              <div style={{ color: 'var(--mid)', marginBottom: 12 }}>
-                Unlock unlimited runs, team sharing, and audit-ready exports.
+            <div className="card" style={{
+              padding: 20,
+              borderColor: 'rgba(38,240,185,0.4)',
+              background: 'linear-gradient(135deg, rgba(38,240,185,0.16), rgba(17,21,32,0.95))',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 8,
+                  display: 'grid', placeItems: 'center',
+                  background: 'rgba(38,240,185,0.18)', color: '#7df2c9',
+                  fontFamily: 'var(--mono)', fontSize: 11,
+                }}>PRO</div>
+                <div>
+                  <div className="card-label" style={{ marginBottom: 2 }}>Get Full Access</div>
+                  <div style={{ fontSize: 12, color: 'var(--mid)' }}>
+                    Unlock unlimited runs, team sharing, and audit-ready exports.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {['Unlimited runs', 'Team sharing', 'Audit PDFs'].map((chip) => (
+                  <span key={chip} style={{
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    border: '1px solid rgba(38,240,185,0.35)',
+                    background: 'rgba(38,240,185,0.12)',
+                    color: '#b8f8e5',
+                    fontSize: 10.5,
+                    fontFamily: 'var(--mono)',
+                  }}>{chip}</span>
+                ))}
               </div>
               <a className="btn btn-primary" href="/auth/signup">Get Full Access</a>
             </div>

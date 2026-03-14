@@ -46,6 +46,7 @@ export default function DemoPage() {
   const [runId, setRunId] = useState(ls.get('abl_demo_active_run_id'));
   const [activeType, setActiveType] = useState(currentTestType(0, 0));
   const [progressLive, setProgressLive] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [shareMsg, setShareMsg] = useState('');
   const [counters, setCounters] = useState({ models: 0, failures: 0, redFlags: 0 });
   const logRef = useRef(null);
@@ -109,18 +110,31 @@ export default function DemoPage() {
     const unsub = pollSub((ev) => {
       if (ev.mode !== 'demo') return;
       if (ev.type === 'done') {
-        setPolling(false);
-        setPct(100);
         ls.set('abl_demo_active_run_id', null);
         addLog(`Demo complete - ${ev.report.results?.length || ev.report.sample_count || 0} tests completed.`, 'ok');
-        setTimeout(() => setReport(ev.report), 200);
+        setFinishing(true);
+        setStage(3);
+        setPct(95);
+        setActiveType('Scoring responses');
+        setTimeout(() => {
+          setStage(4);
+          setPct(100);
+          setActiveType('Compiling report');
+        }, 600);
+        setTimeout(() => {
+          setPolling(false);
+          setFinishing(false);
+          setReport(ev.report);
+        }, 1100);
       } else if (ev.type === 'failed') {
         setPolling(false);
+        setFinishing(false);
         ls.set('abl_demo_active_run_id', null);
         setError(ev.error || 'Demo run failed.');
         addLog(`Failed: ${ev.error}`, 'err');
       } else if (ev.type === 'timeout') {
         setPolling(false);
+        setFinishing(false);
         ls.set('abl_demo_active_run_id', null);
         setError('Timed out after 7 minutes.');
         addLog('Timed out.', 'err');
@@ -145,7 +159,7 @@ export default function DemoPage() {
   }, [addLog]);
 
   useEffect(() => {
-    if (!polling || !runId) return undefined;
+    if (!polling || !runId || finishing) return undefined;
     let active = true;
     const tick = async () => {
       try {
@@ -168,7 +182,7 @@ export default function DemoPage() {
       active = false;
       clearInterval(timer);
     };
-  }, [polling, runId]);
+  }, [polling, runId, finishing]);
 
   const derivedMetrics = useMemo(() => {
     const breakdown = report?.metrics?.breakdown_by_type || report?.metrics?.breakdown || report?.metrics?.test_type_breakdown || {};
@@ -198,6 +212,7 @@ export default function DemoPage() {
     setPct(0);
     setActiveType(currentTestType(0, 0));
     setProgressLive(false);
+    setFinishing(false);
     setLoading(true);
 
     try {
@@ -297,13 +312,13 @@ export default function DemoPage() {
         )}
       </div>
 
-      {polling && (
+      {(polling || finishing) && (
         <LiveProgress
           stage={stage}
           pct={pct}
           logs={logs}
           logRef={logRef}
-          done={false}
+          done={finishing}
           reportId={runId}
           activeType={activeType}
         />
@@ -376,17 +391,63 @@ export default function DemoPage() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div className="card" style={{ padding: 18 }}>
-              <div className="card-label">Explore plans</div>
-              <div style={{ color: 'var(--mid)', marginBottom: 12 }}>
-                See Pro and Enterprise options, billing, and feature comparison.
+            <div className="card" style={{
+              padding: 20,
+              background: 'linear-gradient(135deg, rgba(91,155,245,0.12), rgba(17,21,32,0.95))',
+              borderColor: 'rgba(91,155,245,0.35)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 8,
+                  display: 'grid', placeItems: 'center',
+                  background: 'rgba(91,155,245,0.18)', color: '#9cc4ff',
+                  fontFamily: 'var(--mono)', fontSize: 11,
+                }}>PLAN</div>
+                <div>
+                  <div className="card-label" style={{ marginBottom: 2 }}>Explore plans</div>
+                  <div style={{ fontSize: 12, color: 'var(--mid)' }}>
+                    Compare Pro and Enterprise features, billing, and limits.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gap: 6, marginBottom: 12, fontSize: 12, color: 'var(--mid)' }}>
+                <span>Unlimited runs and higher test caps</span>
+                <span>Team sharing and audit exports</span>
+                <span>Priority support and SLAs</span>
               </div>
               <Link className="btn btn-ghost" to="/pricing">View Pricing</Link>
             </div>
-            <div className="card" style={{ padding: 18, borderColor: 'rgba(38,240,185,0.4)', background: 'rgba(38,240,185,0.08)' }}>
-              <div className="card-label">Get Full Access</div>
-              <div style={{ color: 'var(--mid)', marginBottom: 12 }}>
-                Unlock unlimited runs, agentic evals, and export-ready audit reports.
+            <div className="card" style={{
+              padding: 20,
+              borderColor: 'rgba(38,240,185,0.4)',
+              background: 'linear-gradient(135deg, rgba(38,240,185,0.16), rgba(17,21,32,0.95))',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 8,
+                  display: 'grid', placeItems: 'center',
+                  background: 'rgba(38,240,185,0.18)', color: '#7df2c9',
+                  fontFamily: 'var(--mono)', fontSize: 11,
+                }}>PRO</div>
+                <div>
+                  <div className="card-label" style={{ marginBottom: 2 }}>Get Full Access</div>
+                  <div style={{ fontSize: 12, color: 'var(--mid)' }}>
+                    Unlock unlimited runs, team sharing, and audit-ready exports.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {['Unlimited runs', 'Agentic evals', 'Audit PDFs'].map((chip) => (
+                  <span key={chip} style={{
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    border: '1px solid rgba(38,240,185,0.35)',
+                    background: 'rgba(38,240,185,0.12)',
+                    color: '#b8f8e5',
+                    fontSize: 10.5,
+                    fontFamily: 'var(--mono)',
+                  }}>{chip}</span>
+                ))}
               </div>
               <Link className="btn btn-primary" to="/auth/signup">Get Full Access</Link>
             </div>
