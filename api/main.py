@@ -35,6 +35,11 @@ _log = logging.getLogger(__name__)
 APP_VERSION = "1.0.0"
 STUCK_AFTER_MINUTES = int(os.getenv("STUCK_REPORT_MINUTES", "15"))
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "").strip()
+EXTRA_FRONTEND_ORIGINS = [
+    "https://ai-breaker-labs.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
 
 def _recover_stuck_reports() -> int:
@@ -129,7 +134,12 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-cors_origins = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN else ["*"]
+cors_origins = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN else []
+for origin in EXTRA_FRONTEND_ORIGINS:
+    if origin and origin not in cors_origins:
+        cors_origins.append(origin)
+if not cors_origins:
+    cors_origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
