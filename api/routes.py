@@ -942,7 +942,7 @@ def contact_sales(payload: ContactSalesRequest) -> dict[str, str]:
 def admin_list_leads(
     request: Request,
     contacted: str | None = None,
-    x_admin_key: Annotated[str | None, Header(None, alias="X-ADMIN-KEY")] = None,
+    x_admin_key: Annotated[str | None, Header(alias="X-ADMIN-KEY")] = None,
 ) -> list[dict[str, Any]]:
     expected = os.getenv("ADMIN_API_KEY", "").strip()
     if not expected or not x_admin_key or x_admin_key.strip() != expected:
