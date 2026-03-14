@@ -266,7 +266,7 @@ export default function DemoPage() {
           {running ? 'Running...' : 'Run Free Test'}
         </button>
         <div style={{ marginTop: 10, fontSize: 11, color: 'var(--mute)' }}>
-          Takes ~30 seconds · 20 adversarial tests · Free forever
+          Takes ~30 seconds - 20 adversarial tests - Free forever
         </div>
         {error && (
           <div style={{ marginTop: 10, color: 'var(--red)', fontSize: 11 }}>
@@ -290,7 +290,7 @@ export default function DemoPage() {
           </div>
           <div style={{ marginTop: 10, color: 'var(--hi)' }}>{statusMessage}</div>
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--mute)' }}>
-            Step {progress.steps_done || 0} of {progress.steps_total || 20} · {Math.round(progress.elapsed_seconds || 0)}s elapsed
+            Step {progress.steps_done || 0} of {progress.steps_total || 20} - {Math.round(progress.elapsed_seconds || 0)}s elapsed
           </div>
         </div>
       )}
