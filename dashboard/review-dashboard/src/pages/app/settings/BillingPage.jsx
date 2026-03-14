@@ -4,7 +4,7 @@
  * - Three plan cards (Free/Pro/Enterprise) with upgrade placeholder CTAs
  */
 import { useEffect, useMemo, useState } from 'react';
-import { api, apiFetch, API_BASE, getApiKey } from '../../../App.jsx';
+import { api, apiFetch } from '../../../App.jsx';
 
 const S = {
   card: {
@@ -168,7 +168,14 @@ function PlanCard({ plan, loading, error, onCheckout }) {
             e.currentTarget.style.background = `${plan.color}14`;
           }}
         >
-          {loading ? 'Redirecting to checkout...' : plan.cta}
+          {loading ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <div className="spinner" style={{ width: 12, height: 12 }} />
+              Redirecting...
+            </span>
+          ) : (
+            plan.cta
+          )}
         </button>
       )}
       {!!error && (
@@ -183,7 +190,6 @@ function PlanCard({ plan, loading, error, onCheckout }) {
 export default function BillingPage() {
   const [usage, setUsage] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [topupLoading, setTopupLoading] = useState(false);
   const [planLoading, setPlanLoading] = useState({});
   const [planError, setPlanError] = useState({});
 
@@ -217,27 +223,8 @@ export default function BillingPage() {
     }
   }
 
-  async function startTopupCheckout() {
-    if (topupLoading) return;
-    setTopupLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/create-checkout-session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-KEY': getApiKey(),
-        },
-        body: JSON.stringify({ plan: 'run_pack_100' }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.detail || `Request failed (${res.status})`);
-      if (!body?.url) throw new Error('Missing checkout URL');
-      window.location.href = body.url;
-    } catch (e) {
-      alert(e?.message || 'Failed to start checkout');
-      setTopupLoading(false);
-    }
-  }
+  const runPackLoading = !!planLoading.run_pack_100;
+  const runPackError = planError.run_pack_100;
 
   return (
     <div>
@@ -310,8 +297,8 @@ export default function BillingPage() {
 
         <button
           type="button"
-          onClick={startTopupCheckout}
-          disabled={topupLoading}
+          onClick={() => startPlanCheckout('run_pack_100')}
+          disabled={runPackLoading}
           style={{
             padding: '10px 14px',
             borderRadius: 10,
@@ -321,13 +308,25 @@ export default function BillingPage() {
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 12,
             fontWeight: 900,
-            cursor: topupLoading ? 'not-allowed' : 'pointer',
-            opacity: topupLoading ? 0.7 : 1,
+            cursor: runPackLoading ? 'not-allowed' : 'pointer',
+            opacity: runPackLoading ? 0.7 : 1,
             transition: 'all 0.12s',
           }}
         >
-          {topupLoading ? 'Creating checkout...' : 'Buy 100 extra runs — $10'}
+          {runPackLoading ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <div className="spinner" style={{ width: 12, height: 12 }} />
+              Redirecting...
+            </span>
+          ) : (
+            'Buy 100 extra runs — $10'
+          )}
         </button>
+        {!!runPackError && (
+          <div style={{ marginTop: 8, fontSize: 11, color: '#ff7b91' }}>
+            {runPackError}
+          </div>
+        )}
       </div>
 
       <div style={S.card}>

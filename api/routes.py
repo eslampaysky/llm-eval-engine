@@ -10,12 +10,14 @@ import uuid
 import time
 import hashlib
 import hmac
+from dataclasses import asdict
 from datetime import datetime, timezone
 from email.message import EmailMessage
 from html import escape
 from pathlib import Path
 from typing import Annotated, Any
 from cryptography.fernet import Fernet
+from core.agentic_evaluator import AgentEvaluator, AgentScenario
 from api.multi_judge import (
     build_judges_from_request,
     score_answers,
@@ -25,7 +27,7 @@ from api.multi_judge import (
 )
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from api.database import (
@@ -55,6 +57,7 @@ from api.database import (
     log_usage,
     register_client,
     save_human_reviews,
+    set_report_shared,
     set_report_share_token,
     upsert_demo_run,
 )
@@ -137,10 +140,102 @@ class ContactSalesRequest(BaseModel):
     use_case: str = Field(..., min_length=1, max_length=4000)
 
 
+class AgentScenarioRequest(BaseModel):
+    task: str = Field(..., min_length=1)
+    expected_tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    expected_outcome: str = Field(..., min_length=1)
+    trap_tools: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AgentEvalRequest(BaseModel):
+    agent_description: str = Field(..., min_length=1)
+    target: dict[str, Any] = Field(..., description="Target config for the agent model")
+    scenarios: list[AgentScenarioRequest] = Field(default_factory=list)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _extract_json_payload(raw_text: str) -> dict[str, Any]:
+    """
+    Best-effort JSON extraction from model output.
+    """
+    if not raw_text:
+        return {}
+    text = raw_text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return {}
+        try:
+            return json.loads(text[start:end + 1])
+        except json.JSONDecodeError:
+            return {}
+
+
+def _build_agent_tool_definitions(
+    scenarios: list["AgentScenarioRequest"],
+) -> list[dict[str, Any]]:
+    """
+    Build tool definitions from expected + trap tool declarations.
+    """
+    tools: dict[str, dict[str, Any]] = {}
+    for scenario in scenarios:
+        for call in (scenario.expected_tool_calls or []):
+            name = str(call.get("name", "")).strip()
+            if not name:
+                continue
+            required_params = call.get("required_params") or {}
+            properties = {k: {"type": "string"} for k in required_params.keys()}
+            tools.setdefault(
+                name,
+                {
+                    "name": name,
+                    "description": "Expected tool used by the agent.",
+                    "parameters": {"type": "object", "properties": properties},
+                },
+            )
+        for trap in (scenario.trap_tools or []):
+            name = str(trap.get("name", "")).strip()
+            if not name:
+                continue
+            tools.setdefault(
+                name,
+                {
+                    "name": name,
+                    "description": "Trap tool that should not be called.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            )
+    return list(tools.values())
+
+
+def _build_agent_prompt(
+    agent_description: str,
+    scenario: AgentScenario | AgentScenarioRequest,
+    tool_definitions: list[dict[str, Any]],
+) -> str:
+    """
+    Build a prompt for a tool-using agent to execute the scenario task.
+    """
+    tools_json = json.dumps(tool_definitions, ensure_ascii=False)
+    return (
+        "You are an agent in AI Breaker Lab.\n"
+        f"Agent description: {agent_description}\n"
+        f"Task: {scenario.task}\n\n"
+        "Available tools (JSON schema):\n"
+        f"{tools_json}\n\n"
+        "If you need tools, return JSON only in this format:\n"
+        '{"tool_calls":[{"name":"tool_name","params":{"key":"value"}}],'
+        '"final":"short final outcome"}\n'
+        "If no tools are needed, return JSON with empty tool_calls and a final outcome."
+    )
 
 
 def _paddle_price_id_for_plan(plan: str) -> str | None:
@@ -193,15 +288,15 @@ def _encrypt_target_api_key(api_key: str | None) -> str | None:
     return fernet.encrypt(api_key.encode("utf-8")).decode("utf-8")
 
 
-def _public_report_url(share_token: str) -> str:
-    # Public report links are served by the API route /r/{share_token}.
+def _public_report_url(report_id: str) -> str:
+    # Public report links are served by /report/{report_id}.
     base = (
         os.getenv("API_BASE_URL", "").strip().rstrip("/")
         or os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
     )
     if base:
-        return f"{base}/r/{share_token}"
-    return f"/r/{share_token}"
+        return f"{base}/report/{report_id}"
+    return f"/report/{report_id}"
 
 
 def _ensure_share_token(row: dict[str, Any]) -> str:
@@ -227,7 +322,7 @@ def _send_email_notification(to_email: str, report: dict[str, Any]) -> None:
     metrics = report.get("metrics") or {}
     score = metrics.get("average_score", 0)
     failed = len(metrics.get("failed_rows", []))
-    public_url = _public_report_url(str(report["share_token"]))
+    public_url = _public_report_url(str(report["report_id"]))
 
     msg = EmailMessage()
     msg["Subject"] = f"AI Breaker Lab report {report['report_id']}"
@@ -1042,6 +1137,69 @@ async def evaluate(
         raise HTTPException(status_code=500, detail=f"Evaluation failed: {exc}")
 
 
+@router.post("/evaluate/agent")
+@limiter.limit(LIMIT_EVALUATE)
+def evaluate_agent(
+    request: Request,
+    payload: AgentEvalRequest,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    """
+    Evaluate an agent across multiple scenarios using a fake tool environment.
+    """
+    if not payload.scenarios:
+        raise HTTPException(status_code=422, detail="scenarios must be a non-empty list")
+
+    tool_definitions = _build_agent_tool_definitions(payload.scenarios)
+    evaluator = AgentEvaluator(tool_definitions)
+
+    try:
+        adapter = AdapterFactory.from_config(payload.target)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid target config: {exc}") from exc
+
+    def _agent_callable(env, scenario: AgentScenario) -> dict[str, Any]:
+        prompt = _build_agent_prompt(payload.agent_description, scenario, tool_definitions)
+        raw = adapter.call(prompt)
+        parsed = _extract_json_payload(str(raw))
+        tool_calls = parsed.get("tool_calls") or []
+        if isinstance(tool_calls, list):
+            for call in tool_calls:
+                name = str(call.get("name", "")).strip()
+                params = call.get("params")
+                if not isinstance(params, dict):
+                    params = {}
+                if name:
+                    env.call(name, params)
+        outcome = str(parsed.get("final") or parsed.get("outcome") or "").strip()
+        if not outcome:
+            outcome = str(raw).strip()
+        return {"outcome": outcome}
+
+    results: list[dict[str, Any]] = []
+    for scenario_req in payload.scenarios:
+        scenario = AgentScenario(
+            task=scenario_req.task,
+            expected_tool_calls=scenario_req.expected_tool_calls,
+            expected_outcome=scenario_req.expected_outcome,
+            trap_tools=scenario_req.trap_tools,
+        )
+        eval_result = evaluator.evaluate(_agent_callable, scenario)
+        results.append(asdict(eval_result))
+
+    overall_score = (
+        round(sum(r["overall_score"] for r in results) / len(results), 2)
+        if results
+        else 0.0
+    )
+
+    return {
+        "agent_description": payload.agent_description,
+        "scenario_results": results,
+        "overall_score": overall_score,
+    }
+
+
 @router.post("/break")
 @limiter.limit(LIMIT_BREAK)
 async def break_model(
@@ -1188,7 +1346,8 @@ def list_reports(
     for r in rows:
         share_token = _ensure_share_token(r)
         r["report_url"] = f"/report/{r['report_id']}"
-        r["public_share_url"] = _public_report_url(share_token)
+        r["public_share_url"] = _public_report_url(r["report_id"])
+        r["shared"] = bool(r.get("shared", True))
     return rows
 
 
@@ -1197,18 +1356,21 @@ def list_reports(
 def get_report(
     request: Request,
     report_id: str,
-    auth_ctx: dict[str, Any] = Depends(validate_api_key),
 ) -> dict[str, Any]:
     row = get_report_row(report_id)
     if not row:
         raise HTTPException(status_code=404, detail="Report not found")
-    if row["client_name"] != auth_ctx.get("client_name"):
-        raise HTTPException(status_code=403, detail="Not allowed to access this report")
+    if not bool(row.get("shared", True)):
+        raise HTTPException(status_code=403, detail="Report is not shared")
+    if row["status"] != "done":
+        status = "processing" if row["status"] == "processing" else row["status"]
+        return JSONResponse(status_code=202, content={"status": status})
     share_token = _ensure_share_token(row)
     retryable = bool(row["error"] and "rate limit" in str(row["error"]).lower())
     return {
         "report_id":       row["report_id"],
         "share_token":     share_token,
+        "shared":          bool(row.get("shared", True)),
         "status":          row["status"],
         "judge_model":     row["judge_model"],
         "sample_count":    row["sample_count"],
@@ -1220,10 +1382,55 @@ def get_report(
         "results":         json.loads(row["results_json"]) if row["results_json"] else [],
         "metrics":         json.loads(row["metrics_json"]) if row["metrics_json"] else {},
         "report_url":      f"/report/{row['report_id']}",
-        "public_share_url": _public_report_url(share_token),
+        "public_share_url": _public_report_url(row["report_id"]),
         "html_report_url": f"/report/{row['report_id']}/html" if row["html_path"] else None,
         "error":           row["error"],
         "retryable":       retryable,
+    }
+
+
+@router.post("/report/{report_id}/share")
+@limiter.limit(LIMIT_READ)
+def share_report(
+    request: Request,
+    report_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    row = get_report_row(report_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if row["client_name"] != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=403, detail="Not allowed to share this report")
+
+    if not set_report_shared(report_id, auth_ctx.get("client_name"), True):
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    return {
+        "report_id": report_id,
+        "shared": True,
+        "public_url": _public_report_url(report_id),
+    }
+
+
+@router.post("/report/{report_id}/unshare")
+@limiter.limit(LIMIT_READ)
+def unshare_report(
+    request: Request,
+    report_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    row = get_report_row(report_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if row["client_name"] != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=403, detail="Not allowed to unshare this report")
+
+    if not set_report_shared(report_id, auth_ctx.get("client_name"), False):
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    return {
+        "report_id": report_id,
+        "shared": False,
     }
 
 
@@ -1318,6 +1525,7 @@ def get_demo_report(report_id: str) -> dict[str, Any]:
     return {
         "report_id":       row["report_id"],
         "share_token":     share_token,
+        "shared":          bool(row.get("shared", True)),
         "status":          row["status"],
         "judge_model":     row["judge_model"],
         "sample_count":    row["sample_count"],
@@ -1328,7 +1536,7 @@ def get_demo_report(report_id: str) -> dict[str, Any]:
         "results":         json.loads(row["results_json"]) if row["results_json"] else [],
         "metrics":         json.loads(row["metrics_json"]) if row["metrics_json"] else {},
         "report_url":      f"/report/{row['report_id']}",
-        "public_share_url": _public_report_url(share_token),
+        "public_share_url": _public_report_url(row["report_id"]),
         "html_report_url": f"/report/{row['report_id']}/html" if row["html_path"] else None,
         "error":           row["error"],
         "retryable":       retryable,
@@ -1553,13 +1761,14 @@ def list_stale_reports(
 def get_report_html(
     request: Request,
     report_id: str,
-    auth_ctx: dict[str, Any] = Depends(validate_api_key),
 ):
     row = get_report_row(report_id)
     if not row:
         raise HTTPException(status_code=404, detail="Report not found")
-    if row["client_name"] != auth_ctx.get("client_name"):
-        raise HTTPException(status_code=403, detail="Not allowed")
+    if not bool(row.get("shared", True)):
+        raise HTTPException(status_code=403, detail="Report is not shared")
+    if row["status"] != "done":
+        raise HTTPException(status_code=404, detail="HTML report not available")
 
     html_content = row.get("html_content")
 
@@ -1622,6 +1831,8 @@ def public_report(request: Request, share_token: str):
     row = get_report_row_by_share_token(share_token)
     if not row or row["status"] != "done":
         raise HTTPException(status_code=404, detail="Report not found")
+    if not bool(row.get("shared", True)):
+        raise HTTPException(status_code=403, detail="Report is not shared")
     return HTMLResponse(content=build_public_html(row))
 
 

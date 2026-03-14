@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ReportPage, api } from '../../App.jsx';
+import { ReportPage, SHARE_BASE, api } from '../../App.jsx';
 import { useAppShell } from '../../context/AppShellContext.jsx';
 import RadarChart from '../../components/RadarChart.jsx';
 
@@ -15,6 +15,9 @@ export default function RunDetailPage() {
   const { persona, report, setReport } = useAppShell();
   const [loading, setLoading] = useState(!report || report.report_id !== runId);
   const [error, setError] = useState('');
+  const [shareCopied, setShareCopied] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareError, setShareError] = useState('');
 
   useEffect(() => {
     if (report?.report_id === runId) {
@@ -36,6 +39,7 @@ export default function RunDetailPage() {
   if (error) return <div className="page"><div className="err-box">⚠ {error}</div></div>;
   if (!report) return <div className="page"><div className="empty">Run not found.</div></div>;
 
+  const publicUrl = `${SHARE_BASE}/report/${report.report_id}`;
   const results = Array.isArray(report.results) ? report.results : [];
 
   const avg = (key) => {
@@ -60,5 +64,44 @@ export default function RunDetailPage() {
     toxicity: clamp01(report.metrics?.toxicity ?? 0),
   };
 
-  return <ReportPage report={report} persona={persona} overviewExtra={<RadarChart summary={summary} />} />;
+  const shareReport = async () => {
+    if (!report?.report_id || shareBusy) return;
+    setShareBusy(true);
+    setShareError('');
+    try {
+      const resp = await api.shareReport(report.report_id);
+      const url = resp?.public_url || publicUrl;
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        window.prompt('Copy report URL', url);
+      }
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 1500);
+    } catch (err) {
+      setShareError(err?.message || 'Failed to share report.');
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
+  return (
+    <>
+      {report.status === 'done' && (
+        <div className="page fade-in" style={{ paddingBottom: 0 }}>
+          <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            <div>
+              <div className="card-label">Public report link</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--mid)' }}>{publicUrl}</div>
+              {shareError && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 6 }}>{shareError}</div>}
+            </div>
+            <button className="btn btn-primary" onClick={shareReport} disabled={shareBusy}>
+              {shareCopied ? 'Copied' : shareBusy ? 'Sharing...' : 'Share Report'}
+            </button>
+          </div>
+        </div>
+      )}
+      <ReportPage report={report} persona={persona} overviewExtra={<RadarChart summary={summary} />} />
+    </>
+  );
 }

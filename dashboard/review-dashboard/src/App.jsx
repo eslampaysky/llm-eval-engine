@@ -14,7 +14,7 @@
  *
  * New features:
  *   1. Comparison View — two runs side-by-side, diff per test-type
- *   2. Shareable Report URL — /r/{token} (read-only preview)
+ *   2. Shareable Report URL — /report/{id} (read-only preview)
  *   3. Live Progress View — stage tracker + real progress bar + log stream
  *   4. Notifications — Slack webhook / email config (stored in localStorage)
  *
@@ -116,6 +116,8 @@ export const api = {
   deleteTarget: (id)  => apiFetch(`/targets/${id}`, { method: 'DELETE' }),
   getReport:    (id)  => apiFetch(`/report/${id}`),
   getDemoReport:(id)  => apiFetch(`/demo/report/${id}`, {}, false),
+  shareReport:  (id)  => apiFetch(`/report/${id}/share`, { method: 'POST' }),
+  unshareReport:(id)  => apiFetch(`/report/${id}/unshare`, { method: 'POST' }),
   cancelReport: (id)  => apiFetch(`/report/${id}/cancel`, { method: 'POST' }),
   cancelDemoReport: (id) => apiFetch(`/demo/report/${id}/cancel`, { method: 'POST' }, false),
   getReports:   ()    => apiFetch('/reports'),
@@ -352,8 +354,7 @@ export async function fireNotifications(report) {
   }
   const sc  = overallScore(report);
   const g   = grade(sc);
-  const shareToken = report.share_token || report.report_id;
-  const publicUrl = `${SHARE_BASE}/r/${shareToken}`;
+  const publicUrl = `${SHARE_BASE}/report/${report.report_id}`;
 
   if (cfg.slack_enabled && cfg.slack_url) {
     const msg = {
@@ -2017,7 +2018,7 @@ export function ReportPage({ report, persona, overviewExtra = null }) {
 export function ShareTab({ reportId, shareToken }) {
   const [copied, setCopied] = useState(false);
   const shareUrl = `${API_BASE}/report/${reportId}/html`;
-  const publicUrl = `${SHARE_BASE}/r/${shareToken || reportId}`;
+  const publicUrl = `${SHARE_BASE}/report/${reportId}`;
 
   function copy(url) {
     navigator.clipboard?.writeText(url);
@@ -2531,7 +2532,7 @@ export function NotifsPage() {
                 <span style={{ color: 'var(--accent)' }}>AI Breaker Lab</span><br />
                 ✓ Run complete: <span style={{ color: 'var(--hi)' }}>gpt-4o-mini</span><br />
                 Score: <span style={{ color: 'var(--green)' }}>8.2/10 (A)</span> · 3 failures<br />
-                <span style={{ color: 'var(--blue)' }}>{SHARE_BASE}/r/demoShareToken</span>
+                <span style={{ color: 'var(--blue)' }}>{SHARE_BASE}/report/demoShareToken</span>
               </div>
             </div>
           </>

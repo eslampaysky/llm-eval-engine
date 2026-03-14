@@ -7,6 +7,7 @@ import DemoPage from '../pages/public/DemoPage.jsx';
 import DocsPage from '../pages/public/DocsPage.jsx';
 import PricingPage from '../pages/public/PricingPage.jsx';
 import BillingSuccessPage from '../pages/public/BillingSuccessPage.jsx';
+import PublicReportPage from '../pages/public/PublicReportPage.jsx';
 import LoginPage from '../pages/auth/LoginPage.jsx';
 import SignupPage from '../pages/auth/SignupPage.jsx';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage.jsx';
@@ -34,6 +35,7 @@ const router = createBrowserRouter([
       { path: 'docs', element: <DocsPage /> },
       { path: 'pricing', element: <PricingPage /> },
       { path: 'billing/success', element: <BillingSuccessPage /> },
+      { path: 'report/:reportId', element: <PublicReportPage /> },
       { path: 'auth/login', element: <LoginPage /> },
       { path: 'auth/signup', element: <SignupPage /> },
       { path: 'auth/forgot-password', element: <ForgotPasswordPage /> },

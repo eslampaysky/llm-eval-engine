@@ -195,6 +195,7 @@ def init_db():
                     client_id INTEGER,
                     client_name TEXT,
                     share_token TEXT UNIQUE,
+                    shared BOOLEAN NOT NULL DEFAULT TRUE,
                     status TEXT NOT NULL,
                     judge_model TEXT,
                     sample_count INTEGER NOT NULL,
@@ -241,6 +242,14 @@ def init_db():
                 )
             """)
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    token TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    used BOOLEAN NOT NULL DEFAULT FALSE
+                )
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS human_reviews (
                     id SERIAL PRIMARY KEY,
                     report_id TEXT NOT NULL,
@@ -281,6 +290,7 @@ def init_db():
             cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date         ON demo_runs(run_date)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_targets_client         ON targets(client_name)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email           ON users(email)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_reset_tokens_user_id  ON password_reset_tokens(user_id)")
             cur.execute("""
                 SELECT column_name
                 FROM information_schema.columns
@@ -289,6 +299,8 @@ def init_db():
             existing = {row["column_name"] for row in cur.fetchall()}
             if "share_token" not in existing:
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN share_token TEXT UNIQUE")
+            if "shared" not in existing:
+                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN shared BOOLEAN NOT NULL DEFAULT TRUE")
             if "html_content" not in existing:
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
             if "target_id" not in existing:
@@ -341,6 +353,7 @@ def init_db():
                     client_id INTEGER,
                     client_name TEXT,
                     share_token TEXT UNIQUE,
+                    shared INTEGER NOT NULL DEFAULT 1,
                     status TEXT NOT NULL,
                     judge_model TEXT,
                     sample_count INTEGER NOT NULL,
@@ -387,6 +400,14 @@ def init_db():
                 )
             """)
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    token TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    used INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS human_reviews (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     report_id TEXT NOT NULL,
@@ -429,6 +450,8 @@ def init_db():
             existing = {row[1] for row in cur.fetchall()}
             if "share_token" not in existing:
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN share_token TEXT")
+            if "shared" not in existing:
+                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN shared INTEGER NOT NULL DEFAULT 1")
             if "html_content" not in existing:
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
             if "target_id" not in existing:
@@ -439,6 +462,7 @@ def init_db():
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_targets_client ON targets(client_name)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_reset_tokens_user_id ON password_reset_tokens(user_id)")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -624,19 +648,19 @@ def get_latest_regression_baseline(client_name, dataset_id, current_model_versio
 # ── Evaluation reports ────────────────────────────────────────────────────────
 
 def insert_report(*, report_id, client_id, client_name, share_token, status, judge_model,
-                  sample_count, dataset_id, model_version, target_id=None):
+                  sample_count, dataset_id, model_version, target_id=None, shared: bool = True):
     now = _utc_now()
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             f"""
             INSERT INTO evaluation_reports(
-                report_id, client_id, client_name, share_token, status, judge_model,
+                report_id, client_id, client_name, share_token, shared, status, judge_model,
                 sample_count, dataset_id, model_version, target_id, created_at, updated_at
-            ) VALUES ({_ph(12)})
+            ) VALUES ({_ph(13)})
             """,
-            (report_id, client_id, client_name, share_token, status, judge_model,
-             sample_count, dataset_id, model_version, target_id, now, now),
+            (report_id, client_id, client_name, share_token, int(bool(shared)) if not _USE_PG else bool(shared),
+             status, judge_model, sample_count, dataset_id, model_version, target_id, now, now),
         )
 
 
@@ -762,12 +786,28 @@ def set_report_share_token(report_id: str, share_token: str) -> None:
         )
 
 
+def set_report_shared(report_id: str, client_name: str, shared: bool) -> bool:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if _USE_PG:
+            cur.execute(
+                "UPDATE evaluation_reports SET shared=%s WHERE report_id=%s AND client_name=%s",
+                (bool(shared), report_id, client_name),
+            )
+        else:
+            cur.execute(
+                "UPDATE evaluation_reports SET shared=? WHERE report_id=? AND client_name=?",
+                (1 if shared else 0, report_id, client_name),
+            )
+        return (cur.rowcount or 0) > 0
+
+
 def list_reports_for_client(client_name: str) -> list[dict]:
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             f"""
-            SELECT report_id, share_token, status, judge_model, sample_count, dataset_id,
+            SELECT report_id, share_token, shared, status, judge_model, sample_count, dataset_id,
                    model_version, target_id, created_at, updated_at, metrics_json, error
             FROM evaluation_reports
             WHERE client_name={_P}
@@ -1247,5 +1287,50 @@ def deactivate_user(user_id: str) -> bool:
             cur.execute(
                 "UPDATE users SET is_active=0, updated_at=? WHERE user_id=?",
                 (now, user_id),
+            )
+        return (cur.rowcount or 0) > 0
+
+
+def create_password_reset_token(user_id: str, token: str) -> None:
+    """Store a password reset token for a user."""
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if _USE_PG:
+            cur.execute(
+                "INSERT INTO password_reset_tokens (token, user_id, created_at, used) VALUES (%s, %s, %s, FALSE)",
+                (token, user_id, now),
+            )
+        else:
+            cur.execute(
+                "INSERT INTO password_reset_tokens (token, user_id, created_at, used) VALUES (?, ?, ?, 0)",
+                (token, user_id, now),
+            )
+
+
+def get_password_reset_token(token: str) -> dict | None:
+    """Fetch a password reset token row."""
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT token, user_id, created_at, used FROM password_reset_tokens WHERE token = {_P}",
+            (token,),
+        )
+        return _row_to_dict(cur.fetchone())
+
+
+def mark_password_reset_token_used(token: str) -> bool:
+    """Mark a password reset token as used."""
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        if _USE_PG:
+            cur.execute(
+                "UPDATE password_reset_tokens SET used=TRUE WHERE token=%s",
+                (token,),
+            )
+        else:
+            cur.execute(
+                "UPDATE password_reset_tokens SET used=1 WHERE token=?",
+                (token,),
             )
         return (cur.rowcount or 0) > 0

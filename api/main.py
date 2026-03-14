@@ -34,6 +34,7 @@ _log = logging.getLogger(__name__)
 
 APP_VERSION = "1.0.0"
 STUCK_AFTER_MINUTES = int(os.getenv("STUCK_REPORT_MINUTES", "15"))
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "").strip()
 
 
 def _recover_stuck_reports() -> int:
@@ -128,12 +129,13 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
+cors_origins = [FRONTEND_ORIGIN] if FRONTEND_ORIGIN else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
 
 # ── slowapi middleware — must come AFTER CORSMiddleware ───────────────────────
