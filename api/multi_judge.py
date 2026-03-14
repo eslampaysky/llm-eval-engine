@@ -290,6 +290,7 @@ def score_answers(
     is_demo: bool = False,
     call_delay_seconds: float = 5.0,
     should_cancel: Any | None = None,
+    progress_cb: Any | None = None,
 ) -> list[dict]:
     """
     Score all tests using the tiered judge strategy.
@@ -383,6 +384,11 @@ def score_answers(
                 **scored,
             }
         )
+        if progress_cb:
+            try:
+                progress_cb(i + 1, len(tests), test_type)
+            except Exception:
+                pass
         if should_cancel and should_cancel():
             break
 

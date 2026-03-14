@@ -66,7 +66,7 @@ export default function RunDetailPage() {
   if (error) return <div className="page"><div className="err-box">⚠ {error}</div></div>;
   if (!report) return <div className="page"><div className="empty">Run not found.</div></div>;
 
-  const publicUrl = `${SHARE_BASE}/report/${report.report_id}`;
+  const publicUrl = `${typeof window !== 'undefined' ? window.location.origin : SHARE_BASE}/report/${report.report_id}`;
   const results = Array.isArray(report.results) ? report.results : [];
 
   const avg = (key) => {
@@ -96,8 +96,8 @@ export default function RunDetailPage() {
     setShareBusy(true);
     setShareError('');
     try {
-      const resp = await api.shareReport(report.report_id);
-      const url = resp?.public_url || publicUrl;
+      await api.shareReport(report.report_id);
+      const url = publicUrl;
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
       } else {

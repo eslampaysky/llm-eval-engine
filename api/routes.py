@@ -1361,14 +1361,29 @@ def _process_demo_break_job(report_id, model_name, description, num_tests, groq_
             row = get_report_row(report_id)
             return bool(row and row.get("status") == "canceled")
 
+        total = len(tests)
+        _init_progress(report_id, total)
+        _update_progress(report_id, 0, total, f"Queued (0/{total})")
+
+        def _progress_cb(done, total_count, test_type):
+            label = str(test_type or "test").title()
+            _update_progress(
+                report_id,
+                done,
+                total_count,
+                f"{label} test ({done}/{total_count})",
+            )
+
         results = score_answers(
             tests,
             adapter,
             judges,
             is_demo=True,
             should_cancel=_is_canceled,
+            progress_cb=_progress_cb,
         )
         if _is_canceled():
+            _finish_progress(report_id, "canceled")
             return
 
         agreement_rate = compute_agreement_rate(results)
@@ -1390,11 +1405,13 @@ def _process_demo_break_job(report_id, model_name, description, num_tests, groq_
         )
         _finalize_report_success(report_id=report_id, results=results,
                                   metrics=metrics, html_path=html_path)
+        _finish_progress(report_id, "done")
     except Exception as exc:
         error_message = str(exc)
         if "rate limit" in error_message.lower() or "429" in error_message:
             error_message = DEMO_RATE_LIMIT_ERROR
         _finalize_report_failure(report_id=report_id, error_message=error_message)
+        _finish_progress(report_id, "failed")
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 

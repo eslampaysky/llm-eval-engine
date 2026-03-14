@@ -33,7 +33,7 @@ import JudgeConfigPanel from './components/JudgeConfigPanel';
 export const API_BASE = import.meta.env.VITE_API_BASE_URL
   || 'https://llm-eval-engine-production.up.railway.app';
 export const SHARE_BASE = import.meta.env.VITE_SHARE_BASE_URL
-  || 'https://llm-eval-engine-production.up.railway.app';
+  || (typeof window !== 'undefined' ? window.location.origin : 'https://llm-eval-engine-production.up.railway.app');
 
 const STAGES = [
   { id: 'init',     label: 'Initialising',          icon: '◈', detail: 'Connecting to target model' },
@@ -2018,7 +2018,7 @@ export function ReportPage({ report, persona, overviewExtra = null }) {
 export function ShareTab({ reportId, shareToken }) {
   const [copied, setCopied] = useState(false);
   const shareUrl = `${API_BASE}/report/${reportId}/html`;
-  const publicUrl = `${SHARE_BASE}/report/${reportId}`;
+  const publicUrl = `${typeof window !== 'undefined' ? window.location.origin : SHARE_BASE}/report/${reportId}`;
 
   function copy(url) {
     navigator.clipboard?.writeText(url);

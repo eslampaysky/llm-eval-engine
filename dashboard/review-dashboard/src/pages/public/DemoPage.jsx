@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  API_BASE,
   api,
   currentTestType,
   grade,
@@ -24,6 +25,15 @@ function formatNumber(num) {
   return Number(num || 0).toLocaleString();
 }
 
+function stageFromProgress(pct) {
+  const safe = Math.max(0, Math.min(100, Number(pct) || 0));
+  if (safe < 10) return 0;
+  if (safe < 30) return 1;
+  if (safe < 70) return 2;
+  if (safe < 90) return 3;
+  return 4;
+}
+
 export default function DemoPage() {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,6 +45,7 @@ export default function DemoPage() {
   const [logs, setLogs] = useState([]);
   const [runId, setRunId] = useState(ls.get('abl_demo_active_run_id'));
   const [activeType, setActiveType] = useState(currentTestType(0, 0));
+  const [progressLive, setProgressLive] = useState(false);
   const [shareMsg, setShareMsg] = useState('');
   const [counters, setCounters] = useState({ models: 0, failures: 0, redFlags: 0 });
   const logRef = useRef(null);
@@ -116,11 +127,13 @@ export default function DemoPage() {
       } else if (ev.type === 'error') {
         addLog(`Poll error: ${ev.error}`, 'err');
       } else if (ev.type === 'tick') {
-        setStage(ev.stage ?? 0);
-        setPct(ev.pct ?? 0);
-        setActiveType(currentTestType(ev.stage ?? 0, ev.pct ?? 0));
-        if ((ev.attempts || 0) % 5 === 0) {
-          addLog(`Stage update: ${ev.attempts * 3}s elapsed.`, 'info');
+        if (!progressLive) {
+          setStage(ev.stage ?? 0);
+          setPct(ev.pct ?? 0);
+          setActiveType(currentTestType(ev.stage ?? 0, ev.pct ?? 0));
+          if ((ev.attempts || 0) % 5 === 0) {
+            addLog(`Stage update: ${ev.attempts * 3}s elapsed.`, 'info');
+          }
         }
       }
     });
@@ -130,6 +143,32 @@ export default function DemoPage() {
       unsub();
     };
   }, [addLog]);
+
+  useEffect(() => {
+    if (!polling || !runId) return undefined;
+    let active = true;
+    const tick = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/report/${encodeURIComponent(runId)}/progress`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!active) return;
+        const pctValue = Number(data?.progress_pct ?? 0);
+        setProgressLive(true);
+        setPct(pctValue);
+        setStage(stageFromProgress(pctValue));
+        if (data?.current_step) {
+          setActiveType(data.current_step);
+        }
+      } catch {}
+    };
+    tick();
+    const timer = setInterval(tick, 2000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [polling, runId]);
 
   const derivedMetrics = useMemo(() => {
     const breakdown = report?.metrics?.breakdown_by_type || report?.metrics?.breakdown || report?.metrics?.test_type_breakdown || {};
@@ -158,6 +197,7 @@ export default function DemoPage() {
     setStage(0);
     setPct(0);
     setActiveType(currentTestType(0, 0));
+    setProgressLive(false);
     setLoading(true);
 
     try {
@@ -270,60 +310,88 @@ export default function DemoPage() {
       )}
 
       {!polling && report && (
-        <div className="card" style={{ padding: 26 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 260px)', gap: 24, alignItems: 'center' }}>
-            <div>
-              <div className="card-label">Your AI readiness score</div>
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 12 }}>
-                <div style={{
-                  width: 120,
-                  height: 120,
-                  borderRadius: '50%',
-                  border: '2px solid var(--line2)',
-                  display: 'grid',
-                  placeItems: 'center',
-                  fontSize: 36,
-                  fontFamily: 'var(--display)',
-                  color: 'var(--hi)',
-                  background: 'var(--bg2)',
-                }}>
-                  {letter}
+        <>
+          <div
+            className="card"
+            style={{
+              padding: 28,
+              background: 'linear-gradient(135deg, rgba(59,180,255,0.12), rgba(38,240,185,0.08))',
+              borderColor: 'rgba(59,180,255,0.25)',
+              marginBottom: 18,
+            }}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 280px)', gap: 24, alignItems: 'center' }}>
+              <div>
+                <div className="card-label">Your AI readiness score</div>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 14, alignItems: 'center' }}>
+                  <div style={{
+                    width: 128,
+                    height: 128,
+                    borderRadius: '50%',
+                    border: '2px solid rgba(59,180,255,0.45)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontSize: 40,
+                    fontFamily: 'var(--display)',
+                    color: 'var(--hi)',
+                    background: 'radial-gradient(circle at 30% 30%, rgba(59,180,255,0.22), rgba(17,21,32,0.9))',
+                    boxShadow: '0 0 0 4px rgba(59,180,255,0.1)',
+                  }}>
+                    {letter}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 30, fontFamily: 'var(--display)' }}>{score.toFixed(1)} / 10</div>
+                    <div style={{ fontSize: 12, color: 'var(--mid)' }}>Overall audit score</div>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: 28, fontFamily: 'var(--display)' }}>{score.toFixed(1)} / 10</div>
-                  <div style={{ fontSize: 12, color: 'var(--mid)' }}>Overall audit score</div>
+              </div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                <div className="card" style={{ margin: 0, padding: 12, background: 'rgba(17,21,32,0.9)', borderColor: 'rgba(59,180,255,0.2)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--mute)' }}>Hallucinations</div>
+                  <div style={{ fontSize: 20, color: 'var(--hi)' }}>
+                    {derivedMetrics.hallucinations != null ? derivedMetrics.hallucinations : '--'}
+                  </div>
+                </div>
+                <div className="card" style={{ margin: 0, padding: 12, background: 'rgba(17,21,32,0.9)', borderColor: 'rgba(255,92,114,0.25)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--mute)' }}>Failures</div>
+                  <div style={{ fontSize: 20, color: 'var(--hi)' }}>
+                    {derivedMetrics.failures != null ? derivedMetrics.failures : '--'}
+                  </div>
+                </div>
+                <div className="card" style={{ margin: 0, padding: 12, background: 'rgba(17,21,32,0.9)', borderColor: 'rgba(38,240,185,0.25)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--mute)' }}>Adversarial Score</div>
+                  <div style={{ fontSize: 20, color: 'var(--hi)' }}>
+                    {derivedMetrics.adversarialScore != null ? Number(derivedMetrics.adversarialScore).toFixed(1) : '--'}
+                  </div>
                 </div>
               </div>
             </div>
-            <div style={{ display: 'grid', gap: 10 }}>
-              <div className="card" style={{ margin: 0, padding: 12, background: 'var(--bg3)' }}>
-                <div style={{ fontSize: 11, color: 'var(--mute)' }}>Hallucinations</div>
-                <div style={{ fontSize: 20, color: 'var(--hi)' }}>
-                  {derivedMetrics.hallucinations != null ? derivedMetrics.hallucinations : '--'}
-                </div>
-              </div>
-              <div className="card" style={{ margin: 0, padding: 12, background: 'var(--bg3)' }}>
-                <div style={{ fontSize: 11, color: 'var(--mute)' }}>Failures</div>
-                <div style={{ fontSize: 20, color: 'var(--hi)' }}>
-                  {derivedMetrics.failures != null ? derivedMetrics.failures : '--'}
-                </div>
-              </div>
-              <div className="card" style={{ margin: 0, padding: 12, background: 'var(--bg3)' }}>
-                <div style={{ fontSize: 11, color: 'var(--mute)' }}>Adversarial Score</div>
-                <div style={{ fontSize: 20, color: 'var(--hi)' }}>
-                  {derivedMetrics.adversarialScore != null ? Number(derivedMetrics.adversarialScore).toFixed(1) : '--'}
-                </div>
-              </div>
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
+              <button className="btn btn-ghost" onClick={shareReport}>Share This Report</button>
+              <Link className="btn btn-ghost" to={`/report/${report.report_id}`}>View Full Report</Link>
+              <Link className="btn btn-primary" to="/auth/signup">Get Full Access</Link>
+              {shareMsg && <span style={{ fontSize: 11, color: 'var(--accent)' }}>{shareMsg}</span>}
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
-            <button className="btn btn-ghost" onClick={shareReport}>Share This Report</button>
-            <Link className="btn btn-ghost" to={`/report/${report.report_id}`}>View Full Report</Link>
-            <Link className="btn btn-primary" to="/auth/signup">Get Full Access</Link>
-            {shareMsg && <span style={{ fontSize: 11, color: 'var(--accent)' }}>{shareMsg}</span>}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div className="card" style={{ padding: 18 }}>
+              <div className="card-label">Explore plans</div>
+              <div style={{ color: 'var(--mid)', marginBottom: 12 }}>
+                See Pro and Enterprise options, billing, and feature comparison.
+              </div>
+              <Link className="btn btn-ghost" to="/pricing">View Pricing</Link>
+            </div>
+            <div className="card" style={{ padding: 18, borderColor: 'rgba(38,240,185,0.4)', background: 'rgba(38,240,185,0.08)' }}>
+              <div className="card-label">Get Full Access</div>
+              <div style={{ color: 'var(--mid)', marginBottom: 12 }}>
+                Unlock unlimited runs, agentic evals, and export-ready audit reports.
+              </div>
+              <Link className="btn btn-primary" to="/auth/signup">Get Full Access</Link>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </section>
   );

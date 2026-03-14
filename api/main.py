@@ -135,7 +135,8 @@ app.add_middleware(
     allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-API-KEY", "X-ADMIN-KEY"],
+    expose_headers=["Content-Disposition"],
 )
 
 # ── slowapi middleware — must come AFTER CORSMiddleware ───────────────────────

@@ -109,6 +109,22 @@ export default function PublicReportPage() {
               {pdfBusy ? 'Downloading...' : 'Download PDF Audit Report'}
             </button>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+            <div className="card" style={{ padding: 18 }}>
+              <div className="card-label">Explore plans</div>
+              <div style={{ color: 'var(--mid)', marginBottom: 12 }}>
+                Compare Pro and Enterprise features, billing, and limits.
+              </div>
+              <a className="btn btn-ghost" href="/pricing">View Pricing</a>
+            </div>
+            <div className="card" style={{ padding: 18, borderColor: 'rgba(38,240,185,0.4)', background: 'rgba(38,240,185,0.08)' }}>
+              <div className="card-label">Get Full Access</div>
+              <div style={{ color: 'var(--mid)', marginBottom: 12 }}>
+                Unlock unlimited runs, team sharing, and audit-ready exports.
+              </div>
+              <a className="btn btn-primary" href="/auth/signup">Get Full Access</a>
+            </div>
+          </div>
         </div>
       )}
     </>
