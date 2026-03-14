@@ -795,7 +795,7 @@ export default function TargetsPage() {
         </div>
       )}
 
-      {!loading && error && (
+      {!loading && error && targets.length > 0 && (
         <div
           style={{
             background: 'rgba(255,77,109,0.08)',
@@ -825,8 +825,15 @@ export default function TargetsPage() {
         </div>
       )}
 
-      {!loading && !error && targets.length === 0 && (
-        <EmptyState onNew={() => setShowModal(true)} />
+      {!loading && targets.length === 0 && (
+        <>
+          <EmptyState onNew={() => setShowModal(true)} />
+          {error && (
+            <div style={{ textAlign: 'center', color: 'var(--muted, var(--mid))', fontSize: 12, marginTop: -30 }}>
+              Unable to load targets right now. You can still add a new target.
+            </div>
+          )}
+        </>
       )}
 
       {!loading && !error && targets.length > 0 && (
