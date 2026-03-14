@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../App.jsx';
 
-const TARGET_TYPES = ['openai', 'huggingface', 'webhook'];
+const TARGET_TYPES = ['openai', 'huggingface', 'webhook', 'langchain'];
 
 const EMPTY_FORM = {
   name: '',
@@ -10,16 +10,23 @@ const EMPTY_FORM = {
   base_url: '',
   model_name: '',
   api_key: '',
+  repo_id: '',
+  api_token: '',
+  endpoint_url: '',
+  payload_template: '',
+  headers: '',
+  chain_import_path: '',
+  invoke_key: 'question',
   target_type: 'openai',
 };
 
 const TYPE_PLACEHOLDERS = {
   openai: { base_url: 'https://api.openai.com', model_name: 'gpt-4o-mini' },
   huggingface: {
-    base_url: 'https://api-inference.huggingface.co/models',
-    model_name: 'meta-llama/Llama-3-8B-Instruct',
+    repo_id: 'meta-llama/Llama-3-8B-Instruct',
   },
-  webhook: { base_url: 'https://your-api.com/chat', model_name: 'custom-model' },
+  webhook: { endpoint_url: 'https://your-api.com/chat', payload_template: '{"input":"{question}"}' },
+  langchain: { chain_import_path: 'my_module.my_chain', invoke_key: 'question' },
 };
 
 function formatDate(iso) {
@@ -75,6 +82,7 @@ function typeColor(type) {
     openai: 'var(--accent2, var(--green))',
     huggingface: '#ff9f43',
     webhook: 'var(--accent, var(--blue))',
+    langchain: '#a29bfe',
   };
   return map[type] || 'var(--muted, var(--mid))';
 }
@@ -214,21 +222,68 @@ function NewTargetModal({ onClose, onCreated }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!form.name.trim() || !form.base_url.trim() || !form.model_name.trim()) {
-      setError('Name, Base URL, and Model Name are required.');
+    const name = form.name.trim();
+    if (!name) {
+      setError('Name is required.');
+      return;
+    }
+    if (form.target_type === 'openai') {
+      if (!form.base_url.trim() || !form.model_name.trim()) {
+        setError('Base URL and Model Name are required.');
+        return;
+      }
+    }
+    if (form.target_type === 'huggingface' && !form.repo_id.trim()) {
+      setError('Repo ID is required.');
+      return;
+    }
+    if (form.target_type === 'webhook') {
+      if (!form.endpoint_url.trim() || !form.payload_template.trim()) {
+        setError('Endpoint URL and Payload Template are required.');
+        return;
+      }
+    }
+    if (form.target_type === 'langchain' && !form.chain_import_path.trim()) {
+      setError('Chain import path is required.');
       return;
     }
     setSaving(true);
     setError('');
     try {
-      await api.createTarget({
-        name: form.name.trim(),
-        description: form.description.trim(),
-        base_url: form.base_url.trim(),
-        model_name: form.model_name.trim(),
-        api_key: form.api_key.trim(),
+      let headers = null;
+      if (form.target_type === 'webhook' && form.headers.trim()) {
+        try {
+          headers = JSON.parse(form.headers);
+        } catch {
+          setError('Headers must be valid JSON.');
+          setSaving(false);
+          return;
+        }
+      }
+      const payload = {
+        name,
+        description: form.description.trim() || undefined,
         target_type: form.target_type,
-      });
+      };
+      if (form.target_type === 'openai') {
+        payload.base_url = form.base_url.trim();
+        payload.model_name = form.model_name.trim();
+        payload.api_key = form.api_key.trim();
+      }
+      if (form.target_type === 'huggingface') {
+        payload.repo_id = form.repo_id.trim();
+        payload.api_token = form.api_token.trim();
+      }
+      if (form.target_type === 'webhook') {
+        payload.endpoint_url = form.endpoint_url.trim();
+        payload.payload_template = form.payload_template.trim();
+        if (headers) payload.headers = headers;
+      }
+      if (form.target_type === 'langchain') {
+        payload.chain_import_path = form.chain_import_path.trim();
+        payload.invoke_key = (form.invoke_key || 'question').trim();
+      }
+      await api.createTarget(payload);
       onCreated();
       onClose();
     } catch (err) {
@@ -385,66 +440,177 @@ function NewTargetModal({ onClose, onCreated }) {
             />
           </div>
 
-          <div>
-            <label style={labelStyle}>Base URL *</label>
-            <input
-              style={inputStyle}
-              value={form.base_url}
-              onChange={(e) => set('base_url', e.target.value)}
-              placeholder={ph.base_url || 'https://api.example.com'}
-              required
-              onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
-              onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
-            />
-          </div>
+          {form.target_type === 'openai' && (
+            <>
+              <div>
+                <label style={labelStyle}>Base URL *</label>
+                <input
+                  style={inputStyle}
+                  value={form.base_url}
+                  onChange={(e) => set('base_url', e.target.value)}
+                  placeholder={ph.base_url || 'https://api.example.com'}
+                  required
+                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
+                />
+              </div>
 
-          <div>
-            <label style={labelStyle}>Model Name *</label>
-            <input
-              style={inputStyle}
-              value={form.model_name}
-              onChange={(e) => set('model_name', e.target.value)}
-              placeholder={ph.model_name || 'model-name'}
-              required
-              onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
-              onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
-            />
-          </div>
+              <div>
+                <label style={labelStyle}>Model Name *</label>
+                <input
+                  style={inputStyle}
+                  value={form.model_name}
+                  onChange={(e) => set('model_name', e.target.value)}
+                  placeholder={ph.model_name || 'model-name'}
+                  required
+                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
+                />
+              </div>
 
-          <div>
-            <label style={labelStyle}>API Key (optional)</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                type={showKey ? 'text' : 'password'}
-                style={{ ...inputStyle, flex: 1 }}
-                value={form.api_key}
-                onChange={(e) => set('api_key', e.target.value)}
-                placeholder="sk-..."
-                autoComplete="off"
-                onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
-                onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowKey((s) => !s)}
-                style={{
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(33,57,90,0.9)',
-                  borderRadius: 7,
-              color: 'var(--muted, var(--mid))',
-                  padding: '0 14px',
-                  cursor: 'pointer',
-                  fontSize: 12,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {showKey ? 'Hide' : 'Show'}
-              </button>
-            </div>
-            <div style={{ fontSize: 10.5, color: 'var(--muted, var(--mid))', marginTop: 5 }}>
-              Stored encrypted on the server. Never logged or exposed.
-            </div>
-          </div>
+              <div>
+                <label style={labelStyle}>API Key (optional)</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    style={{ ...inputStyle, flex: 1 }}
+                    value={form.api_key}
+                    onChange={(e) => set('api_key', e.target.value)}
+                    placeholder="sk-..."
+                    autoComplete="off"
+                    onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
+                    onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey((s) => !s)}
+                    style={{
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(33,57,90,0.9)',
+                      borderRadius: 7,
+                      color: 'var(--muted, var(--mid))',
+                      padding: '0 14px',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {showKey ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                <div style={{ fontSize: 10.5, color: 'var(--muted, var(--mid))', marginTop: 5 }}>
+                  Stored encrypted on the server. Never logged or exposed.
+                </div>
+              </div>
+            </>
+          )}
+
+          {form.target_type === 'huggingface' && (
+            <>
+              <div>
+                <label style={labelStyle}>Repo ID *</label>
+                <input
+                  style={inputStyle}
+                  value={form.repo_id}
+                  onChange={(e) => set('repo_id', e.target.value)}
+                  placeholder={ph.repo_id || 'meta-llama/Llama-3-8B-Instruct'}
+                  required
+                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>API Token</label>
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  style={inputStyle}
+                  value={form.api_token}
+                  onChange={(e) => set('api_token', e.target.value)}
+                  placeholder="hf_..."
+                  autoComplete="off"
+                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
+                />
+              </div>
+            </>
+          )}
+
+          {form.target_type === 'webhook' && (
+            <>
+              <div>
+                <label style={labelStyle}>Endpoint URL *</label>
+                <input
+                  style={inputStyle}
+                  value={form.endpoint_url}
+                  onChange={(e) => set('endpoint_url', e.target.value)}
+                  placeholder={ph.endpoint_url || 'https://your-api.com/chat'}
+                  required
+                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Payload Template *</label>
+                <textarea
+                  style={{ ...inputStyle, resize: 'vertical', minHeight: 70, lineHeight: 1.5 }}
+                  value={form.payload_template}
+                  onChange={(e) => set('payload_template', e.target.value)}
+                  placeholder={ph.payload_template || '{"input":"{question}"}'}
+                  required
+                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Headers (optional JSON)</label>
+                <textarea
+                  style={{ ...inputStyle, resize: 'vertical', minHeight: 70, lineHeight: 1.5 }}
+                  value={form.headers}
+                  onChange={(e) => set('headers', e.target.value)}
+                  placeholder='{"Authorization":"Bearer ..."}'
+                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
+                />
+              </div>
+            </>
+          )}
+
+          {form.target_type === 'langchain' && (
+            <>
+              <div>
+                <label style={labelStyle}>Chain import path *</label>
+                <input
+                  style={inputStyle}
+                  value={form.chain_import_path}
+                  onChange={(e) => set('chain_import_path', e.target.value)}
+                  placeholder={ph.chain_import_path || 'my_module.my_chain'}
+                  required
+                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Invoke key</label>
+                <input
+                  style={inputStyle}
+                  value={form.invoke_key}
+                  onChange={(e) => set('invoke_key', e.target.value)}
+                  placeholder={ph.invoke_key || 'question'}
+                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
+                />
+              </div>
+
+              <div style={{ fontSize: 11, color: 'var(--muted, var(--mid))' }}>
+                The LangChain adapter requires `langchain` to be installed on your backend server.
+                Add it to your `requirements.txt` and redeploy. Dynamic pip installs are not supported.
+              </div>
+            </>
+          )}
 
           {error && (
             <div

@@ -1078,8 +1078,12 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
     base_url: '', api_key: '', model_name: '',
     repo_id: '', api_token: '',
     endpoint_url: '', payload_template: '{"input":"{question}"}',
+    chain_import_path: '', invoke_key: 'question',
     description: '', num_tests: 20, groq_api_key: initialGroqApiKey || '', language: 'auto',
   });
+  const [savedTargets, setSavedTargets] = useState([]);
+  const [showSavedTargets, setShowSavedTargets] = useState(false);
+  const [selectedTargetId, setSelectedTargetId] = useState('');
   const [judges, setJudges] = useState([]);
   const [loading,  setLoading]  = useState(false);
   const [polling,  setPolling]  = useState(pollActive());
@@ -1131,9 +1135,61 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
     setForm(p => (p.groq_api_key === (initialGroqApiKey || '') ? p : { ...p, groq_api_key: initialGroqApiKey || '' }));
   }, [initialGroqApiKey]);
 
+  useEffect(() => {
+    let active = true;
+    api.getTargets()
+      .then((data) => {
+        if (!active) return;
+        if (Array.isArray(data) && data.length > 0) {
+          setSavedTargets(data);
+          setShowSavedTargets(true);
+        } else {
+          setShowSavedTargets(false);
+        }
+      })
+      .catch(() => {
+        if (active) setShowSavedTargets(false);
+      });
+    return () => { active = false; };
+  }, []);
+
   function set(k, v) {
     setForm(p => ({ ...p, [k]: v }));
     if (k === 'groq_api_key') onGroqApiKeyChange?.(v);
+  }
+
+  function resetManualTarget() {
+    setSelectedTargetId('');
+    setTT('openai');
+    setForm(p => ({
+      ...p,
+      base_url: '',
+      api_key: '',
+      model_name: '',
+      repo_id: '',
+      api_token: '',
+      endpoint_url: '',
+      payload_template: '{"input":"{question}"}',
+      chain_import_path: '',
+      invoke_key: 'question',
+    }));
+  }
+
+  function applySavedTarget(target) {
+    if (!target) return;
+    setTT(target.target_type || 'openai');
+    setForm(p => ({
+      ...p,
+      base_url: target.base_url || '',
+      model_name: target.model_name || '',
+      repo_id: target.repo_id || '',
+      endpoint_url: target.endpoint_url || '',
+      payload_template: target.payload_template || '{"input":"{question}"}',
+      chain_import_path: target.chain_import_path || '',
+      invoke_key: target.invoke_key || 'question',
+      api_key: '',
+      api_token: '',
+    }));
   }
 
   async function handleStop() {
@@ -1166,6 +1222,7 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
     const target =
       targetType === 'openai'      ? { type: 'openai', base_url: form.base_url || 'https://api.openai.com', api_key: form.api_key, model_name: form.model_name }
       : targetType === 'huggingface' ? { type: 'huggingface', repo_id: form.repo_id, api_token: form.api_token }
+      : targetType === 'langchain' ? { type: 'langchain', chain_import_path: form.chain_import_path, invoke_key: form.invoke_key || 'question' }
       : { type: 'webhook', endpoint_url: form.endpoint_url, payload_template: form.payload_template };
 
     const payload = {
@@ -1225,12 +1282,41 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
               ))}
             </div>
 
+            {showSavedTargets && (
+              <div className="field">
+                <label className="label">Use a saved target</label>
+                <select
+                  className="select"
+                  value={selectedTargetId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSelectedTargetId(id);
+                    if (!id) {
+                      resetManualTarget();
+                      return;
+                    }
+                    const found = savedTargets.find((t) => t.target_id === id);
+                    applySavedTarget(found);
+                  }}
+                  disabled={busy}
+                >
+                  <option value="">??? configure manually ???</option>
+                  {savedTargets.map((t) => (
+                    <option key={t.target_id} value={t.target_id}>
+                      {t.name} ({t.target_type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="field">
               <label className="label">Adapter type</label>
               <select className="select" value={targetType} onChange={e => setTT(e.target.value)} disabled={busy}>
                 <option value="openai">OpenAI-compatible (GPT, Gemini, Groq, vLLM…)</option>
                 <option value="huggingface">HuggingFace Inference API</option>
                 <option value="webhook">Custom Webhook</option>
+                <option value="langchain">LangChain Chain</option>
               </select>
             </div>
 
@@ -1270,6 +1356,22 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
                 <textarea className="textarea" value={form.payload_template} onChange={e => set('payload_template', e.target.value)} disabled={busy} />
               </div>
             </>}
+
+            {targetType === 'langchain' && <>
+              <div className="field">
+                <label className="label">Chain import path</label>
+                <input className="input" value={form.chain_import_path} onChange={e => set('chain_import_path', e.target.value)} placeholder="my_module.my_chain" disabled={busy} />
+              </div>
+              <div className="field">
+                <label className="label">Invoke key</label>
+                <input className="input" value={form.invoke_key} onChange={e => set('invoke_key', e.target.value)} placeholder="question" disabled={busy} />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--mute)' }}>
+                The LangChain adapter requires `langchain` to be installed on your backend server.
+                Add it to your `requirements.txt` and redeploy. Dynamic pip installs are not supported.
+              </div>
+            </>}
+
             </div>
 
             {/* Config */}

@@ -26,10 +26,20 @@ function makeId() {
 
 export default function AgenticPage() {
   const [target, setTarget] = useState({
+    type: 'openai',
     base_url: '',
     api_key: '',
     model_name: '',
+    repo_id: '',
+    api_token: '',
+    endpoint_url: '',
+    payload_template: '{"input":"{question}"}',
+    chain_import_path: '',
+    invoke_key: 'question',
   });
+  const [savedTargets, setSavedTargets] = useState([]);
+  const [showSavedTargets, setShowSavedTargets] = useState(false);
+  const [selectedTargetId, setSelectedTargetId] = useState('');
   const [task, setTask] = useState(DEFAULT_TASK);
   const [expectedTools, setExpectedTools] = useState([{ name: '', requiredParams: '' }]);
   const [trapTools, setTrapTools] = useState([{ name: '', description: '' }]);
@@ -49,6 +59,57 @@ export default function AgenticPage() {
       if (localTimer.current) clearInterval(localTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    apiFetch('/targets')
+      .then((data) => {
+        if (!active) return;
+        if (Array.isArray(data) && data.length > 0) {
+          setSavedTargets(data);
+          setShowSavedTargets(true);
+        } else {
+          setShowSavedTargets(false);
+        }
+      })
+      .catch(() => {
+        if (active) setShowSavedTargets(false);
+      });
+    return () => { active = false; };
+  }, []);
+
+  function resetManualTarget() {
+    setSelectedTargetId('');
+    setTarget({
+      type: 'openai',
+      base_url: '',
+      api_key: '',
+      model_name: '',
+      repo_id: '',
+      api_token: '',
+      endpoint_url: '',
+      payload_template: '{"input":"{question}"}',
+      chain_import_path: '',
+      invoke_key: 'question',
+    });
+  }
+
+  function applySavedTarget(saved) {
+    if (!saved) return;
+    setTarget((prev) => ({
+      ...prev,
+      type: saved.target_type || 'openai',
+      base_url: saved.base_url || '',
+      model_name: saved.model_name || '',
+      repo_id: saved.repo_id || '',
+      endpoint_url: saved.endpoint_url || '',
+      payload_template: saved.payload_template || prev.payload_template,
+      chain_import_path: saved.chain_import_path || '',
+      invoke_key: saved.invoke_key || 'question',
+      api_key: '',
+      api_token: '',
+    }));
+  }
 
   function addLog(message) {
     const stamp = new Date().toLocaleTimeString('en-GB', { hour12: false });
@@ -100,8 +161,21 @@ export default function AgenticPage() {
 
   async function handleRun() {
     if (running) return;
-    if (!target.base_url.trim() || !target.model_name.trim()) {
+    const targetType = target.type || 'openai';
+    if (targetType === 'openai' && (!target.base_url.trim() || !target.model_name.trim())) {
       setError('Base URL and model name are required.');
+      return;
+    }
+    if (targetType === 'huggingface' && !target.repo_id.trim()) {
+      setError('Repo ID is required.');
+      return;
+    }
+    if (targetType === 'webhook' && (!target.endpoint_url.trim() || !target.payload_template.trim())) {
+      setError('Endpoint URL and payload template are required.');
+      return;
+    }
+    if (targetType === 'langchain' && !target.chain_import_path.trim()) {
+      setError('Chain import path is required.');
       return;
     }
     if (!scenarios.length) {
@@ -115,14 +189,37 @@ export default function AgenticPage() {
     resetLogs();
     startLocalTicker();
 
-    const payload = {
-      agent_description: `OpenAI-compatible agent (${target.model_name.trim()})`,
-      target: {
+    let targetPayload = { type: targetType };
+    if (targetType === 'openai') {
+      targetPayload = {
         type: 'openai',
         base_url: target.base_url.trim(),
         api_key: target.api_key.trim(),
         model_name: target.model_name.trim(),
-      },
+      };
+    } else if (targetType === 'huggingface') {
+      targetPayload = {
+        type: 'huggingface',
+        repo_id: target.repo_id.trim(),
+        api_token: target.api_token.trim(),
+      };
+    } else if (targetType === 'webhook') {
+      targetPayload = {
+        type: 'webhook',
+        endpoint_url: target.endpoint_url.trim(),
+        payload_template: target.payload_template.trim(),
+      };
+    } else if (targetType === 'langchain') {
+      targetPayload = {
+        type: 'langchain',
+        chain_import_path: target.chain_import_path.trim(),
+        invoke_key: (target.invoke_key || 'question').trim(),
+      };
+    }
+
+    const payload = {
+      agent_description: `${targetType} agent`,
+      target: targetPayload,
       scenarios: scenarios.map((s) => ({
         task: s.task,
         expected_tool_calls: s.expected_tool_calls || [],
@@ -175,7 +272,13 @@ export default function AgenticPage() {
   }, [reportId]);
 
   const canRun = useMemo(() => {
-    return !!target.base_url.trim() && !!target.model_name.trim() && scenarios.length > 0 && !running;
+    if (running) return false;
+    const type = target.type || 'openai';
+    if (type === 'openai' && (!target.base_url.trim() || !target.model_name.trim())) return false;
+    if (type === 'huggingface' && !target.repo_id.trim()) return false;
+    if (type === 'webhook' && (!target.endpoint_url.trim() || !target.payload_template.trim())) return false;
+    if (type === 'langchain' && !target.chain_import_path.trim()) return false;
+    return scenarios.length > 0;
   }, [target, scenarios.length, running]);
 
   return (
@@ -190,35 +293,153 @@ export default function AgenticPage() {
 
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="card-label">Target config</div>
-        <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-          <div>
-            <label className="label">Base URL (OpenAI-compatible)</label>
-            <input
-              className="input"
-              placeholder="https://api.openai.com/v1"
-              value={target.base_url}
-              onChange={(e) => setTarget((prev) => ({ ...prev, base_url: e.target.value }))}
-            />
+        {showSavedTargets && (
+          <div className="field">
+            <label className="label">Use a saved target</label>
+            <select
+              className="select"
+              value={selectedTargetId}
+              onChange={(e) => {
+                const id = e.target.value;
+                setSelectedTargetId(id);
+                if (!id) {
+                  resetManualTarget();
+                  return;
+                }
+                const found = savedTargets.find((t) => t.target_id === id);
+                applySavedTarget(found);
+              }}
+            >
+              <option value="">— configure manually —</option>
+              {savedTargets.map((t) => (
+                <option key={t.target_id} value={t.target_id}>
+                  {t.name} ({t.target_type})
+                </option>
+              ))}
+            </select>
           </div>
-          <div>
-            <label className="label">API key</label>
-            <input
-              className="input"
-              placeholder="sk-..."
-              value={target.api_key}
-              onChange={(e) => setTarget((prev) => ({ ...prev, api_key: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className="label">Model name</label>
-            <input
-              className="input"
-              placeholder="gpt-4o-mini"
-              value={target.model_name}
-              onChange={(e) => setTarget((prev) => ({ ...prev, model_name: e.target.value }))}
-            />
-          </div>
+        )}
+
+        <div className="field">
+          <label className="label">Adapter type</label>
+          <select
+            className="select"
+            value={target.type}
+            onChange={(e) => setTarget((prev) => ({ ...prev, type: e.target.value }))}
+          >
+            <option value="openai">OpenAI-compatible</option>
+            <option value="huggingface">HuggingFace</option>
+            <option value="webhook">Webhook</option>
+            <option value="langchain">LangChain</option>
+          </select>
         </div>
+
+        {target.type === 'openai' && (
+          <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+            <div>
+              <label className="label">Base URL</label>
+              <input
+                className="input"
+                placeholder="https://api.openai.com/v1"
+                value={target.base_url}
+                onChange={(e) => setTarget((prev) => ({ ...prev, base_url: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="label">API key</label>
+              <input
+                className="input"
+                placeholder={selectedTargetId ? 'Enter API key (not stored)' : 'sk-...'}
+                value={target.api_key}
+                onChange={(e) => setTarget((prev) => ({ ...prev, api_key: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="label">Model name</label>
+              <input
+                className="input"
+                placeholder="gpt-4o-mini"
+                value={target.model_name}
+                onChange={(e) => setTarget((prev) => ({ ...prev, model_name: e.target.value }))}
+              />
+            </div>
+          </div>
+        )}
+
+        {target.type === 'huggingface' && (
+          <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div>
+              <label className="label">Repo ID</label>
+              <input
+                className="input"
+                placeholder="meta-llama/Llama-3-8B-Instruct"
+                value={target.repo_id}
+                onChange={(e) => setTarget((prev) => ({ ...prev, repo_id: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="label">API token</label>
+              <input
+                className="input"
+                placeholder={selectedTargetId ? 'Enter API key (not stored)' : 'hf_...'}
+                value={target.api_token}
+                onChange={(e) => setTarget((prev) => ({ ...prev, api_token: e.target.value }))}
+              />
+            </div>
+          </div>
+        )}
+
+        {target.type === 'webhook' && (
+          <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div>
+              <label className="label">Endpoint URL</label>
+              <input
+                className="input"
+                placeholder="https://your-api.com/agent"
+                value={target.endpoint_url}
+                onChange={(e) => setTarget((prev) => ({ ...prev, endpoint_url: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="label">Payload template</label>
+              <textarea
+                className="textarea"
+                rows={3}
+                value={target.payload_template}
+                onChange={(e) => setTarget((prev) => ({ ...prev, payload_template: e.target.value }))}
+              />
+            </div>
+          </div>
+        )}
+
+        {target.type === 'langchain' && (
+          <>
+            <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <div>
+                <label className="label">Chain import path</label>
+                <input
+                  className="input"
+                  placeholder="my_module.my_chain"
+                  value={target.chain_import_path}
+                  onChange={(e) => setTarget((prev) => ({ ...prev, chain_import_path: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="label">Invoke key</label>
+                <input
+                  className="input"
+                  placeholder="question"
+                  value={target.invoke_key}
+                  onChange={(e) => setTarget((prev) => ({ ...prev, invoke_key: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--mid)' }}>
+              The LangChain adapter requires `langchain` to be installed on your backend server.
+              Add it to your `requirements.txt` and redeploy. Dynamic pip installs are not supported.
+            </div>
+          </>
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: 14 }}>

@@ -52,7 +52,14 @@ def _build_target() -> dict:
             "payload_template": _env("INPUT_TARGET_PAYLOAD_TEMPLATE"),
         }
 
-    raise ValueError(f"Unknown target_type: {target_type!r}. Must be openai|huggingface|webhook.")
+    if target_type == "langchain":
+        return {
+            "type": "langchain",
+            "chain_import_path": _env("INPUT_TARGET_CHAIN_IMPORT_PATH"),
+            "invoke_key": _env("INPUT_TARGET_INVOKE_KEY", "question"),
+        }
+
+    raise ValueError(f"Unknown target_type: {target_type!r}. Must be openai|huggingface|webhook|langchain.")
 
 
 def main() -> int:

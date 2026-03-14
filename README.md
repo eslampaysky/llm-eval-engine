@@ -110,6 +110,10 @@ GEMINI_API_KEY=
 # API_KEYS=acme:client_key,globex:another_key
 API_KEYS=client_key
 
+# Secret used to encrypt stored target API keys
+# Generate with: python scripts/generate_targets_secret.py
+TARGETS_SECRET=
+
 # Optional overrides
 # MAX_WORKERS=4
 # SENTRY_DSN=  # Get a free DSN at sentry.io

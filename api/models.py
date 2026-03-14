@@ -35,7 +35,7 @@ class EvaluationResponse(BaseModel):
 
 
 class BreakTarget(BaseModel):
-    type: str = Field(..., description="openai | huggingface | webhook")
+    type: str = Field(..., description="openai | huggingface | webhook | langchain")
     base_url: Optional[str] = None
     api_key: Optional[str] = None
     model_name: Optional[str] = None
@@ -44,6 +44,8 @@ class BreakTarget(BaseModel):
     endpoint_url: Optional[str] = None
     headers: dict | None = None
     payload_template: Optional[str] = None
+    chain_import_path: Optional[str] = None
+    invoke_key: Optional[str] = None
 
 
 class JudgeConfig(BaseModel):
@@ -98,7 +100,14 @@ class TargetCreate(BaseModel):
     base_url: Optional[str] = None
     model_name: Optional[str] = None
     api_key: Optional[str] = None
-    target_type: str = Field(..., description="openai | huggingface | webhook")
+    repo_id: Optional[str] = None
+    api_token: Optional[str] = None
+    endpoint_url: Optional[str] = None
+    headers: dict | None = None
+    payload_template: Optional[str] = None
+    chain_import_path: Optional[str] = None
+    invoke_key: Optional[str] = None
+    target_type: str = Field(..., description="openai | huggingface | webhook | langchain")
 
 
 class TargetSummary(BaseModel):
@@ -107,5 +116,11 @@ class TargetSummary(BaseModel):
     description: Optional[str] = None
     base_url: Optional[str] = None
     model_name: Optional[str] = None
+    repo_id: Optional[str] = None
+    endpoint_url: Optional[str] = None
+    payload_template: Optional[str] = None
+    headers: dict | None = None
+    chain_import_path: Optional[str] = None
+    invoke_key: Optional[str] = None
     target_type: str
     created_at: str

@@ -102,6 +102,14 @@ router = APIRouter()
 MAX_WORKERS = int(os.getenv("MAX_WORKERS", "4"))
 _API_KEY_MAP: dict[str, str] = {}
 
+TARGETS_SECRET = os.getenv("TARGETS_SECRET", "").strip()
+if not TARGETS_SECRET:
+    raise RuntimeError(
+        "TARGETS_SECRET env variable is not set. "
+        "Run scripts/generate_targets_secret.py to generate one and add it to your .env file."
+    )
+
+
 _log = logging.getLogger(__name__)
 logger = _log
 
@@ -375,11 +383,8 @@ def _paddle_verify_signature(raw_body: bytes, signature_header: str, secret: str
 
 
 def _get_targets_fernet() -> Fernet:
-    key = os.getenv("TARGETS_SECRET", "").strip()
-    if not key:
-        raise HTTPException(status_code=500, detail="TARGETS_SECRET is not configured")
     try:
-        return Fernet(key)
+        return Fernet(TARGETS_SECRET)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Invalid TARGETS_SECRET: {exc}") from exc
 
@@ -1615,7 +1620,8 @@ def create_target_endpoint(
     name = payload.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail="name is required")
-    encrypted_key = _encrypt_target_api_key(payload.api_key)
+    raw_secret = payload.api_key or payload.api_token
+    encrypted_key = _encrypt_target_api_key(raw_secret)
     target = create_target(
         client=auth_ctx.get("client"),
         name=name,
@@ -1623,6 +1629,12 @@ def create_target_endpoint(
         base_url=(payload.base_url or "").strip() or None,
         model_name=(payload.model_name or "").strip() or None,
         api_key_enc=encrypted_key,
+        repo_id=(payload.repo_id or "").strip() or None,
+        endpoint_url=(payload.endpoint_url or "").strip() or None,
+        payload_template=(payload.payload_template or "").strip() or None,
+        headers=payload.headers or None,
+        chain_import_path=(payload.chain_import_path or "").strip() or None,
+        invoke_key=(payload.invoke_key or "").strip() or None,
         target_type=payload.target_type.strip(),
     )
     return {
@@ -1659,6 +1671,12 @@ def get_target(
         "description": target.get("description"),
         "base_url": target.get("base_url"),
         "model_name": target.get("model_name"),
+        "repo_id": target.get("repo_id"),
+        "endpoint_url": target.get("endpoint_url"),
+        "payload_template": target.get("payload_template"),
+        "headers": target.get("headers"),
+        "chain_import_path": target.get("chain_import_path"),
+        "invoke_key": target.get("invoke_key"),
         "target_type": target.get("target_type"),
         "created_at": target.get("created_at"),
         "updated_at": target.get("updated_at"),

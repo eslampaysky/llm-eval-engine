@@ -223,6 +223,12 @@ def init_db():
                     base_url TEXT,
                     model_name TEXT,
                     api_key_enc TEXT,
+                    repo_id TEXT,
+                    endpoint_url TEXT,
+                    payload_template TEXT,
+                    headers_json TEXT,
+                    chain_import_path TEXT,
+                    invoke_key TEXT,
                     target_type TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
@@ -412,6 +418,12 @@ def init_db():
                     base_url TEXT,
                     model_name TEXT,
                     api_key_enc TEXT,
+                    repo_id TEXT,
+                    endpoint_url TEXT,
+                    payload_template TEXT,
+                    headers_json TEXT,
+                    chain_import_path TEXT,
+                    invoke_key TEXT,
                     target_type TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
@@ -518,6 +530,12 @@ def init_db():
                 cur.execute("ALTER TABLE users ADD COLUMN paddle_customer_id TEXT")
             if "paddle_subscription_id" not in existing_users:
                 cur.execute("ALTER TABLE users ADD COLUMN paddle_subscription_id TEXT")
+            # Migrate: add missing columns to targets
+            cur.execute("PRAGMA table_info(targets)")
+            existing_targets = {row[1] for row in cur.fetchall()}
+            for col in ["repo_id", "endpoint_url", "payload_template", "headers_json", "chain_import_path", "invoke_key"]:
+                if col not in existing_targets:
+                    cur.execute(f"ALTER TABLE targets ADD COLUMN {col} TEXT")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_targets_client ON targets(client_name)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_reset_tokens_user_id ON password_reset_tokens(user_id)")
@@ -1117,7 +1135,22 @@ def reset_report_for_retry(report_id: str, client_name: str) -> bool:
 
 # -- Targets ---------------------------------------------------------------
 
-def create_target(*, client, name, description, base_url, model_name, api_key_enc, target_type) -> dict:
+def create_target(
+    *,
+    client,
+    name,
+    description,
+    base_url,
+    model_name,
+    api_key_enc,
+    target_type,
+    repo_id=None,
+    endpoint_url=None,
+    payload_template=None,
+    headers=None,
+    chain_import_path=None,
+    invoke_key=None,
+) -> dict:
     target_id = str(uuid.uuid4())
     now = _utc_now()
     client_name = client.get("name") if isinstance(client, dict) else None
@@ -1128,8 +1161,9 @@ def create_target(*, client, name, description, base_url, model_name, api_key_en
             f"""
             INSERT INTO targets(
                 target_id, client_id, client_name, name, description, base_url,
-                model_name, api_key_enc, target_type, created_at, updated_at
-            ) VALUES ({_ph(11)})
+                model_name, api_key_enc, repo_id, endpoint_url, payload_template,
+                headers_json, chain_import_path, invoke_key, target_type, created_at, updated_at
+            ) VALUES ({_ph(17)})
             """,
             (
                 target_id,
@@ -1140,6 +1174,12 @@ def create_target(*, client, name, description, base_url, model_name, api_key_en
                 base_url,
                 model_name,
                 api_key_enc,
+                repo_id,
+                endpoint_url,
+                payload_template,
+                json.dumps(headers or {}) if headers else None,
+                chain_import_path,
+                invoke_key,
                 target_type,
                 now,
                 now,
@@ -1151,6 +1191,12 @@ def create_target(*, client, name, description, base_url, model_name, api_key_en
         "description": description,
         "base_url": base_url,
         "model_name": model_name,
+        "repo_id": repo_id,
+        "endpoint_url": endpoint_url,
+        "payload_template": payload_template,
+        "headers": headers,
+        "chain_import_path": chain_import_path,
+        "invoke_key": invoke_key,
         "target_type": target_type,
         "created_at": now,
     }
@@ -1162,14 +1208,26 @@ def list_targets_for_client(client_name: str) -> list[dict]:
         cur.execute(
             f"""
             SELECT target_id, name, description, base_url, model_name,
-                   target_type, created_at, updated_at
+                   repo_id, endpoint_url, payload_template, headers_json,
+                   chain_import_path, invoke_key, target_type, created_at, updated_at
             FROM targets
             WHERE client_name={_P}
             ORDER BY created_at DESC
             """,
             (client_name,),
         )
-        return [_row_to_dict(r) for r in cur.fetchall()]
+        targets = []
+        for row in cur.fetchall():
+            data = _row_to_dict(row)
+            headers_json = data.get("headers_json")
+            if headers_json:
+                try:
+                    data["headers"] = json.loads(headers_json)
+                except Exception:
+                    data["headers"] = None
+            data.pop("headers_json", None)
+            targets.append(data)
+        return targets
 
 
 def get_target_by_id(target_id: str) -> dict | None:
@@ -1179,7 +1237,17 @@ def get_target_by_id(target_id: str) -> dict | None:
             f"SELECT * FROM targets WHERE target_id={_P}",
             (target_id,),
         )
-        return _row_to_dict(cur.fetchone())
+        row = _row_to_dict(cur.fetchone())
+        if not row:
+            return None
+        headers_json = row.get("headers_json")
+        if headers_json:
+            try:
+                row["headers"] = json.loads(headers_json)
+            except Exception:
+                row["headers"] = None
+        row.pop("headers_json", None)
+        return row
 
 
 def list_report_ids_for_target(target_id: str, client_name: str) -> list[str]:

@@ -19,7 +19,7 @@ inputs:
     required: false
     default: "https://llm-eval-engine-production.up.railway.app"
   target_type:
-    description: "Adapter type: openai | huggingface | webhook"
+    description: "Adapter type: openai | huggingface | webhook | langchain"
     required: false
     default: "openai"
   target_base_url:
@@ -50,6 +50,14 @@ inputs:
     description: 'Webhook payload template, e.g. {"question":"{question}"}'
     required: false
     default: ""
+  target_chain_import_path:
+    description: "LangChain chain import path (langchain adapter)"
+    required: false
+    default: ""
+  target_invoke_key:
+    description: "LangChain invoke key (langchain adapter)"
+    required: false
+    default: "question"
   description:
     description: "Free-text description of the model under test"
     required: true
@@ -102,6 +110,8 @@ runs:
         INPUT_TARGET_API_TOKEN: ${{ inputs.target_api_token }}
         INPUT_TARGET_ENDPOINT_URL: ${{ inputs.target_endpoint_url }}
         INPUT_TARGET_PAYLOAD_TEMPLATE: ${{ inputs.target_payload_template }}
+        INPUT_TARGET_CHAIN_IMPORT_PATH: ${{ inputs.target_chain_import_path }}
+        INPUT_TARGET_INVOKE_KEY: ${{ inputs.target_invoke_key }}
         INPUT_DESCRIPTION: ${{ inputs.description }}
         INPUT_NUM_TESTS: ${{ inputs.num_tests }}
         INPUT_FAIL_THRESHOLD: ${{ inputs.fail_threshold }}
