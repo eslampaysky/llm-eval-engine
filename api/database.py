@@ -210,6 +210,7 @@ def init_db():
                     html_content TEXT,
                     total_tokens INTEGER,
                     total_cost_usd REAL,
+                    esg_metrics TEXT,
                     error TEXT
                 )
             """)
@@ -327,6 +328,8 @@ def init_db():
             if "target_id" not in existing:
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN target_id TEXT")
                 existing.add("target_id")
+            if "esg_metrics" not in existing:
+                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN IF NOT EXISTS esg_metrics TEXT")
             if "target_id" in existing:
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
 
@@ -405,6 +408,7 @@ def init_db():
                     html_content TEXT,
                     total_tokens INTEGER,
                     total_cost_usd REAL,
+                    esg_metrics TEXT,
                     error TEXT
                 )
             """)
@@ -503,7 +507,7 @@ def init_db():
             for col in ["client_id", "client_name", "dataset_id", "model_version", "evaluation_date"]:
                 if col not in existing:
                     cur.execute(f"ALTER TABLE usage_logs ADD COLUMN {col} TEXT")
-            # Migrate: add html_content to evaluation_reports if missing
+            # Migrate: add extra columns to evaluation_reports if missing
             cur.execute("PRAGMA table_info(evaluation_reports)")
             existing = {row[1] for row in cur.fetchall()}
             if "share_token" not in existing:
@@ -515,6 +519,8 @@ def init_db():
             if "target_id" not in existing:
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN target_id TEXT")
                 existing.add("target_id")
+            if "esg_metrics" not in existing:
+                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN esg_metrics TEXT")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date ON demo_runs(run_date)")
             if "target_id" in existing:
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
@@ -671,6 +677,64 @@ def get_usage_count(client_name: str, prefix: str | None) -> int:
     return int(get_usage_slice(client_name, prefix).get("req_count", 0))
 
 
+# ── Drift / model score helpers ────────────────────────────────────────────────
+
+
+def get_model_scores(
+    model_version: str | None,
+    cutoff_iso: str | None = None,
+) -> list[dict]:
+    """
+    Return per-report scores for a given model_version, ordered by created_at ASC.
+
+    Each row is a dict with keys:
+      - created_at: ISO timestamp string
+      - score: float average_score from metrics_json (0.0 if missing)
+    Optionally filters to created_at >= cutoff_iso when provided.
+    """
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        params: list[Any] = []
+        where = [f"status = {_P}"]
+        params.append("done")
+        if model_version:
+            where.append(f"model_version = {_P}")
+            params.append(model_version)
+        if cutoff_iso:
+            where.append(f"created_at >= {_P}")
+            params.append(cutoff_iso)
+        cur.execute(
+            f"""
+            SELECT created_at, metrics_json
+            FROM evaluation_reports
+            WHERE {" AND ".join(where)}
+            ORDER BY created_at ASC
+            """,
+            params,
+        )
+        rows = cur.fetchall()
+
+    result: list[dict] = []
+    for row in rows:
+        data = _row_to_dict(row) or {}
+        created_at = data.get("created_at")
+        raw_metrics = data.get("metrics_json")
+        score_val: float = 0.0
+        if isinstance(raw_metrics, str) and raw_metrics:
+            try:
+                metrics = json.loads(raw_metrics)
+                score_val = float(metrics.get("average_score", 0.0) or 0.0)
+            except Exception:
+                score_val = 0.0
+        result.append(
+            {
+                "created_at": created_at,
+                "score": score_val,
+            }
+        )
+    return result
+
+
 # ── Evaluation runs ───────────────────────────────────────────────────────────
 
 def log_evaluation_run(report_id, client_name, dataset_id, model_version, summary):
@@ -760,6 +824,28 @@ def finalize_report_success(report_id, results_json, metrics_json, html_path,
             """,
             ("done", _utc_now(), results_json, metrics_json,
              html_path, html_content, total_tokens, total_cost, report_id, "canceled"),
+        )
+
+
+def update_report_esg_metrics(report_id: str, esg_metrics: dict | None) -> None:
+    """
+    Persist ESG metrics JSON for a completed report.
+
+    Stores a JSON-encoded string in the esg_metrics column for both Postgres and SQLite.
+    """
+    if not esg_metrics:
+        return
+    payload = json.dumps(esg_metrics, ensure_ascii=False)
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE evaluation_reports
+               SET esg_metrics={_P},
+                   updated_at={_P}
+             WHERE report_id={_P}
+            """,
+            (payload, _utc_now(), report_id),
         )
 
 
@@ -889,7 +975,7 @@ def list_reports_for_client(client_name: str) -> list[dict]:
         cur.execute(
             f"""
             SELECT report_id, share_token, shared, status, judge_model, sample_count, dataset_id,
-                   model_version, target_id, created_at, updated_at, metrics_json, error
+                   model_version, target_id, created_at, updated_at, metrics_json, total_cost_usd, esg_metrics, error
             FROM evaluation_reports
             WHERE client_name={_P}
             ORDER BY created_at DESC

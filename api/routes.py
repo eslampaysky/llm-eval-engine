@@ -38,9 +38,9 @@ from api.database import (
     create_target,
     delete_report,
     delete_target,
-    get_cached_test_suite,     
+    get_cached_test_suite,
     get_demo_run_count,
-    save_test_suite_cache,     
+    save_test_suite_cache,
     finalize_report_failure,
     finalize_report_success,
     get_client_by_api_key,
@@ -49,7 +49,7 @@ from api.database import (
     get_user_by_paddle_customer_id,
     get_user_plan,
     hash_ip,
-    reset_report_for_retry,     
+    reset_report_for_retry,
     get_stuck_processing_reports,
     get_history_for_client,
     get_report_row,
@@ -71,6 +71,8 @@ from api.database import (
     set_report_shared,
     set_report_share_token,
     upsert_demo_run,
+    update_report_esg_metrics,
+    get_model_scores,
 )
 from api.job_queue import enqueue_job
 from api.models import BreakRequest, BreakTarget, DemoBreakRequest, EvaluationRequest, JudgeConfig, TargetCreate
@@ -87,6 +89,64 @@ from src.metrics import compute_metrics
 from src.target_adapter import AdapterFactory, GeminiDemoAdapter
 from src.test_generator import GroqJudgeClient, TestSuiteGenerator
 from src.use_cases.run_evaluation import EvaluationPipeline
+from core.energy_tracker import EnergyTracker
+
+
+def _compute_drift_from_series(
+    series: list[dict],
+    threshold: float,
+) -> dict[str, Any]:
+    """
+    Compute baseline/current scores and drift percentage from a time-ordered series.
+
+    series: list of {"created_at": str, "score": float}, oldest first.
+    """
+    run_count = len(series)
+    if run_count == 0:
+        return {
+            "baseline_score": 0.0,
+            "current_score": 0.0,
+            "drift_pct": 0.0,
+            "drift_detected": False,
+            "run_count": 0,
+            "series": [],
+        }
+
+    window_size = max(1, run_count // 5)
+    baseline_slice = series[:window_size]
+    current_slice = series[-window_size:]
+
+    def _avg(rows: list[dict]) -> float:
+        if not rows:
+            return 0.0
+        return sum(float(r.get("score") or 0.0) for r in rows) / len(rows)
+
+    baseline_score = _avg(baseline_slice)
+    current_score = _avg(current_slice)
+
+    if baseline_score <= 0:
+        drift_pct = 0.0
+    else:
+        drift_pct = (baseline_score - current_score) / baseline_score
+
+    drift_detected = drift_pct > threshold
+
+    normalized_series = [
+        {
+            "date": str(r.get("created_at") or "")[:10],
+            "score": float(r.get("score") or 0.0),
+        }
+        for r in series
+    ]
+
+    return {
+        "baseline_score": baseline_score,
+        "current_score": current_score,
+        "drift_pct": drift_pct,
+        "drift_detected": drift_detected,
+        "run_count": run_count,
+        "series": normalized_series,
+    }
 
 # Env vars (billing)
 # PADDLE_API_KEY=
@@ -991,6 +1051,29 @@ def _aggregate_usage(results):
     return total_tokens, round(total_cost, 6)
 
 
+def _aggregate_tokens_from_judges(results) -> tuple[int, str]:
+    """
+    Sum tokens_used across all judge dicts and infer a provider label.
+
+    Provider is inferred from the first non-empty judge key and is used only
+    for ESG reporting; if it does not match a known provider, the EnergyTracker
+    will fall back to the default coefficient.
+    """
+    total_tokens = 0
+    provider: str | None = None
+    for row in results or []:
+        judges = (row or {}).get("judges") or {}
+        for judge_name, judge_data in judges.items():
+            if provider is None and judge_name:
+                provider = str(judge_name)
+            if isinstance(judge_data, dict) and judge_data.get("tokens_used") is not None:
+                try:
+                    total_tokens += int(judge_data["tokens_used"])
+                except (TypeError, ValueError):
+                    continue
+    return total_tokens, provider or "default"
+
+
 def _finalize_report_success(report_id, results, metrics, html_path):
     total_tokens, total_cost = _aggregate_usage(results)
     html_content = None
@@ -1111,8 +1194,22 @@ def _process_evaluation_job(report_id, samples, judge_model):
         REPORT_DIR.mkdir(parents=True, exist_ok=True)
         html_path = str(REPORT_DIR / f"report_{report_id}.html")
         html_path = generate_html_report(metrics=metrics, results=results, output_path=html_path)
-        _finalize_report_success(report_id=report_id, results=results,
-                                  metrics=metrics, html_path=html_path)
+        _finalize_report_success(
+            report_id=report_id,
+            results=results,
+            metrics=metrics,
+            html_path=html_path,
+        )
+        # ESG metrics: estimate energy and CO₂ footprint per report.
+        elapsed_s = max(0.0, time.monotonic() - started)
+        total_tokens, provider = _aggregate_tokens_from_judges(results)
+        if total_tokens > 0:
+            esg = EnergyTracker().estimate(
+                provider=provider,
+                tokens_used=total_tokens,
+                elapsed_s=elapsed_s,
+            )
+            update_report_esg_metrics(str(report_id), esg)
         _finish_progress(report_id, "done")
     except Exception as exc:
         _log.error("[Eval] Failed report_id=%s: %s", report_id, exc, exc_info=True)
@@ -1275,6 +1372,7 @@ def _process_break_job(report_id, target_cfg, description, num_tests,
                        judges_config: list[dict[str, Any]] | None = None,
                        disagreement_threshold: float | None = None,
                        target_adapter: Any | None = None):
+    started = time.monotonic()
     try:
         judge_client = GroqJudgeClient(
             api_key=groq_api_key, base_url=GROQ_BASE_URL, model=GROQ_JUDGE_MODEL,
@@ -1320,17 +1418,36 @@ def _process_break_job(report_id, target_cfg, description, num_tests,
         REPORT_DIR.mkdir(parents=True, exist_ok=True)
         html_path = str(REPORT_DIR / f"report_{report_id}.html")
         html_path = generate_premium_report(
-            metrics=metrics, results=results, output_path=html_path,
-            metadata={"target_type": target_cfg.get("type", "unknown"),
-                      "judge_model": judge_label},
+            metrics=metrics,
+            results=results,
+            output_path=html_path,
+            metadata={
+                "target_type": target_cfg.get("type", "unknown"),
+                "judge_model": judge_label,
+            },
         )
-        _finalize_report_success(report_id=report_id, results=results,
-                                  metrics=metrics, html_path=html_path)
+        _finalize_report_success(
+            report_id=report_id,
+            results=results,
+            metrics=metrics,
+            html_path=html_path,
+        )
+        # ESG metrics: estimate energy and CO₂ footprint per report.
+        elapsed_s = max(0.0, time.monotonic() - started)
+        total_tokens, provider = _aggregate_tokens_from_judges(results)
+        if total_tokens > 0:
+            esg = EnergyTracker().estimate(
+                provider=provider,
+                tokens_used=total_tokens,
+                elapsed_s=elapsed_s,
+            )
+            update_report_esg_metrics(str(report_id), esg)
     except Exception as exc:
         _finalize_report_failure(report_id=report_id, error_message=str(exc))
 
 
 def _process_demo_break_job(report_id, model_name, description, num_tests, groq_api_key, gemini_api_key):
+    started = time.monotonic()
     try:
         judge_client = GroqJudgeClient(
             api_key=groq_api_key, base_url=GROQ_BASE_URL, model=GROQ_JUDGE_MODEL,
@@ -1405,12 +1522,30 @@ def _process_demo_break_job(report_id, model_name, description, num_tests, groq_
         REPORT_DIR.mkdir(parents=True, exist_ok=True)
         html_path = str(REPORT_DIR / f"report_{report_id}.html")
         html_path = generate_premium_report(
-            metrics=metrics, results=results, output_path=html_path,
-            metadata={"target_type": "demo",
-                      "judge_model": judge_label},
+            metrics=metrics,
+            results=results,
+            output_path=html_path,
+            metadata={
+                "target_type": "demo",
+                "judge_model": judge_label,
+            },
         )
-        _finalize_report_success(report_id=report_id, results=results,
-                                  metrics=metrics, html_path=html_path)
+        _finalize_report_success(
+            report_id=report_id,
+            results=results,
+            metrics=metrics,
+            html_path=html_path,
+        )
+        # ESG metrics: estimate energy and CO₂ footprint per report.
+        elapsed_s = max(0.0, time.monotonic() - started)
+        total_tokens, provider = _aggregate_tokens_from_judges(results)
+        if total_tokens > 0:
+            esg = EnergyTracker().estimate(
+                provider=provider,
+                tokens_used=total_tokens,
+                elapsed_s=elapsed_s,
+            )
+            update_report_esg_metrics(str(report_id), esg)
         _finish_progress(report_id, "done")
     except Exception as exc:
         error_message = str(exc)
@@ -1473,10 +1608,28 @@ async def evaluate(
         REPORT_DIR.mkdir(parents=True, exist_ok=True)
         html_path = str(REPORT_DIR / f"report_{report_id}.html")
         html_path = generate_html_report(metrics=metrics, results=results, output_path=html_path)
-        _finalize_report_success(report_id=report_id, results=results,
-                                  metrics=metrics, html_path=html_path)
-        return {"report_id": report_id, "status": "done",
-                "results": results, "metrics": metrics}
+        _finalize_report_success(
+            report_id=report_id,
+            results=results,
+            metrics=metrics,
+            html_path=html_path,
+        )
+        # ESG metrics: estimate energy and CO₂ footprint per report.
+        elapsed_s = max(0.0, time.monotonic() - started)
+        total_tokens, provider = _aggregate_tokens_from_judges(results)
+        if total_tokens > 0:
+            esg = EnergyTracker().estimate(
+                provider=provider,
+                tokens_used=total_tokens,
+                elapsed_s=elapsed_s,
+            )
+            update_report_esg_metrics(str(report_id), esg)
+        return {
+            "report_id": report_id,
+            "status": "done",
+            "results": results,
+            "metrics": metrics,
+        }
     except Exception as exc:
         _log.error("[Eval] Failed report_id=%s: %s", report_id, exc, exc_info=True)
         _finalize_report_failure(report_id=report_id, error_message=str(exc))
@@ -1729,6 +1882,14 @@ def get_report(
         return JSONResponse(status_code=202, content={"status": status})
     share_token = _ensure_share_token(row)
     retryable = bool(row["error"] and "rate limit" in str(row["error"]).lower())
+    raw_esg = row.get("esg_metrics")
+    if isinstance(raw_esg, str):
+        try:
+            esg_metrics = json.loads(raw_esg) if raw_esg else None
+        except json.JSONDecodeError:
+            esg_metrics = None
+    else:
+        esg_metrics = raw_esg or None
     return {
         "report_id":       row["report_id"],
         "share_token":     share_token,
@@ -1743,6 +1904,7 @@ def get_report(
         "updated_at":      row["updated_at"],
         "results":         json.loads(row["results_json"]) if row["results_json"] else [],
         "metrics":         json.loads(row["metrics_json"]) if row["metrics_json"] else {},
+        "esg_metrics":     esg_metrics,
         "report_url":      f"/report/{row['report_id']}",
         "public_share_url": _public_report_url(row["report_id"]),
         "html_report_url": f"/report/{row['report_id']}/html" if row["html_path"] else None,
@@ -2339,6 +2501,44 @@ def usage_summary(
         "overall": get_usage_slice(client_name, None),
     }
 
+
+@router.get("/drift")
+@limiter.limit(LIMIT_READ)
+def get_drift(
+    request: Request,
+    model_version: str | None = None,
+    window_days: int = 7,
+) -> dict[str, Any]:
+    """
+    Compute score drift for a given model_version over a rolling window.
+
+    Returns:
+      {
+        model_version,
+        baseline_score,
+        current_score,
+        drift_pct,
+        drift_detected: bool,
+        run_count: int,
+        series: [{ date, score }]
+      }
+    """
+    mv = (model_version or "").strip()
+    if window_days <= 0:
+        raise HTTPException(status_code=422, detail="window_days must be a positive integer")
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=int(window_days))
+    rows = get_model_scores(model_version=mv, cutoff_iso=cutoff.isoformat())
+
+    # Reuse the same 5% default threshold as the CLI script for drift_detected flag.
+    threshold = 0.05
+    drift = _compute_drift_from_series(rows, threshold=threshold)
+
+    return {
+        "model_version": mv,
+        **drift,
+    }
 
 @router.get("/review/rules")
 @limiter.limit(LIMIT_READ)

@@ -67,6 +67,26 @@ function AppLayoutFrame() {
                 </NavLink>
               );
             })}
+
+            <div className="nav-group-label" style={{ marginTop: 16 }}>observability</div>
+            {[
+              { to: '/app/drift', label: 'Drift Monitor', icon: '↗' },
+              { to: '/app/esg', label: 'ESG / Energy', icon: '♻' },
+            ].map((item) => {
+              const isActive = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={`nav-btn${isActive ? ' active' : ''}`}
+                  style={{ textDecoration: 'none' }}
+                  onClick={() => setNavOpen(false)}
+                >
+                  <span className="nav-icon">{item.icon}</span>
+                  {item.label}
+                </NavLink>
+              );
+            })}
           </nav>
 
           <div className="sidebar-foot">
