@@ -9,6 +9,7 @@ import PricingPage from '../pages/public/PricingPage.jsx';
 import ConfigBuilderPage from '../pages/app/ConfigBuilderPage.jsx';
 import BillingSuccessPage from '../pages/public/BillingSuccessPage.jsx';
 import PublicReportPage from '../pages/public/PublicReportPage.jsx';
+import PublicWebAuditPage from '../pages/public/PublicWebAuditPage.jsx';
 import LoginPage from '../pages/auth/LoginPage.jsx';
 import SignupPage from '../pages/auth/SignupPage.jsx';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage.jsx';
@@ -27,6 +28,10 @@ import ApiKeysPage from '../pages/app/ApiKeysPage.jsx';
 import DriftPage from '../pages/app/DriftPage.jsx';
 import EsgPage from '../pages/app/EsgPage.jsx';
 import AuditPage from '../pages/app/AuditPage.jsx';
+import WebAuditPage from '../pages/app/WebAuditPage.jsx';
+import AgentAuditPage from '../pages/app/AgentAuditPage.jsx';
+import MonitorRunPage from '../pages/app/MonitorRunPage.jsx';
+import AuditHistoryPage from '../pages/app/AuditHistoryPage.jsx';
 import SettingsLayout from '../pages/app/settings/SettingsLayout.jsx';
 import ProfilePage from '../pages/app/settings/ProfilePage.jsx';
 import SecurityPage from '../pages/app/settings/SecurityPage.jsx';
@@ -44,6 +49,7 @@ const router = createBrowserRouter([
       { path: 'pricing', element: <PricingPage /> },
       { path: 'billing/success', element: <BillingSuccessPage /> },
       { path: 'report/:reportId', element: <PublicReportPage /> },
+      { path: 'web-audit/share/:token', element: <PublicWebAuditPage /> },
       { path: 'auth/login', element: <LoginPage /> },
       { path: 'auth/signup', element: <SignupPage /> },
       { path: 'auth/forgot-password', element: <ForgotPasswordPage /> },
@@ -74,6 +80,10 @@ const router = createBrowserRouter([
       { path: 'drift', element: <DriftPage /> },
       { path: 'esg', element: <EsgPage /> },
       { path: 'audit', element: <AuditPage /> },
+      { path: 'web-audit', element: <WebAuditPage /> },
+      { path: 'agent-audit', element: <AgentAuditPage /> },
+      { path: 'monitors', element: <MonitorRunPage /> },
+      { path: 'audit-history', element: <AuditHistoryPage /> },
       {
         path: 'settings',
         element: <SettingsLayout />,

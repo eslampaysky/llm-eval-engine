@@ -10,6 +10,7 @@ import uuid
 import time
 import hashlib
 import hmac
+import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -30,7 +31,7 @@ from api.multi_judge import (
 )
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
@@ -42,6 +43,19 @@ from api.database import (
     get_cached_test_suite,
     get_demo_run_count,
     save_test_suite_cache,
+    insert_web_audit_report,
+    update_web_audit_status,
+    finalize_web_audit_success,
+    finalize_web_audit_failure,
+    get_web_audit_row,
+    add_share_token_to_web_audit,
+    get_web_audit_by_share_token,
+    create_feature_monitor,
+    update_feature_monitor_baseline,
+    update_feature_monitor_status,
+    get_feature_monitor,
+    list_monitors_for_client,
+    insert_monitor_run,
     finalize_report_failure,
     finalize_report_success,
     get_client_by_api_key,
@@ -61,6 +75,7 @@ from api.database import (
     insert_report,
     list_report_ids_for_target,
     list_reports_for_client,
+    list_all_audits_for_client,
     list_targets_for_client,
     log_usage,
     register_client,
@@ -76,7 +91,18 @@ from api.database import (
     get_model_scores,
 )
 from api.job_queue import enqueue_job
-from api.models import BreakRequest, BreakTarget, DemoBreakRequest, EvaluationRequest, JudgeConfig, TargetCreate, RagEvalRequest
+from api.models import (
+    BreakRequest,
+    BreakTarget,
+    DemoBreakRequest,
+    EvaluationRequest,
+    JudgeConfig,
+    TargetCreate,
+    RagEvalRequest,
+    WebAuditRequest,
+    AgentAuditRequest,
+    FeatureMonitorConfig,
+)
 from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ, limiter ,LIMIT_RETRY
 from api.plans import get_plan_limits, resolve_plan
 from api.user_auth import decode_access_token
@@ -93,6 +119,10 @@ from src.test_generator import GroqJudgeClient, TestSuiteGenerator
 from src.use_cases.run_evaluation import EvaluationPipeline
 from core.energy_tracker import EnergyTracker
 from core.rag_evaluator import RagEvaluator
+from core.web_agent import run_web_audit
+from core.web_judge import judge_web_audit
+from core.agent_probe import generate_scenarios, run_scenario, judge_scenario
+from core.feature_monitor import capture_baseline, check_regression
 
 
 def _compute_drift_from_series(
@@ -2610,6 +2640,451 @@ def get_report_pdf(
     )
 
 
+@router.post("/web-audit", response_model=dict, status_code=202)
+@limiter.limit("20/hour")
+async def create_web_audit(
+    request: Request,
+    payload: WebAuditRequest,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict:
+    """Submit a URL for a full reliability audit. Poll GET /web-audit/{id}."""
+    report_id = str(uuid.uuid4())
+    _init_progress(report_id, 3)
+    _do_insert_report(
+        report_id=report_id,
+        auth_ctx=auth_ctx,
+        sample_count=1,
+        judge_model="anthropic",
+        dataset_id=None,
+        model_version=payload.url,
+        status="processing",
+    )
+    insert_web_audit_report(
+        audit_id=report_id,
+        client_name=auth_ctx.get("client_name"),
+        url=payload.url,
+        description=payload.description,
+        status="queued",
+    )
+    await enqueue_job(
+        _run_web_audit_job,
+        report_id,
+        payload.url,
+        payload.description,
+        auth_ctx.get("client_name"),
+        job_id=report_id,
+    )
+    return {
+        "audit_id": report_id,
+        "status": "queued",
+        "poll_url": f"/web-audit/{report_id}",
+    }
+
+
+@router.get("/web-audit/{audit_id}/video")
+@limiter.limit(LIMIT_READ)
+def get_web_audit_video(
+    request: Request,
+    audit_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+):
+    """Returns the Playwright screen recording of the audit session as a .webm video stream.
+    Requires X-API-KEY header. Only available after status == "done" and if video was recorded.
+    """
+    row = get_report_row(audit_id)
+    if not row or row.get("client_name") != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=404, detail="Audit not found")
+    if row.get("status") != "done":
+        raise HTTPException(status_code=404, detail="Video not available")
+    metrics = json.loads(row["metrics_json"]) if row.get("metrics_json") else {}
+    video_path = metrics.get("video_path")
+    if not video_path or not Path(video_path).exists():
+        raise HTTPException(status_code=404, detail="Video not found")
+    return FileResponse(video_path, media_type="video/webm")
+
+
+@router.post("/web-audit/{audit_id}/share")
+@limiter.limit(LIMIT_READ)
+def share_web_audit(
+    request: Request,
+    audit_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    row = get_web_audit_row(audit_id)
+    if not row or row.get("client_name") != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=404, detail="Audit not found")
+    token = secrets.token_urlsafe(9).replace("-", "").replace("_", "")[:12]
+    add_share_token_to_web_audit(audit_id, auth_ctx.get("client_name"), token)
+    base = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/") or os.getenv("APP_BASE_URL", "").strip().rstrip("/")
+    share_url = f"{base}/web-audit/share/{token}" if base else f"/web-audit/share/{token}"
+    return {"share_url": share_url}
+
+
+@router.get("/web-audit/share/{token}")
+def public_web_audit(token: str):
+    row = get_web_audit_by_share_token(token)
+    if not row or row.get("status") != "done":
+        raise HTTPException(status_code=404, detail="Report not found")
+    issues_raw = row.get("issues_json") or "[]"
+    passed_raw = row.get("passed_json") or "[]"
+    try:
+        issues = json.loads(issues_raw) if isinstance(issues_raw, str) else issues_raw
+    except json.JSONDecodeError:
+        issues = []
+    try:
+        passed = json.loads(passed_raw) if isinstance(passed_raw, str) else passed_raw
+    except json.JSONDecodeError:
+        passed = []
+    public_issues = [{"title": i.get("title"), "detail": i.get("detail")} for i in (issues or [])]
+    return JSONResponse(
+        content={
+            "url": row.get("url"),
+            "health": row.get("health"),
+            "confidence": row.get("confidence"),
+            "summary": row.get("summary"),
+            "issues": public_issues,
+            "passed": passed,
+            "created_at": row.get("created_at"),
+            "cta_url": "/auth/signup",
+        },
+        headers={"X-Robots-Tag": "noindex"},
+    )
+
+
+@router.get("/web-audit/{audit_id}")
+@limiter.limit(LIMIT_READ)
+def get_web_audit(
+    request: Request,
+    audit_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict:
+    """Poll this endpoint until status == 'done'."""
+    row = get_web_audit_row(audit_id)
+    if not row or row.get("client_name") != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=404, detail="Audit not found")
+
+    issues = None
+    passed = None
+    if row.get("issues_json"):
+        try:
+            issues = json.loads(row["issues_json"])
+        except json.JSONDecodeError:
+            issues = None
+    if row.get("passed_json"):
+        try:
+            passed = json.loads(row["passed_json"])
+        except json.JSONDecodeError:
+            passed = None
+    inferred_spec = None
+    metrics_row = get_report_row(audit_id)
+    if metrics_row and metrics_row.get("metrics_json"):
+        try:
+            metrics = json.loads(metrics_row["metrics_json"])
+            inferred_spec = metrics.get("inferred_spec")
+        except json.JSONDecodeError:
+            inferred_spec = None
+
+    return {
+        "audit_id": audit_id,
+        "status": row.get("status"),
+        "url": row.get("url") or "",
+        "overall_health": row.get("health"),
+        "confidence": row.get("confidence"),
+        "issues": issues,
+        "passed": passed,
+        "summary": row.get("summary"),
+        "inferred_spec": inferred_spec,
+        "video_path": row.get("video_path"),
+        "video_url": None,
+        "screenshot_url": None,
+        "created_at": row.get("created_at"),
+    }
+
+
+def _run_web_audit_job(report_id, url, description, client_name):
+    try:
+        update_web_audit_status(report_id, "processing")
+        _update_progress(report_id, 1, 3, "Launching browser...")
+        _update_progress(report_id, 2, 3, "Crawling site...")
+        crawl = asyncio.run(run_web_audit(url))
+        _update_progress(report_id, 3, 3, "Running AI judge...")
+        verdict = judge_web_audit(crawl, description)
+        metrics = {**verdict, "url": url, "video_path": crawl.get("video_path")}
+        _finalize_report_success(
+            report_id=report_id,
+            results=[crawl],
+            metrics=metrics,
+            html_path=None,
+        )
+        finalize_web_audit_success(
+            audit_id=report_id,
+            health=verdict.get("overall_health"),
+            confidence=verdict.get("confidence"),
+            issues_json=json.dumps(verdict.get("issues"), ensure_ascii=False) if verdict.get("issues") is not None else None,
+            passed_json=json.dumps(verdict.get("passed"), ensure_ascii=False) if verdict.get("passed") is not None else None,
+            summary=verdict.get("summary"),
+            video_path=crawl.get("video_path"),
+        )
+        _finish_progress(report_id, "done")
+    except Exception as e:
+        finalize_web_audit_failure(report_id)
+        _finalize_report_failure(report_id=report_id, error_message=str(e))
+        _finish_progress(report_id, "failed")
+
+
+@router.post("/agent-audit", status_code=202)
+@limiter.limit(LIMIT_BREAK)
+async def create_agent_audit(
+    request: Request,
+    payload: AgentAuditRequest,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict:
+    """Generate adversarial scenarios and run them against an agent/API."""
+    report_id = str(uuid.uuid4())
+    _init_progress(report_id, payload.num_scenarios + 2)
+    target_cfg = payload.target.model_dump(exclude_none=True)
+    model_version = (
+        target_cfg.get("model_name")
+        or target_cfg.get("repo_id")
+        or target_cfg.get("endpoint_url")
+        or "unknown"
+    )
+    _do_insert_report(
+        report_id=report_id,
+        auth_ctx=auth_ctx,
+        sample_count=payload.num_scenarios,
+        judge_model="anthropic",
+        dataset_id=None,
+        model_version=model_version,
+        status="processing",
+    )
+    await enqueue_job(
+        _run_agent_audit_job,
+        report_id,
+        target_cfg,
+        payload.description,
+        payload.num_scenarios,
+        auth_ctx.get("client_name"),
+        job_id=report_id,
+    )
+    return {
+        "audit_id": report_id,
+        "status": "queued",
+        "poll_url": f"/report/{report_id}",
+    }
+
+
+def _run_agent_audit_job(report_id, target, description, num, client_name):
+    try:
+        _update_progress(report_id, 0, num + 2, "Generating scenarios...")
+        scenarios = generate_scenarios(description, num)
+        results = []
+        for i, sc in enumerate(scenarios):
+            _update_progress(report_id, i + 1, num + 2, f"Testing: {sc['name']}")
+            execution = run_scenario(sc, target)
+            verdict = judge_scenario(sc, execution)
+            results.append({**sc, "execution": execution, "verdict": verdict})
+        _update_progress(report_id, num + 1, num + 2, "Computing metrics...")
+        passed = sum(1 for r in results if r["verdict"].get("passed"))
+        failures = [r for r in results if not r["verdict"].get("passed")]
+        critical = [r for r in failures if r["verdict"].get("severity") == "critical"]
+        metrics = {
+            "total": len(results),
+            "passed": passed,
+            "failed": len(failures),
+            "critical_failures": len(critical),
+            "pass_rate": round(passed / len(results) * 100, 1) if results else 0,
+            "top_issues": [r["verdict"]["finding"] for r in critical[:3]],
+        }
+        _finalize_report_success(
+            report_id=report_id,
+            results=results,
+            metrics=metrics,
+            html_path=None,
+        )
+        _finish_progress(report_id, "done")
+    except Exception as e:
+        _finalize_report_failure(report_id=report_id, error_message=str(e))
+        _finish_progress(report_id, "failed")
+
+
+@router.post("/monitors", status_code=201)
+@limiter.limit("30/hour")
+async def create_monitor(
+    request: Request,
+    payload: FeatureMonitorConfig,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict:
+    """Create a new AI feature monitor and capture the baseline immediately."""
+    monitor_id = str(uuid.uuid4())
+    _init_progress(monitor_id, len(payload.test_inputs) + 1)
+    target_cfg = payload.target.model_dump(exclude_none=True)
+    create_feature_monitor(
+        monitor_id=monitor_id,
+        client_name=auth_ctx.get("client_name"),
+        feature_name=payload.feature_name,
+        description=payload.description,
+        target_json=json.dumps(target_cfg, ensure_ascii=False),
+        test_inputs_json=json.dumps(payload.test_inputs, ensure_ascii=False),
+        schedule=payload.schedule,
+        alert_webhook=payload.alert_webhook,
+    )
+    _do_insert_report(
+        report_id=monitor_id,
+        auth_ctx=auth_ctx,
+        sample_count=len(payload.test_inputs),
+        judge_model="anthropic",
+        dataset_id=None,
+        model_version=payload.feature_name,
+        status="processing",
+    )
+    await enqueue_job(
+        _capture_baseline_job,
+        monitor_id,
+        payload.model_dump(),
+        auth_ctx.get("client_name"),
+        job_id=monitor_id,
+    )
+    return {"monitor_id": monitor_id, "status": "capturing_baseline"}
+
+
+@router.get("/monitors")
+@limiter.limit(LIMIT_READ)
+def list_monitors(
+    request: Request,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> list:
+    return list_monitors_for_client(auth_ctx.get("client_name"))
+
+
+@router.post("/monitors/{monitor_id}/check", status_code=202)
+@limiter.limit("60/hour")
+async def run_monitor_check(
+    request: Request,
+    monitor_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict:
+    """Trigger an immediate regression check against the stored baseline."""
+    monitor = get_feature_monitor(monitor_id)
+    if not monitor or monitor.get("client_name") != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=404, detail="Monitor not found")
+    run_id = str(uuid.uuid4())
+    _init_progress(run_id, 2)
+    _do_insert_report(
+        report_id=run_id,
+        auth_ctx=auth_ctx,
+        sample_count=len(json.loads(monitor.get("test_inputs_json") or "[]")),
+        judge_model="anthropic",
+        dataset_id=None,
+        model_version=monitor.get("feature_name"),
+        status="processing",
+    )
+    await enqueue_job(
+        _run_monitor_check_job,
+        run_id,
+        monitor_id,
+        auth_ctx.get("client_name"),
+        job_id=run_id,
+    )
+    return {"monitor_id": monitor_id, "status": "checking"}
+
+
+def _capture_baseline_job(monitor_id, payload, client_name):
+    try:
+        test_inputs = payload.get("test_inputs") or []
+        _update_progress(monitor_id, 0, len(test_inputs) + 1, "Capturing baseline...")
+        target_cfg = payload.get("target") or {}
+        adapter = AdapterFactory.from_config(target_cfg)
+        step = {"count": 0}
+
+        def _call_fn(inp):
+            step["count"] += 1
+            _update_progress(
+                monitor_id,
+                step["count"],
+                len(test_inputs) + 1,
+                f"Running baseline {step['count']}/{len(test_inputs)}",
+            )
+            return adapter.call(inp)
+
+        feature_config = {
+            "name": payload.get("feature_name"),
+            "description": payload.get("description"),
+            "test_inputs": test_inputs,
+            "call_fn": _call_fn,
+        }
+        baseline = capture_baseline(feature_config)
+        update_feature_monitor_baseline(
+            monitor_id,
+            json.dumps(baseline, ensure_ascii=False),
+            status="ready",
+        )
+        _finalize_report_success(
+            report_id=monitor_id,
+            results=baseline.get("samples") or [],
+            metrics={"baseline": baseline},
+            html_path=None,
+        )
+        _finish_progress(monitor_id, "done")
+    except Exception as e:
+        update_feature_monitor_status(monitor_id, "failed")
+        _finalize_report_failure(report_id=monitor_id, error_message=str(e))
+        _finish_progress(monitor_id, "failed")
+
+
+def _run_monitor_check_job(run_id, monitor_id, client_name):
+    try:
+        monitor = get_feature_monitor(monitor_id)
+        if not monitor or monitor.get("client_name") != client_name:
+            raise RuntimeError("Monitor not found")
+        baseline_json = monitor.get("baseline_json")
+        if not baseline_json:
+            raise RuntimeError("Baseline not captured yet")
+        baseline = json.loads(baseline_json)
+        test_inputs = json.loads(monitor.get("test_inputs_json") or "[]")
+        target_cfg = json.loads(monitor.get("target_json") or "{}")
+        adapter = AdapterFactory.from_config(target_cfg)
+        _update_progress(run_id, 1, 2, "Running regression check...")
+        current_results = []
+        for inp in test_inputs:
+            output = adapter.call(inp)
+            current_results.append(
+                {
+                    "input": inp,
+                    "output": output,
+                    "hash": hashlib.sha256(str(output).encode()).hexdigest()[:12],
+                }
+            )
+        verdict = check_regression(baseline, current_results)
+        ran_at = _utc_now_iso()
+        insert_monitor_run(
+            run_id=run_id,
+            monitor_id=monitor_id,
+            client_name=client_name,
+            ran_at=ran_at,
+            regression_detected=bool(verdict.get("regression_detected")),
+            severity=verdict.get("severity"),
+            results_json=json.dumps(
+                {"verdict": verdict, "current_results": current_results},
+                ensure_ascii=False,
+            ),
+        )
+        update_feature_monitor_status(
+            monitor_id,
+            "regression" if verdict.get("regression_detected") else "ok",
+        )
+        _finalize_report_success(
+            report_id=run_id,
+            results=current_results,
+            metrics=verdict,
+            html_path=None,
+        )
+        _finish_progress(run_id, "done")
+    except Exception as e:
+        _finalize_report_failure(report_id=run_id, error_message=str(e))
+        _finish_progress(run_id, "failed")
+
+
 @router.post("/notify")
 @limiter.limit(LIMIT_READ)
 def notify(
@@ -2695,6 +3170,15 @@ def get_history(
         client_name=auth_ctx.get("client_name"),
         limit=int(limit),
     )
+
+
+@router.get("/audit-history")
+@limiter.limit(LIMIT_READ)
+def get_audit_history(
+    request: Request,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> list[dict[str, Any]]:
+    return list_all_audits_for_client(auth_ctx.get("client_name"))
 
 
 @router.get("/usage/summary")

@@ -96,6 +96,7 @@ Both expose:
   - toxicity/safety
   - latency/tokens/cost analysis
 - Report export as HTML files under `reports/`
+- Web audit video replay streaming via `GET /web-audit/{audit_id}/video`
 
 ## Environment variables
 

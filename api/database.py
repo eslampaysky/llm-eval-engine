@@ -215,6 +215,23 @@ def init_db():
                 )
             """)
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS web_audit_reports (
+                    audit_id     TEXT PRIMARY KEY,
+                    client_name  TEXT,
+                    url          TEXT,
+                    description  TEXT,
+                    status       TEXT NOT NULL DEFAULT 'queued',
+                    health       TEXT,
+                    confidence   INTEGER,
+                    issues_json  TEXT,
+                    passed_json  TEXT,
+                    summary      TEXT,
+                    video_path   TEXT,
+                    created_at   TEXT NOT NULL,
+                    updated_at   TEXT NOT NULL
+                )
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS targets (
                     target_id TEXT PRIMARY KEY,
                     client_id INTEGER,
@@ -303,6 +320,34 @@ def init_db():
                     last_used_at TEXT NOT NULL
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS feature_monitors (
+                    monitor_id    TEXT PRIMARY KEY,
+                    client_name   TEXT,
+                    feature_name  TEXT,
+                    description   TEXT,
+                    target_json   TEXT,
+                    test_inputs_json TEXT,
+                    schedule      TEXT DEFAULT 'daily',
+                    alert_webhook TEXT,
+                    baseline_json TEXT,
+                    last_run_at   TEXT,
+                    last_status   TEXT DEFAULT 'pending',
+                    created_at    TEXT NOT NULL
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS monitor_runs (
+                    run_id        TEXT PRIMARY KEY,
+                    monitor_id    TEXT,
+                    client_name   TEXT,
+                    ran_at        TEXT,
+                    regression_detected INTEGER DEFAULT 0,
+                    severity      TEXT,
+                    results_json  TEXT,
+                    FOREIGN KEY(monitor_id) REFERENCES feature_monitors(monitor_id)
+                )
+            """)
             # Indexes for common query patterns
             cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_logs_client_name ON usage_logs(client_name)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_logs_timestamp   ON usage_logs(timestamp)")
@@ -332,6 +377,15 @@ def init_db():
                 cur.execute("ALTER TABLE evaluation_reports ADD COLUMN IF NOT EXISTS esg_metrics TEXT")
             if "target_id" in existing:
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
+
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'web_audit_reports'
+            """)
+            existing_web_audit = {row["column_name"] for row in cur.fetchall()}
+            if "share_token" not in existing_web_audit:
+                cur.execute("ALTER TABLE web_audit_reports ADD COLUMN share_token TEXT UNIQUE")
 
             # Users table migrations
             cur.execute("""
@@ -410,6 +464,23 @@ def init_db():
                     total_cost_usd REAL,
                     esg_metrics TEXT,
                     error TEXT
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS web_audit_reports (
+                    audit_id     TEXT PRIMARY KEY,
+                    client_name  TEXT,
+                    url          TEXT,
+                    description  TEXT,
+                    status       TEXT NOT NULL DEFAULT 'queued',
+                    health       TEXT,
+                    confidence   INTEGER,
+                    issues_json  TEXT,
+                    passed_json  TEXT,
+                    summary      TEXT,
+                    video_path   TEXT,
+                    created_at   TEXT NOT NULL,
+                    updated_at   TEXT NOT NULL
                 )
             """)
             cur.execute("""
@@ -501,6 +572,34 @@ def init_db():
                     last_used_at TEXT NOT NULL
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS feature_monitors (
+                    monitor_id    TEXT PRIMARY KEY,
+                    client_name   TEXT,
+                    feature_name  TEXT,
+                    description   TEXT,
+                    target_json   TEXT,
+                    test_inputs_json TEXT,
+                    schedule      TEXT DEFAULT 'daily',
+                    alert_webhook TEXT,
+                    baseline_json TEXT,
+                    last_run_at   TEXT,
+                    last_status   TEXT DEFAULT 'pending',
+                    created_at    TEXT NOT NULL
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS monitor_runs (
+                    run_id        TEXT PRIMARY KEY,
+                    monitor_id    TEXT,
+                    client_name   TEXT,
+                    ran_at        TEXT,
+                    regression_detected INTEGER DEFAULT 0,
+                    severity      TEXT,
+                    results_json  TEXT,
+                    FOREIGN KEY(monitor_id) REFERENCES feature_monitors(monitor_id)
+                )
+            """)
             # Migrate: add missing columns to usage_logs
             cur.execute("PRAGMA table_info(usage_logs)")
             existing = {row[1] for row in cur.fetchall()}
@@ -524,6 +623,11 @@ def init_db():
             cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date ON demo_runs(run_date)")
             if "target_id" in existing:
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
+
+            cur.execute("PRAGMA table_info(web_audit_reports)")
+            existing_web_audit = {row[1] for row in cur.fetchall()}
+            if "share_token" not in existing_web_audit:
+                cur.execute("ALTER TABLE web_audit_reports ADD COLUMN share_token TEXT")
 
             # Migrate: add billing columns to users if missing
             cur.execute("PRAGMA table_info(users)")
@@ -858,6 +962,258 @@ def finalize_report_failure(report_id, error_message):
         )
 
 
+# ── Web audit reports ─────────────────────────────────────────────────────────
+
+def insert_web_audit_report(*, audit_id, client_name, url, description, status="queued"):
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            INSERT INTO web_audit_reports(
+                audit_id, client_name, url, description, status, created_at, updated_at
+            ) VALUES ({_ph(7)})
+            """,
+            (audit_id, client_name, url, description, status, now, now),
+        )
+
+
+def update_web_audit_status(audit_id: str, status: str) -> None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE web_audit_reports
+               SET status={_P}, updated_at={_P}
+             WHERE audit_id={_P}
+            """,
+            (status, _utc_now(), audit_id),
+        )
+
+
+def finalize_web_audit_success(
+    *,
+    audit_id: str,
+    health: str | None,
+    confidence: int | None,
+    issues_json: str | None,
+    passed_json: str | None,
+    summary: str | None,
+    video_path: str | None,
+) -> None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE web_audit_reports
+               SET status={_P},
+                   health={_P},
+                   confidence={_P},
+                   issues_json={_P},
+                   passed_json={_P},
+                   summary={_P},
+                   video_path={_P},
+                   updated_at={_P}
+             WHERE audit_id={_P}
+            """,
+            (
+                "done",
+                health,
+                confidence,
+                issues_json,
+                passed_json,
+                summary,
+                video_path,
+                _utc_now(),
+                audit_id,
+            ),
+        )
+
+
+def finalize_web_audit_failure(audit_id: str) -> None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE web_audit_reports
+               SET status={_P},
+                   updated_at={_P}
+             WHERE audit_id={_P}
+            """,
+            ("failed", _utc_now(), audit_id),
+        )
+
+
+def get_web_audit_row(audit_id: str) -> dict | None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT * FROM web_audit_reports WHERE audit_id=%s" % _P
+            if _USE_PG else
+            "SELECT * FROM web_audit_reports WHERE audit_id=?",
+            (audit_id,),
+        )
+        return _row_to_dict(cur.fetchone())
+
+
+def add_share_token_to_web_audit(audit_id: str, client_name: str, token: str) -> None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE web_audit_reports
+               SET share_token={_P}
+             WHERE audit_id={_P}
+               AND client_name={_P}
+            """,
+            (token, audit_id, client_name),
+        )
+
+
+def get_web_audit_by_share_token(token: str) -> dict | None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT * FROM web_audit_reports WHERE share_token=%s" % _P
+            if _USE_PG else
+            "SELECT * FROM web_audit_reports WHERE share_token=?",
+            (token,),
+        )
+        return _row_to_dict(cur.fetchone())
+
+
+# ── Feature monitors ─────────────────────────────────────────────────────────
+
+def create_feature_monitor(
+    *,
+    monitor_id: str,
+    client_name: str,
+    feature_name: str,
+    description: str,
+    target_json: str,
+    test_inputs_json: str,
+    schedule: str,
+    alert_webhook: str | None,
+) -> None:
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            INSERT INTO feature_monitors(
+                monitor_id, client_name, feature_name, description, target_json,
+                test_inputs_json, schedule, alert_webhook, baseline_json,
+                last_run_at, last_status, created_at
+            ) VALUES ({_ph(12)})
+            """,
+            (
+                monitor_id,
+                client_name,
+                feature_name,
+                description,
+                target_json,
+                test_inputs_json,
+                schedule,
+                alert_webhook,
+                None,
+                None,
+                "pending",
+                now,
+            ),
+        )
+
+
+def update_feature_monitor_baseline(monitor_id: str, baseline_json: str, status: str = "ready") -> None:
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE feature_monitors
+               SET baseline_json={_P},
+                   last_run_at={_P},
+                   last_status={_P}
+             WHERE monitor_id={_P}
+            """,
+            (baseline_json, now, status, monitor_id),
+        )
+
+
+def update_feature_monitor_status(monitor_id: str, status: str) -> None:
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE feature_monitors
+               SET last_run_at={_P},
+                   last_status={_P}
+             WHERE monitor_id={_P}
+            """,
+            (now, status, monitor_id),
+        )
+
+
+def get_feature_monitor(monitor_id: str) -> dict | None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT * FROM feature_monitors WHERE monitor_id=%s" % _P
+            if _USE_PG else
+            "SELECT * FROM feature_monitors WHERE monitor_id=?",
+            (monitor_id,),
+        )
+        return _row_to_dict(cur.fetchone())
+
+
+def list_monitors_for_client(client_name: str) -> list[dict]:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            SELECT monitor_id, client_name, feature_name, description, target_json,
+                   test_inputs_json, schedule, alert_webhook, baseline_json,
+                   last_run_at, last_status, created_at
+            FROM feature_monitors
+            WHERE client_name={_P}
+            ORDER BY created_at DESC
+            """,
+            (client_name,),
+        )
+        return [_row_to_dict(r) for r in cur.fetchall()]
+
+
+def insert_monitor_run(
+    *,
+    run_id: str,
+    monitor_id: str,
+    client_name: str,
+    ran_at: str,
+    regression_detected: bool,
+    severity: str | None,
+    results_json: str,
+) -> None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            INSERT INTO monitor_runs(
+                run_id, monitor_id, client_name, ran_at,
+                regression_detected, severity, results_json
+            ) VALUES ({_ph(7)})
+            """,
+            (
+                run_id,
+                monitor_id,
+                client_name,
+                ran_at,
+                1 if regression_detected else 0,
+                severity,
+                results_json,
+            ),
+        )
+
+
 def cancel_report(report_id: str, reason: str, client_name: str | None = None) -> bool:
     with _get_conn() as conn:
         cur = conn.cursor()
@@ -984,6 +1340,66 @@ def list_reports_for_client(client_name: str) -> list[dict]:
             (client_name,),
         )
         return [_row_to_dict(r) for r in cur.fetchall()]
+
+
+def list_all_audits_for_client(client_name: str, limit: int = 100) -> list[dict]:
+    web_rows: list[dict] = []
+    monitor_rows: list[dict] = []
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                f"""
+                SELECT audit_id as id, 'web_audit' as type, url as title,
+                       status, health, issues_json, created_at
+                FROM web_audit_reports
+                WHERE client_name={_P}
+                ORDER BY created_at DESC
+                LIMIT {_P}
+                """,
+                (client_name, int(limit)),
+            )
+            web_rows = [_row_to_dict(r) for r in cur.fetchall()]
+        except Exception:
+            web_rows = []
+
+        try:
+            cur.execute(
+                f"""
+                SELECT run_id as id, 'monitor_check' as type, monitor_id as title,
+                       ran_at as created_at,
+                       CASE WHEN regression_detected=1 THEN 'critical' ELSE 'good' END as health,
+                       results_json as issues_json,
+                       'done' as status
+                FROM monitor_runs
+                WHERE client_name={_P}
+                ORDER BY ran_at DESC
+                LIMIT {_P}
+                """,
+                (client_name, int(limit)),
+            )
+            monitor_rows = [_row_to_dict(r) for r in cur.fetchall()]
+        except Exception:
+            monitor_rows = []
+
+    combined = (web_rows or []) + (monitor_rows or [])
+    combined.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    combined = combined[: int(limit)]
+    for row in combined:
+        issues_raw = row.get("issues_json") or "[]"
+        try:
+            issues = json.loads(issues_raw) if isinstance(issues_raw, str) else issues_raw
+            issues_count = len(issues or [])
+        except Exception:
+            issues_count = 0
+        row["issues_count"] = issues_count
+        if row.get("type") == "web_audit":
+            row["detail_url"] = f"/app/web-audit"
+        elif row.get("type") == "monitor_check":
+            row["detail_url"] = f"/app/monitors"
+        else:
+            row["detail_url"] = "/app"
+    return combined
 
 
 # ── Human reviews ─────────────────────────────────────────────────────────────

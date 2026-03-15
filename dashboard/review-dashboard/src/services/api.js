@@ -87,4 +87,54 @@ export const api = {
   getUsageSummary() {
     return request('/usage/summary');
   },
+  createWebAudit(body) {
+    return request('/web-audit', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+  getWebAudit(id) {
+    return request(`/web-audit/${encodeURIComponent(id)}`);
+  },
+  getWebAuditVideo(id) {
+    return `${API_BASE_URL}/web-audit/${encodeURIComponent(id)}/video`;
+  },
+  shareWebAudit(id) {
+    return request(`/web-audit/${encodeURIComponent(id)}/share`, {
+      method: 'POST',
+    });
+  },
+  getPublicWebAudit(token) {
+    return fetch(`${API_BASE_URL}/web-audit/share/${encodeURIComponent(token)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Report not found');
+        return res.json();
+      });
+  },
+  createAgentAudit(body) {
+    return request('/agent-audit', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+  getReport(id) {
+    return request(`/report/${encodeURIComponent(id)}`);
+  },
+  createMonitor(body) {
+    return request('/monitors', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+  getMonitors() {
+    return request('/monitors');
+  },
+  runMonitorCheck(id) {
+    return request(`/monitors/${encodeURIComponent(id)}/check`, {
+      method: 'POST',
+    });
+  },
+  getAuditHistory() {
+    return request('/audit-history');
+  },
 };

@@ -173,3 +173,46 @@ class RagEvalRequest(BaseModel):
     target: BreakTarget
     samples: list[RagEvalSample] = Field(default_factory=list)
     groq_api_key: str
+
+
+class WebAuditRequest(BaseModel):
+    url: str = Field(..., description="Full URL to audit e.g. https://myapp.com")
+    description: str | None = Field(None, description="What the site is supposed to do")
+
+
+class WebAuditResponse(BaseModel):
+    audit_id: str
+    url: str
+    status: str  # queued | processing | done | failed
+    overall_health: str | None = None
+    confidence: int | None = None
+    issues: list | None = None
+    passed: list | None = None
+    summary: str | None = None
+    video_url: str | None = None
+    screenshot_url: str | None = None
+    created_at: str
+
+
+class AgentAuditRequest(BaseModel):
+    target: BreakTarget
+    description: str = Field(..., min_length=10, description="What this agent/API is supposed to do")
+    num_scenarios: int = Field(default=10, ge=3, le=30)
+    categories: list[str] | None = Field(
+        default=None,
+        description="Filter: edge_case | logic | hallucination | security | reliability",
+    )
+
+
+class FeatureMonitorConfig(BaseModel):
+    feature_name: str
+    description: str
+    target: BreakTarget
+    test_inputs: list[str] = Field(..., min_length=3, description="At least 3 representative inputs for this feature")
+    schedule: str = Field(default="daily", description="daily | hourly | on_deploy")
+    alert_webhook: str | None = None
+
+
+class MonitorCheckRequest(BaseModel):
+    monitor_id: str
+    force: bool = False
