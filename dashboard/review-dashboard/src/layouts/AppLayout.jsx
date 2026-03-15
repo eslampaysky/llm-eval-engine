@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/app/dashboard', label: 'Dashboard', icon: '◆' },
   { to: '/app/targets', label: 'Targets', icon: '◈' },
   { to: '/app/runs', label: 'Runs', icon: '◷' },
+  { to: '/app/audit', label: 'Audit Report', icon: '📋' },
   { to: '/app/hitl', label: 'HITL Review', icon: '✎' },
   { to: '/app/playground', label: 'Playground', icon: '⚡' },
   { to: '/app/agentic', label: 'Agentic', icon: '*' },

@@ -80,6 +80,7 @@ from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ
 from api.plans import get_plan_limits, resolve_plan
 from api.user_auth import decode_access_token
 from reports.report_generator import ReportGenerator, generate_html_report, generate_premium_report
+from reports.compliance_report import generate_compliance_report
 from src.llm_eval_engine.infrastructure.config_loader import load_project_config
 from src.llm_eval_engine.infrastructure.evaluator_factories import (
     build_default_evaluator_registry,
@@ -211,6 +212,12 @@ class NotifyRequest(BaseModel):
     email: str | None = None
     slack_enabled: bool = False
     email_enabled: bool = False
+
+
+class ComplianceRequest(BaseModel):
+    standard: str
+    risk_level: str
+    output_format: str = "html"
 
 
 class BillingCheckoutRequest(BaseModel):
@@ -1958,6 +1965,62 @@ def unshare_report(
     }
 
 
+@router.post("/report/{report_id}/compliance")
+@limiter.limit(LIMIT_READ)
+def generate_compliance_endpoint(
+    request: Request,
+    report_id: str,
+    payload: ComplianceRequest,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    row = get_report_row(report_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if row.get("client_name") != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=403, detail="Not allowed to access this report")
+    if row.get("status") != "done":
+        raise HTTPException(status_code=409, detail="Report is not complete yet")
+
+    standard_map = {
+        "eu_ai_act": "eu_ai_act",
+        "iso_42001": "iso_42001",
+    }
+    risk_map = {
+        "high": "high",
+        "limited": "limited",
+        "minimal": "minimal",
+    }
+    fmt_map = {
+        "html": "html",
+        "pdf": "pdf",
+    }
+
+    std = standard_map.get((payload.standard or "").strip().lower())
+    if not std:
+        raise HTTPException(status_code=422, detail="Unsupported standard")
+    risk = risk_map.get((payload.risk_level or "").strip().lower())
+    if not risk:
+        raise HTTPException(status_code=422, detail="Unsupported risk_level")
+    fmt = fmt_map.get((payload.output_format or "").strip().lower(), "html")
+
+    try:
+        file_path = generate_compliance_report(
+            report_id=report_id,
+            standard=std,
+            risk_level=risk,
+            output_format=fmt,
+        )
+    except NotImplementedError as exc:
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
+
+    return {
+        "report_id": report_id,
+        "compliance_report_path": f"/report/{report_id}/compliance-html",
+        "standard": std,
+        "risk_level": risk,
+    }
+
+
 @router.post("/report/{report_id}/cancel", status_code=202)
 async def cancel_report_endpoint(
     report_id: str,
@@ -2356,6 +2419,25 @@ def get_report_html(
         if not html_content:
             raise HTTPException(status_code=404, detail="Could not generate HTML report")
 
+    return HTMLResponse(content=html_content)
+
+
+@router.get("/report/{report_id}/compliance-html", response_class=HTMLResponse)
+@limiter.limit(LIMIT_READ)
+def get_compliance_html(
+    request: Request,
+    report_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+):
+    row = get_report_row(report_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if row.get("client_name") != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=403, detail="Not allowed to access this report")
+    path = REPORT_DIR / f"compliance_{report_id}.html"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Compliance report not found")
+    html_content = path.read_text(encoding="utf-8")
     return HTMLResponse(content=html_content)
 
 

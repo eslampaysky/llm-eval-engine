@@ -23,6 +23,7 @@ import ComparePage from '../pages/app/ComparePage.jsx';
 import ApiKeysPage from '../pages/app/ApiKeysPage.jsx';
 import DriftPage from '../pages/app/DriftPage.jsx';
 import EsgPage from '../pages/app/EsgPage.jsx';
+import AuditPage from '../pages/app/AuditPage.jsx';
 import SettingsLayout from '../pages/app/settings/SettingsLayout.jsx';
 import ProfilePage from '../pages/app/settings/ProfilePage.jsx';
 import SecurityPage from '../pages/app/settings/SecurityPage.jsx';
@@ -66,6 +67,7 @@ const router = createBrowserRouter([
       { path: 'api-keys', element: <ApiKeysPage /> },
       { path: 'drift', element: <DriftPage /> },
       { path: 'esg', element: <EsgPage /> },
+      { path: 'audit', element: <AuditPage /> },
       {
         path: 'settings',
         element: <SettingsLayout />,
