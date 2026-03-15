@@ -6,7 +6,6 @@ import LandingPage from '../pages/public/LandingPage.jsx';
 import DemoPage from '../pages/public/DemoPage.jsx';
 import DocsPage from '../pages/public/DocsPage.jsx';
 import PricingPage from '../pages/public/PricingPage.jsx';
-import ConfigBuilderPage from '../pages/app/ConfigBuilderPage.jsx';
 import BillingSuccessPage from '../pages/public/BillingSuccessPage.jsx';
 import PublicReportPage from '../pages/public/PublicReportPage.jsx';
 import LoginPage from '../pages/auth/LoginPage.jsx';
@@ -66,7 +65,6 @@ const router = createBrowserRouter([
       { path: 'hitl', element: <HitlPage /> },
       { path: 'playground', element: <PlaygroundPage /> },
       { path: 'agentic', element: <AgenticPage /> },
-      { path: 'config-builder', element: <ConfigBuilderPage /> },
       { path: 'rag', element: <RagPage /> },
       { path: 'vision', element: <VisionPage /> },
       { path: 'compare', element: <ComparePage /> },
