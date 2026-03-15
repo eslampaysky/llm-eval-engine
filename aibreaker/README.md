@@ -15,7 +15,6 @@ from aibreaker import BreakerClient
 
 client = BreakerClient(
     api_key="client_key",
-    groq_api_key="gsk_...",   # forwarded to backend for test generation + judging
 )
 
 report = client.break_model(
@@ -129,8 +128,9 @@ one-step CI integration.
 - uses: your-org/aibreaker-action@v1
   with:
     api_key: ${{ secrets.BREAKER_API_KEY }}
-    groq_api_key: ${{ secrets.GROQ_API_KEY }}
     endpoint: https://llm-eval-engine-production.up.railway.app
     description: "Customer support chatbot"
     fail_threshold: "5.0"
+    comment_on_pr: "true"
+    github_token: ${{ secrets.GITHUB_TOKEN }}
 ```

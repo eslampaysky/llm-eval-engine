@@ -1,0 +1,26 @@
+name: AiBreaker PR Audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  aibreaker-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run AiBreaker audit
+        uses: ./github-action
+        with:
+          api_key: ${{ secrets.AIBREAKER_API_KEY }}
+          endpoint: ${{ secrets.AIBREAKER_ENDPOINT }}
+          description: "PR audit for the current web app build"
+          target_type: "webhook"
+          target_endpoint_url: ${{ secrets.AIBREAKER_WEBHOOK_URL }}
+          comment_on_pr: "true"
+          github_token: ${{ secrets.GITHUB_TOKEN }}

@@ -35,6 +35,8 @@ _log = logging.getLogger(__name__)
 APP_VERSION = "1.0.0"
 STUCK_AFTER_MINUTES = int(os.getenv("STUCK_REPORT_MINUTES", "15"))
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "").strip()
+_APP_ENV = (os.getenv("APP_ENV") or os.getenv("ENV") or "").strip().lower()
+_IS_PROD = _APP_ENV in {"prod", "production"}
 EXTRA_FRONTEND_ORIGINS = [
     "https://ai-breaker-labs.vercel.app",
     "http://localhost:5173",
@@ -139,6 +141,11 @@ for origin in EXTRA_FRONTEND_ORIGINS:
     if origin and origin not in cors_origins:
         cors_origins.append(origin)
 if not cors_origins:
+    if _IS_PROD:
+        raise RuntimeError(
+            "FRONTEND_ORIGIN is required in production. "
+            "Set FRONTEND_ORIGIN to your dashboard origin (e.g. https://app.example.com)."
+        )
     cors_origins = ["*"]
 app.add_middleware(
     CORSMiddleware,

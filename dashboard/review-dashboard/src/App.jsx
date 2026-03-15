@@ -790,6 +790,7 @@ tr:hover td { background:rgba(255,255,255,.012); }
 .fail-item { background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:10px 13px; margin-bottom:6px; }
 .fail-q { font-size:12.5px; color:var(--text); margin-bottom:4px; line-height:1.4; }
 .fail-meta { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.fail-summary { margin-top:6px; font-size:12px; color:var(--mid); line-height:1.45; }
 .rec-box { background:rgba(240,165,0,.06); border:1px solid rgba(240,165,0,.22); border-radius:var(--r); padding:13px 15px; }
 .rec-label { font-family:var(--mono); font-size:9px; color:var(--accent); letter-spacing:.12em; text-transform:uppercase; margin-bottom:5px; }
 
@@ -1951,6 +1952,24 @@ export function ReportPage({ report, persona, overviewExtra = null }) {
                     <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--mute)' }}>score {f.score?.toFixed(1) ?? '—'}/10</span>
                     {f.hallucination && <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--red)' }}>⚠ hallucination</span>}
                   </div>
+                  {f.summary && <div className="fail-summary">{f.summary}</div>}
+                  {f.fix_prompt && (
+                    <div style={{ marginTop: 8 }}>
+                      <button
+                        className="btn btn-ghost"
+                        style={{ padding: '6px 10px', fontSize: 11 }}
+                        onClick={() => {
+                          if (navigator.clipboard?.writeText) {
+                            navigator.clipboard.writeText(f.fix_prompt);
+                          } else {
+                            window.prompt('Copy fix prompt', f.fix_prompt);
+                          }
+                        }}
+                      >
+                        Copy fix prompt
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

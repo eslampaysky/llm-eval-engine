@@ -2,8 +2,7 @@
 database.py — unified DB layer for Breaker Lab.
 
 Strategy:
-  - If DATABASE_URL env var is set (Railway Postgres), use psycopg2.
-  - Otherwise fall back to SQLite (local dev / legacy).
+  - Require PostgreSQL (DATABASE_URL).
 
 All public functions share the same signature as before so routes.py
 needs zero changes except for the new delete + cache helpers at the bottom.
@@ -16,7 +15,6 @@ import hashlib
 import json
 import logging
 import os
-import sqlite3
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -31,100 +29,63 @@ _RAW_DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
 def _is_postgres_url(url: str) -> bool:
     return url.startswith("postgresql://") or url.startswith("postgres://")
 
-_USE_PG = _is_postgres_url(_RAW_DATABASE_URL)
+if not _RAW_DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is required. SQLite is no longer supported.")
+if not _is_postgres_url(_RAW_DATABASE_URL):
+    raise RuntimeError("DATABASE_URL must start with postgres:// or postgresql://")
 
 # Normalize scheme for compatibility (Railway commonly uses postgres://...).
-DATABASE_URL: str | None = None
-if _USE_PG:
-    DATABASE_URL = (
-        "postgresql://" + _RAW_DATABASE_URL[len("postgres://") :]
-        if _RAW_DATABASE_URL.startswith("postgres://")
-        else _RAW_DATABASE_URL
-    )
-
-# SQLite fallback path
-_DATA_DIR = os.getenv("DATA_DIR")
-_SQLITE_FILE = (
-    os.path.join(_DATA_DIR, "usage.db")
-    if _DATA_DIR
-    else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "usage.db"))
+DATABASE_URL: str = (
+    "postgresql://" + _RAW_DATABASE_URL[len("postgres://") :]
+    if _RAW_DATABASE_URL.startswith("postgres://")
+    else _RAW_DATABASE_URL
 )
-
-# Backwards-compatibility alias — routes.py imports DB_FILE directly
-DB_FILE = _SQLITE_FILE
+_USE_PG = True
 
 # ── Connection helpers ────────────────────────────────────────────────────────
 
-if _USE_PG:
-    import psycopg2
-    import psycopg2.extras
-    from psycopg2.pool import ThreadedConnectionPool
+import psycopg2
+import psycopg2.extras
+from psycopg2.pool import ThreadedConnectionPool
 
-    _PG_POOL: ThreadedConnectionPool | None = None
-    _PG_MIN_CONN = int(os.getenv("PG_POOL_MIN_CONN", "1"))
-    _PG_MAX_CONN = int(os.getenv("PG_POOL_MAX_CONN", "8"))
+_PG_POOL: ThreadedConnectionPool | None = None
+_PG_MIN_CONN = int(os.getenv("PG_POOL_MIN_CONN", "1"))
+_PG_MAX_CONN = int(os.getenv("PG_POOL_MAX_CONN", "8"))
 
-    def _get_pg_pool() -> ThreadedConnectionPool:
-        global _PG_POOL
-        if _PG_POOL is None:
-            _PG_POOL = ThreadedConnectionPool(
-                _PG_MIN_CONN,
-                _PG_MAX_CONN,
-                DATABASE_URL,
-                cursor_factory=psycopg2.extras.RealDictCursor,
-            )
-        return _PG_POOL
+def _get_pg_pool() -> ThreadedConnectionPool:
+    global _PG_POOL
+    if _PG_POOL is None:
+        _PG_POOL = ThreadedConnectionPool(
+            _PG_MIN_CONN,
+            _PG_MAX_CONN,
+            DATABASE_URL,
+            cursor_factory=psycopg2.extras.RealDictCursor,
+        )
+    return _PG_POOL
 
-    def _close_pg_pool() -> None:
-        global _PG_POOL
-        if _PG_POOL is not None:
-            _PG_POOL.closeall()
-            _PG_POOL = None
+def _close_pg_pool() -> None:
+    global _PG_POOL
+    if _PG_POOL is not None:
+        _PG_POOL.closeall()
+        _PG_POOL = None
 
-    atexit.register(_close_pg_pool)
+atexit.register(_close_pg_pool)
 
-    @contextmanager
-    def _get_conn() -> Generator:
-        pool = _get_pg_pool()
-        conn = pool.getconn()
-        try:
-            yield conn
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            pool.putconn(conn)
+@contextmanager
+def _get_conn() -> Generator:
+    pool = _get_pg_pool()
+    conn = pool.getconn()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        pool.putconn(conn)
 
-    # Postgres uses %s placeholders; SQLite uses ?
-    _P = "%s"
-
-else:
-    def _ensure_sqlite_dir() -> None:
-        db_dir = os.path.dirname(_SQLITE_FILE)
-        if not db_dir:
-            return
-        try:
-            os.makedirs(db_dir, exist_ok=True)
-        except Exception:
-            # If we can't create it here, sqlite will raise a clearer error on connect.
-            pass
-
-    @contextmanager
-    def _get_conn() -> Generator:
-        _ensure_sqlite_dir()
-        conn = sqlite3.connect(_SQLITE_FILE)
-        conn.row_factory = sqlite3.Row
-        try:
-            yield conn
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
-
-    _P = "?"
+# Postgres uses %s placeholders.
+_P = "%s"
 
 
 def _row_to_dict(row) -> dict | None:
@@ -144,60 +105,56 @@ def _ph(n: int = 1) -> str:
 
 def init_db():
     """Create all tables if they don't exist. Safe to call on every startup."""
-    if _USE_PG:
-        _log.info("[DB] Initializing Postgres schema")
-    else:
-        _log.info("[DB] Initializing SQLite schema file=%s", _SQLITE_FILE)
+    _log.info("[DB] Initializing Postgres schema")
     with _get_conn() as conn:
         cur = conn.cursor()
 
-        if _USE_PG:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS clients (
-                    id SERIAL PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    api_key_hash TEXT NOT NULL UNIQUE,
-                    active INTEGER NOT NULL DEFAULT 1,
-                    created_at TEXT NOT NULL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS usage_logs (
-                    id SERIAL PRIMARY KEY,
-                    client_id INTEGER,
-                    client_name TEXT,
-                    report_id TEXT,
-                    dataset_id TEXT,
-                    model_version TEXT,
-                    evaluation_date TEXT,
-                    api_key_hash TEXT,
-                    timestamp TEXT,
-                    sample_count INTEGER,
-                    FOREIGN KEY (client_id) REFERENCES clients(id)
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS evaluation_runs (
-                    report_id TEXT PRIMARY KEY,
-                    client_name TEXT,
-                    dataset_id TEXT,
-                    model_version TEXT,
-                    timestamp TEXT NOT NULL,
-                    correctness REAL,
-                    relevance REAL,
-                    hallucination REAL,
-                    overall REAL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS evaluation_reports (
-                    report_id TEXT PRIMARY KEY,
-                    client_id INTEGER,
-                    client_name TEXT,
-                    share_token TEXT UNIQUE,
-                    shared BOOLEAN NOT NULL DEFAULT TRUE,
-                    status TEXT NOT NULL,
-                    judge_model TEXT,
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS clients (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                api_key_hash TEXT NOT NULL UNIQUE,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS usage_logs (
+                id SERIAL PRIMARY KEY,
+                client_id INTEGER,
+                client_name TEXT,
+                report_id TEXT,
+                dataset_id TEXT,
+                model_version TEXT,
+                evaluation_date TEXT,
+                api_key_hash TEXT,
+                timestamp TEXT,
+                sample_count INTEGER,
+                FOREIGN KEY (client_id) REFERENCES clients(id)
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS evaluation_runs (
+                report_id TEXT PRIMARY KEY,
+                client_name TEXT,
+                dataset_id TEXT,
+                model_version TEXT,
+                timestamp TEXT NOT NULL,
+                correctness REAL,
+                relevance REAL,
+                hallucination REAL,
+                overall REAL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS evaluation_reports (
+                report_id TEXT PRIMARY KEY,
+                client_id INTEGER,
+                client_name TEXT,
+                share_token TEXT UNIQUE,
+                shared BOOLEAN NOT NULL DEFAULT TRUE,
+                status TEXT NOT NULL,
+                judge_model TEXT,
                     sample_count INTEGER NOT NULL,
                     dataset_id TEXT,
                     model_version TEXT,

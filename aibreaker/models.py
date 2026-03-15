@@ -15,6 +15,8 @@ class FailedTest:
     score:        float
     hallucination: bool
     reason:       str
+    summary:      str
+    fix_prompt:   str
 
     @classmethod
     def _from_dict(cls, d: dict) -> "FailedTest":
@@ -26,6 +28,8 @@ class FailedTest:
             score         = float(d.get("score",       0.0)),
             hallucination = bool(d.get("hallucination", False)),
             reason        = str(d.get("reason",        "")),
+            summary       = str(d.get("summary",       "")),
+            fix_prompt    = str(d.get("fix_prompt",    "")),
         )
 
 

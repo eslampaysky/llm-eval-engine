@@ -9,7 +9,7 @@ import shutil
 import tempfile
 from typing import Generator
 from uuid import uuid4
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -134,6 +134,31 @@ def test_evaluate_and_report_endpoints(app_client: TestClient) -> None:
 
     res_missing = app_client.get("/report/does-not-exist", headers={"X-API-KEY": "test_key"})
     assert res_missing.status_code == 404
+
+
+def test_break_endpoint(app_client: TestClient) -> None:
+    payload = {
+        "target": {
+            "type": "openai",
+            "model_name": "gpt-4o-mini",
+        },
+        "description": "Customer support assistant for a SaaS product",
+        "num_tests": 6,
+        "groq_api_key": "gsk_test",
+    }
+
+    with patch("api.routes.enqueue_job", new=AsyncMock()) as enqueue_mock:
+        res = app_client.post(
+            "/break",
+            headers={"X-API-KEY": "test_key"},
+            json=payload,
+        )
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["status"] == "processing"
+    assert "report_id" in body
+    enqueue_mock.assert_awaited()
 
 
 def test_billing_checkout_errors(app_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:

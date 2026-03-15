@@ -1,7 +1,7 @@
 /**
  * Billing settings.
  * - Uses existing GET /usage/summary endpoint for usage meters
- * - Three plan cards (Free/Pro/Enterprise) with upgrade placeholder CTAs
+ * - Three plan cards (Free/Pro/Enterprise) wired to checkout
  */
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../../../App.jsx';
@@ -71,21 +71,26 @@ const PLANS = [
     price: '$0',
     period: '/month',
     color: 'rgba(142,168,199,0.65)',
-    features: ['50 break runs/month', '20 tests per run', 'Community support', 'Multi-provider support'],
+    features: [
+      '3 web audits / month',
+      '20 tests per run',
+      'Video replays',
+      'AI fix prompts',
+    ],
   },
   {
     key: 'pro',
     name: 'Pro',
-    price: '$29',
+    price: '$99',
     period: '/month',
     color: 'var(--accent)',
     cta: 'Upgrade to Pro',
     features: [
-      '500 break runs / month',
-      '100 tests per run',
-      'PDF + HTML reports',
-      'Saved targets',
-      'Team sharing',
+      '200 web audits / month',
+      '75 tests per run',
+      'PR comment bot',
+      'Team sharing + share links',
+      'Audit exports',
       'Priority support',
     ],
   },
@@ -96,7 +101,13 @@ const PLANS = [
     period: '',
     color: 'var(--accent2)',
     cta: 'Contact sales',
-    features: ['Team workspaces', 'SAML/SSO', 'Custom policies', 'Dedicated support'],
+    features: [
+      'Unlimited audits',
+      'Custom test suites',
+      'SSO / SAML',
+      'Dedicated support',
+      'SLA + security review',
+    ],
   },
 ];
 
@@ -288,7 +299,7 @@ export default function BillingPage() {
         <div style={{ ...S.card, border: '1px solid rgba(59,180,255,0.35)', background: 'rgba(59,180,255,0.06)' }}>
           <div style={{ ...S.sectionTitle, marginBottom: 6 }}>Upgrade to Pro</div>
           <div style={{ ...S.sectionDesc, marginBottom: 14 }}>
-            Unlock 500 monthly runs, longer test suites, and priority support.
+            Unlock 200 monthly audits, PR comments, and team sharing.
           </div>
           <button
             type="button"
@@ -346,9 +357,9 @@ export default function BillingPage() {
       </div>
 
       <div style={S.card}>
-        <div style={S.sectionTitle}>Top-up Runs</div>
+        <div style={S.sectionTitle}>Top-up Audits</div>
         <div style={S.sectionDesc}>
-          Top-up runs never expire and stack with your monthly plan limit.
+          Top-ups never expire and stack with your monthly plan limit.
         </div>
 
         <button
@@ -375,7 +386,7 @@ export default function BillingPage() {
               Redirecting...
             </span>
           ) : (
-            'Buy 100 extra runs — $10'
+            'Buy 100 extra audits — $29'
           )}
         </button>
         {!!runPackError && (

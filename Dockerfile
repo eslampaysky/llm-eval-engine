@@ -27,6 +27,6 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 # Copy the rest of the project
 COPY . .
 
-EXPOSE 8080
+EXPOSE 8000
 
 CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

@@ -61,7 +61,7 @@ export default function DocsPage() {
           Create a client, kick off a break run, then check <code>report.passed</code>.
         </div>
         <pre style={codeStyle}>{`from aibreaker import BreakerClient
-client = BreakerClient(api_key="client_key", groq_api_key="gsk_...")
+client = BreakerClient(api_key="client_key")
 report = client.break_model(
     target={"type": "openai", "base_url": "https://api.openai.com", "api_key": "sk-...", "model_name": "gpt-4o-mini"},
     description="Customer-support chatbot for an e-commerce platform",
@@ -126,10 +126,11 @@ if not report.passed: raise SystemExit(1)`}</pre>
         <pre style={codeStyle}>{`- uses: your-org/aibreaker-action@v1
   with:
     api_key: \${{ secrets.BREAKER_API_KEY }}
-    groq_api_key: \${{ secrets.GROQ_API_KEY }}
     endpoint: https://llm-eval-engine-production.up.railway.app
     description: "Customer support chatbot"
-    fail_threshold: "5.0"`}</pre>
+    fail_threshold: "5.0"
+    comment_on_pr: "true"
+    github_token: \${{ secrets.GITHUB_TOKEN }}`}</pre>
       </div>
 
       <div className="card" style={{ marginBottom: 14 }}>
@@ -183,7 +184,7 @@ if not report.passed: raise SystemExit(1)`}</pre>
         <pre style={codeStyle}>{`from aibreaker import BreakerClient
 from aibreaker.client import BreakerError
 
-client = BreakerClient(api_key="client_key", groq_api_key="gsk_...")
+client = BreakerClient(api_key="client_key")
 
 try:
     report = client.break_model(target=..., description="...", num_tests=20)

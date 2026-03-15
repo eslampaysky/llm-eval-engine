@@ -48,6 +48,14 @@ Return ONLY valid JSON — no markdown, no explanation:
       "likely_failure_point": "string"
     }}
   ],
+  "test_scenarios": [
+    {{
+      "name": "string",
+      "goal": "string",
+      "steps": ["step 1", "step 2", "step 3"],
+      "expected_outcome": "string"
+    }}
+  ],
   "confidence": 0-100
 }}"""
     r = _get_client().messages.create(
@@ -65,7 +73,12 @@ Return ONLY valid JSON — no markdown, no explanation:
                 return json.loads(match.group())
             except Exception:
                 pass
-    return {"inferred_purpose": "Unknown product", "critical_journeys": [], "confidence": 0}
+    return {
+        "inferred_purpose": "Unknown product",
+        "critical_journeys": [],
+        "test_scenarios": [],
+        "confidence": 0,
+    }
 
 
 def judge_web_audit(crawl: dict, description: str | None = None) -> dict:

@@ -29,10 +29,10 @@ export default function LandingPage() {
             lineHeight: 1.02,
             marginBottom: 16,
           }}>
-            Break your AI before users do.
+            Ship AI-built apps without the embarrassing breakage.
           </h1>
           <div className="page-desc" style={{ maxWidth: 640, fontSize: 16 }}>
-            AI Breaker Labs stress-tests LLM applications for hallucinations, safety failures, regressions, and prompt attacks so your team can ship with evidence instead of guesswork.
+            AiBreaker watches your app like a real user, runs adversarial web QA, and hands you a fix prompt you can paste back into your AI builder.
           </div>
           <div style={{ display: 'flex', gap: 12, marginTop: 22, flexWrap: 'wrap' }}>
             <Link className="btn btn-primary" to="/auth/signup">Start Free</Link>
@@ -45,10 +45,10 @@ export default function LandingPage() {
           <div className="card-label">What AI Breaker does</div>
           <div style={{ display: 'grid', gap: 10 }}>
             {[
-              'Generates adversarial and safety-focused test suites.',
-              'Runs your target model against real break scenarios.',
-              'Scores outputs with judge models and detailed evidence.',
-              'Tracks regressions across versions and releases.',
+              'Infers what your app is supposed to do from just a URL.',
+              'Crawls and records every critical user flow.',
+              'Flags broken behavior with plain-English summaries.',
+              'Gives you copy-paste fix prompts for the AI builder.',
             ].map((item) => (
               <div key={item} style={{
                 padding: '12px 14px',

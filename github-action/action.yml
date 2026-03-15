@@ -12,8 +12,9 @@ inputs:
     description: "Breaker Lab client API key (X-API-KEY)"
     required: true
   groq_api_key:
-    description: "Groq API key for test generation and judging"
-    required: true
+    description: "Optional Groq API key if your backend does not have GROQ_API_KEY configured"
+    required: false
+    default: ""
   endpoint:
     description: "Breaker Lab backend URL"
     required: false
@@ -73,6 +74,14 @@ inputs:
     description: "Bypass test-suite cache (true/false)"
     required: false
     default: "false"
+  comment_on_pr:
+    description: "Post a PR comment with the audit summary (true/false)"
+    required: false
+    default: "false"
+  github_token:
+    description: "GitHub token or App token used to post PR comments"
+    required: false
+    default: ""
 
 outputs:
   score:
@@ -97,10 +106,10 @@ runs:
       run: pip install "${{ github.action_path }}/../aibreaker" --quiet
 
     - name: Run evaluation
+      id: run_eval
       shell: bash
       env:
         INPUT_API_KEY: ${{ inputs.api_key }}
-        INPUT_GROQ_API_KEY: ${{ inputs.groq_api_key }}
         INPUT_ENDPOINT: ${{ inputs.endpoint }}
         INPUT_TARGET_TYPE: ${{ inputs.target_type }}
         INPUT_TARGET_BASE_URL: ${{ inputs.target_base_url }}
@@ -117,3 +126,23 @@ runs:
         INPUT_FAIL_THRESHOLD: ${{ inputs.fail_threshold }}
         INPUT_FORCE_REFRESH: ${{ inputs.force_refresh }}
       run: python "${{ github.action_path }}/_run.py"
+
+    - name: Comment on pull request
+      if: ${{ inputs.comment_on_pr == 'true' && github.event_name == 'pull_request' && inputs.github_token != '' }}
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github_token }}
+        script: |
+          const score = '${{ steps.run_eval.outputs.score }}';
+          const passed = '${{ steps.run_eval.outputs.passed }}';
+          const failures = '${{ steps.run_eval.outputs.failure_count }}';
+          const reportUrl = '${{ steps.run_eval.outputs.report_url }}';
+          const statusEmoji = passed === 'true' ? '✅' : '❌';
+          const body = [
+            '## AiBreaker Audit',
+            `${statusEmoji} Score: **${score}/10**`,
+            `Failures: **${failures}**`,
+            `Report: ${reportUrl}`,
+          ].join('\\n');
+          const { owner, repo, number } = context.issue;
+          await github.rest.issues.createComment({ owner, repo, issue_number: number, body });

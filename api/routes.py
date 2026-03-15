@@ -116,7 +116,7 @@ from src.arabic_test_generator import ArabicTestGenerator, detect_language
 from src.metrics import compute_metrics
 from src.target_adapter import AdapterFactory, GeminiDemoAdapter
 from src.test_generator import GroqJudgeClient, TestSuiteGenerator
-from src.use_cases.run_evaluation import EvaluationPipeline
+from src.llm_eval_engine.application.pipeline import EvaluationPipeline
 from core.energy_tracker import EnergyTracker
 from core.rag_evaluator import RagEvaluator
 from core.web_agent import run_web_audit

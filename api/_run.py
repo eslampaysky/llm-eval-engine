@@ -64,7 +64,6 @@ def main() -> int:
         return 1
 
     api_key      = _env("INPUT_API_KEY")
-    groq_api_key = _env("INPUT_GROQ_API_KEY")
     endpoint     = _env("INPUT_ENDPOINT", "https://llm-eval-engine-production.up.railway.app")
     description  = _env("INPUT_DESCRIPTION")
     num_tests    = int(_env("INPUT_NUM_TESTS", "20"))
@@ -101,7 +100,6 @@ def main() -> int:
     client = BreakerClient(
         api_key=api_key,
         endpoint=endpoint,
-        groq_api_key=groq_api_key or None,
         poll_interval=8,
         timeout=600,
     )

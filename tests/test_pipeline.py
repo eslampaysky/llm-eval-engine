@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from src.llm_eval_engine.application.registry import EvaluatorDefinition, EvaluatorRegistry
 from src.metrics import compute_metrics
-from src.use_cases.run_evaluation import EvaluationPipeline
+from src.llm_eval_engine.application.pipeline import EvaluationPipeline
 
 
 class _FakeEvaluator:

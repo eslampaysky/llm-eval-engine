@@ -215,12 +215,65 @@ export default function WebAuditPage() {
           {typeof result.confidence === 'number' && (
             <ConfidenceBar score={result.confidence} subject="this site" />
           )}
+          {result?.video_path && videoUrl && (
+            <div style={{ margin: '16px 0 18px' }}>
+              <div className="card-label">Video Replay</div>
+              <div style={{ fontSize: 12, color: 'var(--mid)', marginTop: 4 }}>
+                Watch the exact flow the auditor took before it scored the site.
+              </div>
+              <video
+                controls
+                width="100%"
+                style={{ marginTop: 10, borderRadius: 12, background: 'var(--bg0)' }}
+                src={videoUrl}
+              />
+            </div>
+          )}
           {result.inferred_spec && !desc && (
             <div style={{ fontSize: 13, color: 'var(--mid)', fontStyle: 'italic', marginTop: 8 }}>
               Inferred: {result.inferred_spec.inferred_purpose}
             </div>
           )}
           <p style={{ marginBottom: 16 }}>{result.summary}</p>
+          {result.inferred_spec && (
+            <div className="card" style={{ marginBottom: 16, background: 'var(--bg2)' }}>
+              <div className="card-label">Inferred Spec</div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                <div style={{ fontSize: 13, color: 'var(--mid)' }}>
+                  <strong style={{ color: 'var(--hi)' }}>Product:</strong> {result.inferred_spec.product_type || '—'}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--mid)' }}>
+                  <strong style={{ color: 'var(--hi)' }}>Target user:</strong> {result.inferred_spec.target_user || '—'}
+                </div>
+                {Array.isArray(result.inferred_spec.critical_journeys) && result.inferred_spec.critical_journeys.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--mute)', marginBottom: 6 }}>Critical journeys</div>
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {result.inferred_spec.critical_journeys.slice(0, 3).map((journey, idx) => (
+                        <div key={idx} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)' }}>
+                          <div style={{ fontWeight: 600, marginBottom: 4 }}>{journey?.name || `Journey ${idx + 1}`}</div>
+                          <div style={{ fontSize: 12, color: 'var(--mid)' }}>{journey?.success_criteria || '—'}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {Array.isArray(result.inferred_spec.test_scenarios) && result.inferred_spec.test_scenarios.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--mute)', marginBottom: 6 }}>Auto-generated scenarios</div>
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {result.inferred_spec.test_scenarios.slice(0, 3).map((sc, idx) => (
+                        <div key={idx} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)' }}>
+                          <div style={{ fontWeight: 600, marginBottom: 4 }}>{sc?.name || `Scenario ${idx + 1}`}</div>
+                          <div style={{ fontSize: 12, color: 'var(--mid)' }}>{sc?.expected_outcome || sc?.goal || '—'}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {result.issues?.map((issue, i) => (
             <div
               key={i}
@@ -267,17 +320,6 @@ export default function WebAuditPage() {
               <CopyButton text={issue.fix} />
             </div>
           ))}
-          {result?.video_path && videoUrl && (
-            <div style={{ marginTop: 16 }}>
-              <div className="card-label">Recording</div>
-              <video
-                controls
-                width="100%"
-                style={{ marginTop: 8, borderRadius: 10, background: 'var(--bg0)' }}
-                src={videoUrl}
-              />
-            </div>
-          )}
         </div>
       )}
     </div>

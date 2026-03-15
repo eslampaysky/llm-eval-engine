@@ -52,7 +52,6 @@ class BreakerClient:
         self,
         api_key:       str,
         endpoint:      str   = DEFAULT_ENDPOINT,
-        groq_api_key:  str | None = None,
         poll_interval: int   = DEFAULT_POLL_INTERVAL,
         timeout:       int   = DEFAULT_TIMEOUT,
     ) -> None:
@@ -63,9 +62,6 @@ class BreakerClient:
             Your Breaker Lab client key (X-API-KEY header).
         endpoint
             Base URL of your deployed Breaker Lab backend.
-        groq_api_key
-            Groq API key forwarded to the backend.  Falls back to
-            the GROQ_API_KEY env var on the backend if omitted.
         poll_interval
             Seconds between status polls while a job is running.
         timeout
@@ -76,7 +72,6 @@ class BreakerClient:
             "X-API-KEY":    api_key,
             "Content-Type": "application/json",
         }
-        self._groq_api_key  = groq_api_key
         self._poll_interval = poll_interval
         self._timeout       = timeout
 
@@ -139,9 +134,6 @@ class BreakerClient:
             "num_tests":    num_tests,
             "force_refresh": force_refresh,
         }
-        if self._groq_api_key:
-            body["groq_api_key"] = self._groq_api_key
-
         _log.info("[aibreaker] Submitting /break  description=%r  num_tests=%d",
                   description, num_tests)
 

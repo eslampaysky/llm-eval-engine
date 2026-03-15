@@ -5,7 +5,7 @@ from typing import Any
 
 PLAN_LIMITS: dict[str, dict[str, Any]] = {
     "free": {"runs_per_month": 3, "tests_per_run": 20, "agentic": False},
-    "pro": {"runs_per_month": 500, "tests_per_run": 100, "agentic": True},
+    "pro": {"runs_per_month": 200, "tests_per_run": 75, "agentic": True},
     "enterprise": {"runs_per_month": -1, "tests_per_run": -1, "agentic": True},
 }
 
