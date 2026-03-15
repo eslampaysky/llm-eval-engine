@@ -21,6 +21,8 @@ RUN python -m pip install --upgrade pip setuptools wheel
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --default-timeout=1000 -r requirements.txt
+RUN playwright install chromium --with-deps
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Copy the rest of the project
 COPY . .

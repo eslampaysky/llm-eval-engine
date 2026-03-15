@@ -2699,7 +2699,7 @@ def get_web_audit_video(
     metrics = json.loads(row["metrics_json"]) if row.get("metrics_json") else {}
     video_path = metrics.get("video_path")
     if not video_path or not Path(video_path).exists():
-        raise HTTPException(status_code=404, detail="Video not found")
+        raise HTTPException(status_code=404, detail="Video expired — re-run the audit")
     return FileResponse(video_path, media_type="video/webm")
 
 

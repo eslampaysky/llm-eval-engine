@@ -21,7 +21,7 @@ async def run_web_audit(url: str) -> dict:
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page(
-            record_video_dir="reports/videos/",
+            record_video_dir="/tmp/aibreaker_videos/",
             record_video_size={"width": 1280, "height": 720},
         )
         page.on(
