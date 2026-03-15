@@ -19,6 +19,8 @@ import RunDetailPage from '../pages/app/RunDetailPage.jsx';
 import PlaygroundPage from '../pages/app/PlaygroundPage.jsx';
 import HitlPage from '../pages/app/HitlPage.jsx';
 import AgenticPage from '../pages/app/AgenticPage.jsx';
+import RagPage from '../pages/app/RagPage.jsx';
+import VisionPage from '../pages/app/VisionPage.jsx';
 import ComparePage from '../pages/app/ComparePage.jsx';
 import ApiKeysPage from '../pages/app/ApiKeysPage.jsx';
 import DriftPage from '../pages/app/DriftPage.jsx';
@@ -63,6 +65,8 @@ const router = createBrowserRouter([
       { path: 'hitl', element: <HitlPage /> },
       { path: 'playground', element: <PlaygroundPage /> },
       { path: 'agentic', element: <AgenticPage /> },
+      { path: 'rag', element: <RagPage /> },
+      { path: 'vision', element: <VisionPage /> },
       { path: 'compare', element: <ComparePage /> },
       { path: 'api-keys', element: <ApiKeysPage /> },
       { path: 'drift', element: <DriftPage /> },

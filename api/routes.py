@@ -75,7 +75,7 @@ from api.database import (
     get_model_scores,
 )
 from api.job_queue import enqueue_job
-from api.models import BreakRequest, BreakTarget, DemoBreakRequest, EvaluationRequest, JudgeConfig, TargetCreate
+from api.models import BreakRequest, BreakTarget, DemoBreakRequest, EvaluationRequest, JudgeConfig, TargetCreate, RagEvalRequest
 from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ, limiter ,LIMIT_RETRY
 from api.plans import get_plan_limits, resolve_plan
 from api.user_auth import decode_access_token
@@ -91,6 +91,7 @@ from src.target_adapter import AdapterFactory, GeminiDemoAdapter
 from src.test_generator import GroqJudgeClient, TestSuiteGenerator
 from src.use_cases.run_evaluation import EvaluationPipeline
 from core.energy_tracker import EnergyTracker
+from core.rag_evaluator import RagEvaluator
 
 
 def _compute_drift_from_series(
@@ -1276,7 +1277,7 @@ def _score_answers(
         test_type    = str(test.get("test_type", "factual"))
 
         try:
-            model_answer = target_adapter.call(question)
+            model_answer = target_adapter.call({"text": question, "image_b64": None, "mime_type": None})
         except Exception as exc:
             model_answer = ""
             scored = {"correctness": 0.0, "relevance": 0.0,
@@ -1768,6 +1769,121 @@ async def break_model(
             f"Generating {payload.num_tests} adversarial tests and breaking your model. "
             f"Poll GET /report/{report_id} for results."
         ),
+    }
+
+
+@router.post("/evaluate/rag")
+@limiter.limit(LIMIT_EVALUATE)
+async def evaluate_rag(
+    request: Request,
+    payload: RagEvalRequest,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    """
+    Evaluate retrieval-augmented generation (RAG) samples.
+
+    If a sample is missing `model_answer`, the target model is called first,
+    analogous to the /break flow.
+    """
+    if not payload.samples:
+        raise HTTPException(
+            status_code=422,
+            detail="Request body must include non-empty 'samples'",
+        )
+
+    groq_api_key = (payload.groq_api_key or os.getenv("GROQ_API_KEY", "")).strip()
+    if not groq_api_key:
+        raise HTTPException(
+            status_code=422,
+            detail="groq_api_key is required (or set GROQ_API_KEY env var)",
+        )
+
+    limit_response = _enforce_monthly_run_limit(auth_ctx.get("client_name"))
+    if limit_response:
+        return limit_response
+
+    target_cfg = payload.target.model_dump(exclude_none=True)
+    try:
+        target_adapter = AdapterFactory.from_config(target_cfg)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid target config: {exc}") from exc
+
+    judge_client = GroqJudgeClient(
+        api_key=groq_api_key,
+        base_url=GROQ_BASE_URL,
+        model=GROQ_JUDGE_MODEL,
+        timeout_seconds=120,
+    )
+    rag_evaluator = RagEvaluator(judge_client=judge_client)
+
+    results: list[dict[str, Any]] = []
+    total_faithfulness = 0.0
+    total_hit_rate = 0.0
+    total_mrr = 0.0
+    hallucinations_detected = 0
+
+    for sample in payload.samples:
+        question = sample.question
+        context_docs = sample.context_docs or []
+        ground_truth = sample.ground_truth
+        model_answer = sample.model_answer
+
+        if not model_answer:
+            try:
+                model_answer = target_adapter.call(question)
+            except Exception as exc:
+                eval_result = {
+                    "faithfulness": 0.0,
+                    "hit_rate": 0.0,
+                    "mrr": 0.0,
+                    "hallucination": True,
+                    "reason": f"Target call failed: {exc}",
+                    "overall_score": 0.0,
+                }
+            else:
+                eval_result = rag_evaluator.evaluate_rag_sample(
+                    question=question,
+                    context_docs=context_docs,
+                    ground_truth=ground_truth,
+                    model_answer=model_answer,
+                )
+        else:
+            eval_result = rag_evaluator.evaluate_rag_sample(
+                question=question,
+                context_docs=context_docs,
+                ground_truth=ground_truth,
+                model_answer=model_answer,
+            )
+
+        total_faithfulness += float(eval_result.get("faithfulness", 0.0) or 0.0)
+        total_hit_rate += float(eval_result.get("hit_rate", 0.0) or 0.0)
+        total_mrr += float(eval_result.get("mrr", 0.0) or 0.0)
+        if eval_result.get("hallucination"):
+            hallucinations_detected += 1
+
+        results.append(
+            {
+                "question": question,
+                "ground_truth": ground_truth,
+                "model_answer": model_answer,
+                "context_docs": context_docs,
+                **eval_result,
+            }
+        )
+
+    n = len(results)
+    metrics = {
+        "avg_faithfulness": round(total_faithfulness / n, 4) if n else 0.0,
+        "avg_hit_rate": round(total_hit_rate / n, 4) if n else 0.0,
+        "avg_mrr": round(total_mrr / n, 4) if n else 0.0,
+        "hallucinations_detected": hallucinations_detected,
+    }
+
+    report_id = str(uuid.uuid4())
+    return {
+        "report_id": report_id,
+        "results": results,
+        "metrics": metrics,
     }
 
 

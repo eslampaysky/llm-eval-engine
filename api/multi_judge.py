@@ -335,7 +335,7 @@ def score_answers(
         test_type = str(test.get("test_type", "factual"))
 
         try:
-            model_answer = target_adapter.call(question)
+            model_answer = target_adapter.call({"text": question, "image_b64": None, "mime_type": None})
         except Exception as exc:
             fail_reason = f"Target call failed: {exc}"
             rows.append(

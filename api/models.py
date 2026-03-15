@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -13,6 +13,9 @@ class Sample(BaseModel):
     ground_truth: str
     model_answer: Optional[str] = None
     context: Optional[str] = None
+    input_type: str = "text"  # "text" | "image" | "pdf"
+    image_b64: Optional[str] = None
+    mime_type: Optional[str] = None
 
 
 class EvaluationRequest(BaseModel):
@@ -21,6 +24,9 @@ class EvaluationRequest(BaseModel):
     dataset_id: Optional[str] = None
     model_version: Optional[str] = None
     judge_model: Optional[str] = None  # None = use all providers from config.yaml
+    input_type: str = "text"
+    image_b64: Optional[str] = None
+    mime_type: Optional[str] = None
 
     def get_samples(self) -> list[Sample]:
         return self.dataset or self.samples or []
@@ -87,6 +93,9 @@ class BreakRequest(BaseModel):
         default="auto",
         description="'en', 'ar', or 'auto' (detect from description)",
     )
+    input_type: str = "text"
+    image_b64: Optional[str] = None
+    mime_type: Optional[str] = None
 
 
 class DemoBreakRequest(BaseModel):
@@ -133,3 +142,16 @@ class TargetSummary(BaseModel):
     invoke_key: Optional[str] = None
     target_type: str
     created_at: str
+
+
+class RagEvalSample(BaseModel):
+    question: str
+    context_docs: list[str]
+    ground_truth: str
+    model_answer: Optional[str] = None
+
+
+class RagEvalRequest(BaseModel):
+    target: BreakTarget
+    samples: list[RagEvalSample] = Field(default_factory=list)
+    groq_api_key: str

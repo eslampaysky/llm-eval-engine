@@ -153,7 +153,9 @@ class EvaluationPipeline:
 
     def _evaluate_single_sample(self, sample, evaluators: dict, skipped: list[tuple[str, str]]) -> EvaluatedSample:
         try:
-            target_answer = self._target_adapter.call(sample.question)
+            target_answer = self._target_adapter.call(
+                {"text": sample.question, "image_b64": None, "mime_type": None}
+            )
         except Exception as exc:
             failure_reason = f"Target adapter error: {exc}"
             fusing_result = None

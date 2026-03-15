@@ -1,11 +1,30 @@
 from __future__ import annotations
 
 import json
+import logging
+from typing import Any, Dict
 
 import requests
 
-from .base import BaseTargetAdapter
+from .base import BaseTargetAdapter, Payload
 from .langchain_adapter import LangChainAdapter
+
+_log = logging.getLogger(__name__)
+
+
+def _ensure_payload(payload: Payload) -> Payload:
+    """
+    Normalize incoming payload to the expected multimodal shape.
+    """
+    if payload is None:
+        return {"text": "", "image_b64": None, "mime_type": None}
+    if not isinstance(payload, dict):
+        return {"text": str(payload), "image_b64": None, "mime_type": None}
+    return {
+      "text": str(payload.get("text", "")),
+      "image_b64": payload.get("image_b64"),
+      "mime_type": payload.get("mime_type"),
+    }
 
 
 class OpenAICompatibleAdapter(BaseTargetAdapter):
@@ -14,7 +33,12 @@ class OpenAICompatibleAdapter(BaseTargetAdapter):
         self._api_key = api_key or ""
         self._model_name = model_name
 
-    def call(self, question: str) -> str:
+    def call(self, payload: Payload) -> str:
+        data = _ensure_payload(payload)
+        text = data["text"]
+        image_b64 = data.get("image_b64")
+        mime_type = data.get("mime_type") or "image/png"
+
         if not self._base_url:
             raise ValueError("OpenAI-compatible adapter requires 'base_url'.")
         if not self._model_name:
@@ -35,20 +59,32 @@ class OpenAICompatibleAdapter(BaseTargetAdapter):
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
 
+        if image_b64:
+            content: Any = [
+                {"type": "text", "text": text},
+                {
+                    "type": "image_url",
+                    "url": f"data:{mime_type};base64,{image_b64}",
+                },
+            ]
+        else:
+            # Backwards compatible: plain text content.
+            content = text
+
         response = requests.post(
             endpoint,
             headers=headers,
             json={
                 "model": self._model_name,
-                "messages": [{"role": "user", "content": question}],
+                "messages": [{"role": "user", "content": content}],
                 "temperature": 0.0,
             },
             timeout=120,
         )
         response.raise_for_status()
-        payload = response.json()
-        content = payload["choices"][0]["message"]["content"]
-        return str(content).strip()
+        payload_json = response.json()
+        content_out = payload_json["choices"][0]["message"]["content"]
+        return str(content_out).strip()
 
 
 class GeminiDemoAdapter(OpenAICompatibleAdapter):
@@ -65,7 +101,11 @@ class HuggingFaceAdapter(BaseTargetAdapter):
         self._repo_id = repo_id
         self._api_token = api_token or ""
 
-    def call(self, question: str) -> str:
+    def call(self, payload: Payload) -> str:
+        data = _ensure_payload(payload)
+        question = data["text"]
+        if data.get("image_b64"):
+            _log.warning("Multimodal input ignored: HuggingFaceAdapter does not support image/pdf.")
         if not self._repo_id:
             raise ValueError("HuggingFace adapter requires 'repo_id'.")
         if not self._api_token:
@@ -103,7 +143,11 @@ class WebhookAdapter(BaseTargetAdapter):
         self._headers = headers or {}
         self._payload_template = payload_template
 
-    def call(self, question: str) -> str:
+    def call(self, payload: Payload) -> str:
+        data = _ensure_payload(payload)
+        question = data["text"]
+        if data.get("image_b64"):
+            _log.warning("Multimodal input ignored: WebhookAdapter does not support image/pdf.")
         if not self._endpoint_url:
             raise ValueError("Webhook adapter requires 'endpoint_url'.")
         if not self._payload_template:
