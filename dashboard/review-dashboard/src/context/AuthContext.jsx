@@ -4,7 +4,19 @@ const API_BASE =
   import.meta.env.VITE_API_BASE_URL ||
   'https://llm-eval-engine-production.up.railway.app';
 
-let token = null;
+
+let token = localStorage.getItem('auth_token');
+
+
+token = data.access_token;
+localStorage.setItem('auth_token', token);  
+
+
+token = data.access_token;
+localStorage.setItem('auth_token', token);  
+
+token = null;
+localStorage.removeItem('auth_token');
 
 export function getAuthHeader() {
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -44,22 +56,24 @@ export function AuthProvider({ children }) {
   const initRan = useRef(false);
 
   useEffect(() => {
-    if (initRan.current) return;
-    initRan.current = true;
+  if (initRan.current) return;
+  initRan.current = true;
 
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+  if (!token) {
+    setLoading(false);
+    return;
+  }
 
-    authFetch('/auth/me')
-      .then((userData) => setUser(userData))
-      .catch(() => {
-        token = null;
-        setUser(null);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  // token was restored from localStorage, verify it's still valid
+  authFetch('/auth/me')
+    .then((userData) => setUser(userData))
+    .catch(() => {
+      token = null;
+      localStorage.removeItem('auth_token');  // ← clear invalid token
+      setUser(null);
+    })
+    .finally(() => setLoading(false));
+}, []);
 
   const register = useCallback(async ({ name, email, password }) => {
     setError('');
