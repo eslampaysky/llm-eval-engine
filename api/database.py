@@ -2,7 +2,7 @@
 database.py — unified DB layer for Breaker Lab.
 
 Strategy:
-  - Require PostgreSQL (DATABASE_URL).
+  - Requires PostgreSQL (DATABASE_URL).
 
 All public functions share the same signature as before so routes.py
 needs zero changes except for the new delete + cache helpers at the bottom.
@@ -17,7 +17,7 @@ import logging
 import os
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Generator
 
 _log = logging.getLogger(__name__)
@@ -26,21 +26,22 @@ _log = logging.getLogger(__name__)
 
 _RAW_DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
 
+
 def _is_postgres_url(url: str) -> bool:
     return url.startswith("postgresql://") or url.startswith("postgres://")
+
 
 if not _RAW_DATABASE_URL:
     raise RuntimeError("DATABASE_URL is required. SQLite is no longer supported.")
 if not _is_postgres_url(_RAW_DATABASE_URL):
     raise RuntimeError("DATABASE_URL must start with postgres:// or postgresql://")
 
-# Normalize scheme for compatibility (Railway commonly uses postgres://...).
+# Normalize scheme for psycopg2 compatibility (Railway commonly uses postgres://...).
 DATABASE_URL: str = (
-    "postgresql://" + _RAW_DATABASE_URL[len("postgres://") :]
+    "postgresql://" + _RAW_DATABASE_URL[len("postgres://"):]
     if _RAW_DATABASE_URL.startswith("postgres://")
     else _RAW_DATABASE_URL
 )
-_USE_PG = True
 
 # ── Connection helpers ────────────────────────────────────────────────────────
 
@@ -51,6 +52,10 @@ from psycopg2.pool import ThreadedConnectionPool
 _PG_POOL: ThreadedConnectionPool | None = None
 _PG_MIN_CONN = int(os.getenv("PG_POOL_MIN_CONN", "1"))
 _PG_MAX_CONN = int(os.getenv("PG_POOL_MAX_CONN", "8"))
+
+# Postgres placeholder
+_P = "%s"
+
 
 def _get_pg_pool() -> ThreadedConnectionPool:
     global _PG_POOL
@@ -63,13 +68,16 @@ def _get_pg_pool() -> ThreadedConnectionPool:
         )
     return _PG_POOL
 
+
 def _close_pg_pool() -> None:
     global _PG_POOL
     if _PG_POOL is not None:
         _PG_POOL.closeall()
         _PG_POOL = None
 
+
 atexit.register(_close_pg_pool)
+
 
 @contextmanager
 def _get_conn() -> Generator:
@@ -84,20 +92,17 @@ def _get_conn() -> Generator:
     finally:
         pool.putconn(conn)
 
-# Postgres uses %s placeholders.
-_P = "%s"
-
 
 def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     if isinstance(row, dict):
         return row
-    return dict(row)  # sqlite3.Row
+    return dict(row)
 
 
 def _ph(n: int = 1) -> str:
-    """Return n comma-separated placeholders."""
+    """Return n comma-separated %s placeholders."""
     return ", ".join([_P] * n)
 
 
@@ -155,457 +160,212 @@ def init_db():
                 shared BOOLEAN NOT NULL DEFAULT TRUE,
                 status TEXT NOT NULL,
                 judge_model TEXT,
-                    sample_count INTEGER NOT NULL,
-                    dataset_id TEXT,
-                    model_version TEXT,
-                    target_id TEXT,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    results_json TEXT,
-                    metrics_json TEXT,
-                    html_path TEXT,
-                    html_content TEXT,
-                    total_tokens INTEGER,
-                    total_cost_usd REAL,
-                    esg_metrics TEXT,
-                    error TEXT
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS web_audit_reports (
-                    audit_id     TEXT PRIMARY KEY,
-                    client_name  TEXT,
-                    url          TEXT,
-                    description  TEXT,
-                    status       TEXT NOT NULL DEFAULT 'queued',
-                    health       TEXT,
-                    confidence   INTEGER,
-                    issues_json  TEXT,
-                    passed_json  TEXT,
-                    summary      TEXT,
-                    video_path   TEXT,
-                    created_at   TEXT NOT NULL,
-                    updated_at   TEXT NOT NULL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS targets (
-                    target_id TEXT PRIMARY KEY,
-                    client_id INTEGER,
-                    client_name TEXT,
-                    name TEXT NOT NULL,
-                    description TEXT,
-                    base_url TEXT,
-                    model_name TEXT,
-                    api_key_enc TEXT,
-                    repo_id TEXT,
-                    endpoint_url TEXT,
-                    payload_template TEXT,
-                    headers_json TEXT,
-                    chain_import_path TEXT,
-                    invoke_key TEXT,
-                    target_type TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    FOREIGN KEY (client_id) REFERENCES clients(id)
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    user_id TEXT NOT NULL UNIQUE,
-                    name TEXT NOT NULL,
-                    email TEXT NOT NULL UNIQUE,
-                    password_hash TEXT NOT NULL,
-                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-                    plan TEXT NOT NULL DEFAULT 'free',
-                    plan_expires_at TEXT,
-                    paddle_customer_id TEXT,
-                    paddle_subscription_id TEXT,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS password_reset_tokens (
-                    token TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    used BOOLEAN NOT NULL DEFAULT FALSE
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS human_reviews (
-                    id SERIAL PRIMARY KEY,
-                    report_id TEXT NOT NULL,
-                    item_index INTEGER NOT NULL,
-                    score REAL NOT NULL,
-                    comment TEXT,
-                    approved INTEGER NOT NULL,
-                    created_at TEXT NOT NULL,
-                    FOREIGN KEY (report_id) REFERENCES evaluation_reports(report_id) ON DELETE CASCADE
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS demo_runs (
-                    ip_hash TEXT NOT NULL,
-                    run_date TEXT NOT NULL,
-                    run_count INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY (ip_hash, run_date)
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS sales_leads (
-                    id SERIAL PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    email TEXT NOT NULL,
-                    company TEXT NOT NULL,
-                    use_case TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    contacted BOOLEAN NOT NULL DEFAULT FALSE
-                )
-            """)
-            # ── Test suite cache ──────────────────────────────────────────────
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS test_suite_cache (
-                    cache_key    TEXT PRIMARY KEY,
-                    description  TEXT NOT NULL,
-                    num_tests    INTEGER NOT NULL,
-                    tests_json   TEXT NOT NULL,
-                    hit_count    INTEGER NOT NULL DEFAULT 0,
-                    created_at   TEXT NOT NULL,
-                    last_used_at TEXT NOT NULL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS feature_monitors (
-                    monitor_id    TEXT PRIMARY KEY,
-                    client_name   TEXT,
-                    feature_name  TEXT,
-                    description   TEXT,
-                    target_json   TEXT,
-                    test_inputs_json TEXT,
-                    schedule      TEXT DEFAULT 'daily',
-                    alert_webhook TEXT,
-                    baseline_json TEXT,
-                    last_run_at   TEXT,
-                    last_status   TEXT DEFAULT 'pending',
-                    created_at    TEXT NOT NULL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS monitor_runs (
-                    run_id        TEXT PRIMARY KEY,
-                    monitor_id    TEXT,
-                    client_name   TEXT,
-                    ran_at        TEXT,
-                    regression_detected INTEGER DEFAULT 0,
-                    severity      TEXT,
-                    results_json  TEXT,
-                    FOREIGN KEY(monitor_id) REFERENCES feature_monitors(monitor_id)
-                )
-            """)
-            # Indexes for common query patterns
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_logs_client_name ON usage_logs(client_name)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_logs_timestamp   ON usage_logs(timestamp)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_client    ON evaluation_reports(client_name)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_created   ON evaluation_reports(created_at)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_test_cache_key         ON test_suite_cache(cache_key)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date         ON demo_runs(run_date)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_targets_client         ON targets(client_name)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email           ON users(email)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_reset_tokens_user_id  ON password_reset_tokens(user_id)")
-            cur.execute("""
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_name = 'evaluation_reports'
-            """)
-            existing = {row["column_name"] for row in cur.fetchall()}
-            if "share_token" not in existing:
-                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN share_token TEXT UNIQUE")
-            if "shared" not in existing:
-                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN shared BOOLEAN NOT NULL DEFAULT TRUE")
-            if "html_content" not in existing:
-                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
-            if "target_id" not in existing:
-                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN target_id TEXT")
-                existing.add("target_id")
-            if "esg_metrics" not in existing:
-                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN IF NOT EXISTS esg_metrics TEXT")
-            if "target_id" in existing:
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
+                sample_count INTEGER NOT NULL,
+                dataset_id TEXT,
+                model_version TEXT,
+                target_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                results_json TEXT,
+                metrics_json TEXT,
+                html_path TEXT,
+                html_content TEXT,
+                total_tokens INTEGER,
+                total_cost_usd REAL,
+                esg_metrics TEXT,
+                error TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS web_audit_reports (
+                audit_id     TEXT PRIMARY KEY,
+                client_name  TEXT,
+                url          TEXT,
+                description  TEXT,
+                status       TEXT NOT NULL DEFAULT 'queued',
+                health       TEXT,
+                confidence   INTEGER,
+                issues_json  TEXT,
+                passed_json  TEXT,
+                summary      TEXT,
+                video_path   TEXT,
+                share_token  TEXT UNIQUE,
+                created_at   TEXT NOT NULL,
+                updated_at   TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS targets (
+                target_id TEXT PRIMARY KEY,
+                client_id INTEGER,
+                client_name TEXT,
+                name TEXT NOT NULL,
+                description TEXT,
+                base_url TEXT,
+                model_name TEXT,
+                api_key_enc TEXT,
+                repo_id TEXT,
+                endpoint_url TEXT,
+                payload_template TEXT,
+                headers_json TEXT,
+                chain_import_path TEXT,
+                invoke_key TEXT,
+                target_type TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (client_id) REFERENCES clients(id)
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                user_id TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                plan TEXT NOT NULL DEFAULT 'free',
+                plan_expires_at TEXT,
+                paddle_customer_id TEXT,
+                paddle_subscription_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                token TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                used BOOLEAN NOT NULL DEFAULT FALSE
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS human_reviews (
+                id SERIAL PRIMARY KEY,
+                report_id TEXT NOT NULL,
+                item_index INTEGER NOT NULL,
+                score REAL NOT NULL,
+                comment TEXT,
+                approved INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (report_id) REFERENCES evaluation_reports(report_id) ON DELETE CASCADE
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS demo_runs (
+                ip_hash TEXT NOT NULL,
+                run_date TEXT NOT NULL,
+                run_count INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (ip_hash, run_date)
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sales_leads (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                company TEXT NOT NULL,
+                use_case TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                contacted BOOLEAN NOT NULL DEFAULT FALSE
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS test_suite_cache (
+                cache_key    TEXT PRIMARY KEY,
+                description  TEXT NOT NULL,
+                num_tests    INTEGER NOT NULL,
+                tests_json   TEXT NOT NULL,
+                hit_count    INTEGER NOT NULL DEFAULT 0,
+                created_at   TEXT NOT NULL,
+                last_used_at TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS feature_monitors (
+                monitor_id    TEXT PRIMARY KEY,
+                client_name   TEXT,
+                feature_name  TEXT,
+                description   TEXT,
+                target_json   TEXT,
+                test_inputs_json TEXT,
+                schedule      TEXT DEFAULT 'daily',
+                alert_webhook TEXT,
+                baseline_json TEXT,
+                last_run_at   TEXT,
+                last_status   TEXT DEFAULT 'pending',
+                created_at    TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS monitor_runs (
+                run_id        TEXT PRIMARY KEY,
+                monitor_id    TEXT,
+                client_name   TEXT,
+                ran_at        TEXT,
+                regression_detected INTEGER DEFAULT 0,
+                severity      TEXT,
+                results_json  TEXT,
+                FOREIGN KEY(monitor_id) REFERENCES feature_monitors(monitor_id)
+            )
+        """)
 
-            cur.execute("""
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_name = 'web_audit_reports'
-            """)
-            existing_web_audit = {row["column_name"] for row in cur.fetchall()}
-            if "share_token" not in existing_web_audit:
-                cur.execute("ALTER TABLE web_audit_reports ADD COLUMN share_token TEXT UNIQUE")
+        # ── Indexes ───────────────────────────────────────────────────────────
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_logs_client_name ON usage_logs(client_name)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_logs_timestamp   ON usage_logs(timestamp)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_client    ON evaluation_reports(client_name)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_created   ON evaluation_reports(created_at)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target    ON evaluation_reports(target_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_test_cache_key         ON test_suite_cache(cache_key)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date         ON demo_runs(run_date)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_targets_client         ON targets(client_name)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email            ON users(email)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_reset_tokens_user_id  ON password_reset_tokens(user_id)")
 
-            # Users table migrations
-            cur.execute("""
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_name = 'users'
-            """)
-            existing_users = {row["column_name"] for row in cur.fetchall()}
-            if "plan" not in existing_users:
-                cur.execute("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'")
-            if "plan_expires_at" not in existing_users:
-                cur.execute("ALTER TABLE users ADD COLUMN plan_expires_at TEXT")
-            if "paddle_customer_id" not in existing_users:
-                cur.execute("ALTER TABLE users ADD COLUMN paddle_customer_id TEXT")
-            if "paddle_subscription_id" not in existing_users:
-                cur.execute("ALTER TABLE users ADD COLUMN paddle_subscription_id TEXT")
+        # ── Migrations: evaluation_reports ────────────────────────────────────
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'evaluation_reports'
+        """)
+        existing = {row["column_name"] for row in cur.fetchall()}
+        if "share_token" not in existing:
+            cur.execute("ALTER TABLE evaluation_reports ADD COLUMN share_token TEXT UNIQUE")
+        if "shared" not in existing:
+            cur.execute("ALTER TABLE evaluation_reports ADD COLUMN shared BOOLEAN NOT NULL DEFAULT TRUE")
+        if "html_content" not in existing:
+            cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
+        if "target_id" not in existing:
+            cur.execute("ALTER TABLE evaluation_reports ADD COLUMN target_id TEXT")
+        if "esg_metrics" not in existing:
+            cur.execute("ALTER TABLE evaluation_reports ADD COLUMN esg_metrics TEXT")
 
-        else:
-            # --- SQLite DDL (unchanged from original) -------------------------
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS clients (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    api_key_hash TEXT NOT NULL UNIQUE,
-                    active INTEGER NOT NULL DEFAULT 1,
-                    created_at TEXT NOT NULL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS usage_logs (
-                    client_id INTEGER,
-                    client_name TEXT,
-                    report_id TEXT,
-                    dataset_id TEXT,
-                    model_version TEXT,
-                    evaluation_date TEXT,
-                    api_key_hash TEXT,
-                    timestamp TEXT,
-                    sample_count INTEGER,
-                    FOREIGN KEY(client_id) REFERENCES clients(id)
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS evaluation_runs (
-                    report_id TEXT PRIMARY KEY,
-                    client_name TEXT,
-                    dataset_id TEXT,
-                    model_version TEXT,
-                    timestamp TEXT NOT NULL,
-                    correctness REAL,
-                    relevance REAL,
-                    hallucination REAL,
-                    overall REAL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS evaluation_reports (
-                    report_id TEXT PRIMARY KEY,
-                    client_id INTEGER,
-                    client_name TEXT,
-                    share_token TEXT UNIQUE,
-                    shared INTEGER NOT NULL DEFAULT 1,
-                    status TEXT NOT NULL,
-                    judge_model TEXT,
-                    sample_count INTEGER NOT NULL,
-                    dataset_id TEXT,
-                    model_version TEXT,
-                    target_id TEXT,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    results_json TEXT,
-                    metrics_json TEXT,
-                    html_path TEXT,
-                    html_content TEXT,
-                    total_tokens INTEGER,
-                    total_cost_usd REAL,
-                    esg_metrics TEXT,
-                    error TEXT
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS web_audit_reports (
-                    audit_id     TEXT PRIMARY KEY,
-                    client_name  TEXT,
-                    url          TEXT,
-                    description  TEXT,
-                    status       TEXT NOT NULL DEFAULT 'queued',
-                    health       TEXT,
-                    confidence   INTEGER,
-                    issues_json  TEXT,
-                    passed_json  TEXT,
-                    summary      TEXT,
-                    video_path   TEXT,
-                    created_at   TEXT NOT NULL,
-                    updated_at   TEXT NOT NULL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS targets (
-                    target_id TEXT PRIMARY KEY,
-                    client_id INTEGER,
-                    client_name TEXT,
-                    name TEXT NOT NULL,
-                    description TEXT,
-                    base_url TEXT,
-                    model_name TEXT,
-                    api_key_enc TEXT,
-                    repo_id TEXT,
-                    endpoint_url TEXT,
-                    payload_template TEXT,
-                    headers_json TEXT,
-                    chain_import_path TEXT,
-                    invoke_key TEXT,
-                    target_type TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    FOREIGN KEY(client_id) REFERENCES clients(id)
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL UNIQUE,
-                    name TEXT NOT NULL,
-                    email TEXT NOT NULL UNIQUE,
-                    password_hash TEXT NOT NULL,
-                    is_active INTEGER NOT NULL DEFAULT 1,
-                    plan TEXT NOT NULL DEFAULT 'free',
-                    plan_expires_at TEXT,
-                    paddle_customer_id TEXT,
-                    paddle_subscription_id TEXT,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS password_reset_tokens (
-                    token TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    used INTEGER NOT NULL DEFAULT 0
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS human_reviews (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    report_id TEXT NOT NULL,
-                    item_index INTEGER NOT NULL,
-                    score REAL NOT NULL,
-                    comment TEXT,
-                    approved INTEGER NOT NULL,
-                    created_at TEXT NOT NULL,
-                    FOREIGN KEY(report_id) REFERENCES evaluation_reports(report_id)
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS demo_runs (
-                    ip_hash TEXT NOT NULL,
-                    run_date TEXT NOT NULL,
-                    run_count INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY (ip_hash, run_date)
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS sales_leads (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    email TEXT NOT NULL,
-                    company TEXT NOT NULL,
-                    use_case TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    contacted INTEGER NOT NULL DEFAULT 0
-                )
-            """)
-            # ── Test suite cache ──────────────────────────────────────────────
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS test_suite_cache (
-                    cache_key    TEXT PRIMARY KEY,
-                    description  TEXT NOT NULL,
-                    num_tests    INTEGER NOT NULL,
-                    tests_json   TEXT NOT NULL,
-                    hit_count    INTEGER NOT NULL DEFAULT 0,
-                    created_at   TEXT NOT NULL,
-                    last_used_at TEXT NOT NULL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS feature_monitors (
-                    monitor_id    TEXT PRIMARY KEY,
-                    client_name   TEXT,
-                    feature_name  TEXT,
-                    description   TEXT,
-                    target_json   TEXT,
-                    test_inputs_json TEXT,
-                    schedule      TEXT DEFAULT 'daily',
-                    alert_webhook TEXT,
-                    baseline_json TEXT,
-                    last_run_at   TEXT,
-                    last_status   TEXT DEFAULT 'pending',
-                    created_at    TEXT NOT NULL
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS monitor_runs (
-                    run_id        TEXT PRIMARY KEY,
-                    monitor_id    TEXT,
-                    client_name   TEXT,
-                    ran_at        TEXT,
-                    regression_detected INTEGER DEFAULT 0,
-                    severity      TEXT,
-                    results_json  TEXT,
-                    FOREIGN KEY(monitor_id) REFERENCES feature_monitors(monitor_id)
-                )
-            """)
-            # Migrate: add missing columns to usage_logs
-            cur.execute("PRAGMA table_info(usage_logs)")
-            existing = {row[1] for row in cur.fetchall()}
-            for col in ["client_id", "client_name", "dataset_id", "model_version", "evaluation_date"]:
-                if col not in existing:
-                    cur.execute(f"ALTER TABLE usage_logs ADD COLUMN {col} TEXT")
-            # Migrate: add extra columns to evaluation_reports if missing
-            cur.execute("PRAGMA table_info(evaluation_reports)")
-            existing = {row[1] for row in cur.fetchall()}
-            if "share_token" not in existing:
-                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN share_token TEXT")
-            if "shared" not in existing:
-                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN shared INTEGER NOT NULL DEFAULT 1")
-            if "html_content" not in existing:
-                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN html_content TEXT")
-            if "target_id" not in existing:
-                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN target_id TEXT")
-                existing.add("target_id")
-            if "esg_metrics" not in existing:
-                cur.execute("ALTER TABLE evaluation_reports ADD COLUMN esg_metrics TEXT")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_demo_runs_date ON demo_runs(run_date)")
-            if "target_id" in existing:
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_eval_reports_target ON evaluation_reports(target_id)")
+        # ── Migrations: web_audit_reports ─────────────────────────────────────
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'web_audit_reports'
+        """)
+        existing_web_audit = {row["column_name"] for row in cur.fetchall()}
+        if "share_token" not in existing_web_audit:
+            cur.execute("ALTER TABLE web_audit_reports ADD COLUMN share_token TEXT UNIQUE")
 
-            cur.execute("PRAGMA table_info(web_audit_reports)")
-            existing_web_audit = {row[1] for row in cur.fetchall()}
-            if "share_token" not in existing_web_audit:
-                cur.execute("ALTER TABLE web_audit_reports ADD COLUMN share_token TEXT")
-
-            # Migrate: add billing columns to users if missing
-            cur.execute("PRAGMA table_info(users)")
-            existing_users = {row[1] for row in cur.fetchall()}
-            if "plan" not in existing_users:
-                cur.execute("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'")
-            if "plan_expires_at" not in existing_users:
-                cur.execute("ALTER TABLE users ADD COLUMN plan_expires_at TEXT")
-            if "paddle_customer_id" not in existing_users:
-                cur.execute("ALTER TABLE users ADD COLUMN paddle_customer_id TEXT")
-            if "paddle_subscription_id" not in existing_users:
-                cur.execute("ALTER TABLE users ADD COLUMN paddle_subscription_id TEXT")
-            # Migrate: add missing columns to targets
-            cur.execute("PRAGMA table_info(targets)")
-            existing_targets = {row[1] for row in cur.fetchall()}
-            for col in ["repo_id", "endpoint_url", "payload_template", "headers_json", "chain_import_path", "invoke_key"]:
-                if col not in existing_targets:
-                    cur.execute(f"ALTER TABLE targets ADD COLUMN {col} TEXT")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_targets_client ON targets(client_name)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_reset_tokens_user_id ON password_reset_tokens(user_id)")
+        # ── Migrations: users ─────────────────────────────────────────────────
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'users'
+        """)
+        existing_users = {row["column_name"] for row in cur.fetchall()}
+        if "plan" not in existing_users:
+            cur.execute("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'")
+        if "plan_expires_at" not in existing_users:
+            cur.execute("ALTER TABLE users ADD COLUMN plan_expires_at TEXT")
+        if "paddle_customer_id" not in existing_users:
+            cur.execute("ALTER TABLE users ADD COLUMN paddle_customer_id TEXT")
+        if "paddle_subscription_id" not in existing_users:
+            cur.execute("ALTER TABLE users ADD COLUMN paddle_subscription_id TEXT")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -627,23 +387,17 @@ def _utc_now() -> str:
 def register_client(name: str, api_key: str):
     with _get_conn() as conn:
         cur = conn.cursor()
-        if _USE_PG:
-            cur.execute(
-                "INSERT INTO clients(name, api_key_hash, active, created_at) VALUES (%s,%s,1,%s) ON CONFLICT DO NOTHING",
-                (name, _hash_key(api_key), _utc_now()),
-            )
-        else:
-            cur.execute(
-                "INSERT OR IGNORE INTO clients(name, api_key_hash, active, created_at) VALUES (?,?,1,?)",
-                (name, _hash_key(api_key), _utc_now()),
-            )
+        cur.execute(
+            "INSERT INTO clients(name, api_key_hash, active, created_at) VALUES (%s,%s,1,%s) ON CONFLICT DO NOTHING",
+            (name, _hash_key(api_key), _utc_now()),
+        )
 
 
 def get_client_by_key(api_key: str) -> dict | None:
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            f"SELECT id, name, active FROM clients WHERE api_key_hash={_P}",
+            "SELECT id, name, active FROM clients WHERE api_key_hash=%s",
             (_hash_key(api_key),),
         )
         return _row_to_dict(cur.fetchone())
@@ -726,9 +480,9 @@ def get_usage_slice(client_name: str, prefix: str | None) -> dict:
         row = _row_to_dict(cur.fetchone()) or {}
 
     return {
-        "req_count": int(row.get("req_count") or 0),
-        "sample_count": int(row.get("sample_count") or 0),
-        "total_tokens": int(row.get("total_tokens") or 0),
+        "req_count":     int(row.get("req_count") or 0),
+        "sample_count":  int(row.get("sample_count") or 0),
+        "total_tokens":  int(row.get("total_tokens") or 0),
         "total_cost_usd": float(row.get("total_cost_usd") or 0),
     }
 
@@ -738,8 +492,7 @@ def get_usage_count(client_name: str, prefix: str | None) -> int:
     return int(get_usage_slice(client_name, prefix).get("req_count", 0))
 
 
-# ── Drift / model score helpers ────────────────────────────────────────────────
-
+# ── Drift / model score helpers ───────────────────────────────────────────────
 
 def get_model_scores(
     model_version: str | None,
@@ -787,12 +540,7 @@ def get_model_scores(
                 score_val = float(metrics.get("average_score", 0.0) or 0.0)
             except Exception:
                 score_val = 0.0
-        result.append(
-            {
-                "created_at": created_at,
-                "score": score_val,
-            }
-        )
+        result.append({"created_at": created_at, "score": score_val})
     return result
 
 
@@ -801,31 +549,19 @@ def get_model_scores(
 def log_evaluation_run(report_id, client_name, dataset_id, model_version, summary):
     with _get_conn() as conn:
         cur = conn.cursor()
-        if _USE_PG:
-            cur.execute(
-                """
-                INSERT INTO evaluation_runs(report_id, client_name, dataset_id, model_version, timestamp,
-                    correctness, relevance, hallucination, overall)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                ON CONFLICT (report_id) DO UPDATE SET
-                    correctness=EXCLUDED.correctness, relevance=EXCLUDED.relevance,
-                    hallucination=EXCLUDED.hallucination, overall=EXCLUDED.overall
-                """,
-                (report_id, client_name, dataset_id, model_version, _utc_now(),
-                 float(summary.get("correctness", 0) or 0), float(summary.get("relevance", 0) or 0),
-                 float(summary.get("hallucination", 0) or 0), float(summary.get("overall", 0) or 0)),
-            )
-        else:
-            cur.execute(
-                """
-                INSERT OR REPLACE INTO evaluation_runs(report_id, client_name, dataset_id, model_version, timestamp,
-                    correctness, relevance, hallucination, overall)
-                VALUES (?,?,?,?,?,?,?,?,?)
-                """,
-                (report_id, client_name, dataset_id, model_version, _utc_now(),
-                 float(summary.get("correctness", 0) or 0), float(summary.get("relevance", 0) or 0),
-                 float(summary.get("hallucination", 0) or 0), float(summary.get("overall", 0) or 0)),
-            )
+        cur.execute(
+            """
+            INSERT INTO evaluation_runs(report_id, client_name, dataset_id, model_version, timestamp,
+                correctness, relevance, hallucination, overall)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (report_id) DO UPDATE SET
+                correctness=EXCLUDED.correctness, relevance=EXCLUDED.relevance,
+                hallucination=EXCLUDED.hallucination, overall=EXCLUDED.overall
+            """,
+            (report_id, client_name, dataset_id, model_version, _utc_now(),
+             float(summary.get("correctness", 0) or 0), float(summary.get("relevance", 0) or 0),
+             float(summary.get("hallucination", 0) or 0), float(summary.get("overall", 0) or 0)),
+        )
 
 
 def get_latest_regression_baseline(client_name, dataset_id, current_model_version):
@@ -865,7 +601,7 @@ def insert_report(*, report_id, client_id, client_name, share_token, status, jud
                 sample_count, dataset_id, model_version, target_id, created_at, updated_at
             ) VALUES ({_ph(13)})
             """,
-            (report_id, client_id, client_name, share_token, int(bool(shared)) if not _USE_PG else bool(shared),
+            (report_id, client_id, client_name, share_token, bool(shared),
              status, judge_model, sample_count, dataset_id, model_version, target_id, now, now),
         )
 
@@ -881,19 +617,15 @@ def finalize_report_success(report_id, results_json, metrics_json, html_path,
                 html_path={_P}, html_content={_P}, total_tokens={_P},
                 total_cost_usd={_P}, error=NULL
             WHERE report_id={_P}
-              AND status != {_P}
+              AND status = {_P}
             """,
             ("done", _utc_now(), results_json, metrics_json,
-             html_path, html_content, total_tokens, total_cost, report_id, "canceled"),
+             html_path, html_content, total_tokens, total_cost, report_id, "processing"),
         )
 
 
 def update_report_esg_metrics(report_id: str, esg_metrics: dict | None) -> None:
-    """
-    Persist ESG metrics JSON for a completed report.
-
-    Stores a JSON-encoded string in the esg_metrics column for both Postgres and SQLite.
-    """
+    """Persist ESG metrics JSON for a completed report."""
     if not esg_metrics:
         return
     payload = json.dumps(esg_metrics, ensure_ascii=False)
@@ -973,17 +705,8 @@ def finalize_web_audit_success(
                    updated_at={_P}
              WHERE audit_id={_P}
             """,
-            (
-                "done",
-                health,
-                confidence,
-                issues_json,
-                passed_json,
-                summary,
-                video_path,
-                _utc_now(),
-                audit_id,
-            ),
+            ("done", health, confidence, issues_json, passed_json,
+             summary, video_path, _utc_now(), audit_id),
         )
 
 
@@ -1005,9 +728,7 @@ def get_web_audit_row(audit_id: str) -> dict | None:
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM web_audit_reports WHERE audit_id=%s" % _P
-            if _USE_PG else
-            "SELECT * FROM web_audit_reports WHERE audit_id=?",
+            f"SELECT * FROM web_audit_reports WHERE audit_id={_P}",
             (audit_id,),
         )
         return _row_to_dict(cur.fetchone())
@@ -1031,15 +752,13 @@ def get_web_audit_by_share_token(token: str) -> dict | None:
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM web_audit_reports WHERE share_token=%s" % _P
-            if _USE_PG else
-            "SELECT * FROM web_audit_reports WHERE share_token=?",
+            f"SELECT * FROM web_audit_reports WHERE share_token={_P}",
             (token,),
         )
         return _row_to_dict(cur.fetchone())
 
 
-# ── Feature monitors ─────────────────────────────────────────────────────────
+# ── Feature monitors ──────────────────────────────────────────────────────────
 
 def create_feature_monitor(
     *,
@@ -1063,20 +782,8 @@ def create_feature_monitor(
                 last_run_at, last_status, created_at
             ) VALUES ({_ph(12)})
             """,
-            (
-                monitor_id,
-                client_name,
-                feature_name,
-                description,
-                target_json,
-                test_inputs_json,
-                schedule,
-                alert_webhook,
-                None,
-                None,
-                "pending",
-                now,
-            ),
+            (monitor_id, client_name, feature_name, description, target_json,
+             test_inputs_json, schedule, alert_webhook, None, None, "pending", now),
         )
 
 
@@ -1115,9 +822,7 @@ def get_feature_monitor(monitor_id: str) -> dict | None:
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM feature_monitors WHERE monitor_id=%s" % _P
-            if _USE_PG else
-            "SELECT * FROM feature_monitors WHERE monitor_id=?",
+            f"SELECT * FROM feature_monitors WHERE monitor_id={_P}",
             (monitor_id,),
         )
         return _row_to_dict(cur.fetchone())
@@ -1159,17 +864,12 @@ def insert_monitor_run(
                 regression_detected, severity, results_json
             ) VALUES ({_ph(7)})
             """,
-            (
-                run_id,
-                monitor_id,
-                client_name,
-                ran_at,
-                1 if regression_detected else 0,
-                severity,
-                results_json,
-            ),
+            (run_id, monitor_id, client_name, ran_at,
+             1 if regression_detected else 0, severity, results_json),
         )
 
+
+# ── Report lifecycle ──────────────────────────────────────────────────────────
 
 def cancel_report(report_id: str, reason: str, client_name: str | None = None) -> bool:
     with _get_conn() as conn:
@@ -1195,7 +895,7 @@ def cancel_report(report_id: str, reason: str, client_name: str | None = None) -
             """,
             ("canceled", _utc_now(), reason[:2000], report_id, "processing", "stale"),
         )
-        return cur.rowcount > 0
+        return (cur.rowcount or 0) > 0
 
 
 def get_report_row(report_id: str) -> dict | None:
@@ -1203,55 +903,17 @@ def get_report_row(report_id: str) -> dict | None:
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM evaluation_reports WHERE report_id=%s" % _P
-            if _USE_PG else
-            "SELECT * FROM evaluation_reports WHERE report_id=?",
+            f"SELECT * FROM evaluation_reports WHERE report_id={_P}",
             (report_id,),
         )
         return _row_to_dict(cur.fetchone())
-
-
-def get_demo_run_count(ip_hash: str, run_date: str) -> int:
-    with _get_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            f"SELECT run_count FROM demo_runs WHERE ip_hash={_P} AND run_date={_P}",
-            (ip_hash, run_date),
-        )
-        row = _row_to_dict(cur.fetchone())
-        return int((row or {}).get("run_count") or 0)
-
-
-def upsert_demo_run(ip_hash: str, run_date: str) -> int:
-    with _get_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            f"SELECT run_count FROM demo_runs WHERE ip_hash={_P} AND run_date={_P}",
-            (ip_hash, run_date),
-        )
-        row = _row_to_dict(cur.fetchone())
-        if row is None:
-            cur.execute(
-                f"INSERT INTO demo_runs(ip_hash, run_date, run_count) VALUES ({_ph(3)})",
-                (ip_hash, run_date, 1),
-            )
-            return 1
-
-        new_count = int(row["run_count"] or 0) + 1
-        cur.execute(
-            f"UPDATE demo_runs SET run_count={_P} WHERE ip_hash={_P} AND run_date={_P}",
-            (new_count, ip_hash, run_date),
-        )
-        return new_count
 
 
 def get_report_row_by_share_token(share_token: str) -> dict | None:
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM evaluation_reports WHERE share_token=%s" % _P
-            if _USE_PG else
-            "SELECT * FROM evaluation_reports WHERE share_token=?",
+            f"SELECT * FROM evaluation_reports WHERE share_token={_P}",
             (share_token,),
         )
         return _row_to_dict(cur.fetchone())
@@ -1269,16 +931,10 @@ def set_report_share_token(report_id: str, share_token: str) -> None:
 def set_report_shared(report_id: str, client_name: str, shared: bool) -> bool:
     with _get_conn() as conn:
         cur = conn.cursor()
-        if _USE_PG:
-            cur.execute(
-                "UPDATE evaluation_reports SET shared=%s WHERE report_id=%s AND client_name=%s",
-                (bool(shared), report_id, client_name),
-            )
-        else:
-            cur.execute(
-                "UPDATE evaluation_reports SET shared=? WHERE report_id=? AND client_name=?",
-                (1 if shared else 0, report_id, client_name),
-            )
+        cur.execute(
+            "UPDATE evaluation_reports SET shared=%s WHERE report_id=%s AND client_name=%s",
+            (bool(shared), report_id, client_name),
+        )
         return (cur.rowcount or 0) > 0
 
 
@@ -1351,9 +1007,9 @@ def list_all_audits_for_client(client_name: str, limit: int = 100) -> list[dict]
             issues_count = 0
         row["issues_count"] = issues_count
         if row.get("type") == "web_audit":
-            row["detail_url"] = f"/app/web-audit"
+            row["detail_url"] = "/app/web-audit"
         elif row.get("type") == "monitor_check":
-            row["detail_url"] = f"/app/monitors"
+            row["detail_url"] = "/app/monitors"
         else:
             row["detail_url"] = "/app"
     return combined
@@ -1376,6 +1032,42 @@ def save_human_reviews(report_id: str, reviews: list[dict]):
             )
 
 
+# ── Demo runs ─────────────────────────────────────────────────────────────────
+
+def get_demo_run_count(ip_hash: str, run_date: str) -> int:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT run_count FROM demo_runs WHERE ip_hash={_P} AND run_date={_P}",
+            (ip_hash, run_date),
+        )
+        row = _row_to_dict(cur.fetchone())
+        return int((row or {}).get("run_count") or 0)
+
+
+def upsert_demo_run(ip_hash: str, run_date: str) -> int:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT run_count FROM demo_runs WHERE ip_hash={_P} AND run_date={_P}",
+            (ip_hash, run_date),
+        )
+        row = _row_to_dict(cur.fetchone())
+        if row is None:
+            cur.execute(
+                f"INSERT INTO demo_runs(ip_hash, run_date, run_count) VALUES ({_ph(3)})",
+                (ip_hash, run_date, 1),
+            )
+            return 1
+
+        new_count = int(row["run_count"] or 0) + 1
+        cur.execute(
+            f"UPDATE demo_runs SET run_count={_P} WHERE ip_hash={_P} AND run_date={_P}",
+            (new_count, ip_hash, run_date),
+        )
+        return new_count
+
+
 # ── Delete report ─────────────────────────────────────────────────────────────
 
 def delete_report(report_id: str, client_name: str) -> bool:
@@ -1385,15 +1077,12 @@ def delete_report(report_id: str, client_name: str) -> bool:
     """
     with _get_conn() as conn:
         cur = conn.cursor()
-        # Ownership check
         cur.execute(
             f"SELECT report_id FROM evaluation_reports WHERE report_id={_P} AND client_name={_P}",
             (report_id, client_name),
         )
         if not cur.fetchone():
             return False
-
-        # Cascade: human_reviews, usage_logs, then the report itself
         cur.execute(f"DELETE FROM human_reviews WHERE report_id={_P}", (report_id,))
         cur.execute(f"DELETE FROM usage_logs WHERE report_id={_P}", (report_id,))
         cur.execute(f"DELETE FROM evaluation_reports WHERE report_id={_P}", (report_id,))
@@ -1413,11 +1102,8 @@ def get_cached_test_suite(description: str, num_tests: int) -> list[dict] | None
     """
     Return a cached test suite for the given (description, num_tests) pair.
 
-    On a hit:
-      - Deserialises tests_json and returns the list.
-      - Increments hit_count and updates last_used_at (best-effort).
-    On a miss:
-      - Returns None so the caller falls through to generation.
+    On a hit: deserialises tests_json, increments hit_count, updates last_used_at.
+    On a miss: returns None so the caller falls through to generation.
     """
     key = _suite_cache_key(description, num_tests)
     with _get_conn() as conn:
@@ -1430,7 +1116,6 @@ def get_cached_test_suite(description: str, num_tests: int) -> list[dict] | None
         if row is None:
             return None
 
-        # Best-effort stat update — don't let this kill the request
         try:
             cur.execute(
                 f"""
@@ -1448,13 +1133,12 @@ def get_cached_test_suite(description: str, num_tests: int) -> list[dict] | None
 
 
 def save_test_suite_cache(description: str, num_tests: int, tests: list[dict]) -> None:
-
     """
     Persist a freshly-generated test suite so future identical requests
-    skip Groq generation entirely.
+    skip generation entirely.
 
-    Uses INSERT OR IGNORE / ON CONFLICT DO NOTHING so concurrent workers
-    can both call this without raising.
+    Uses ON CONFLICT DO NOTHING so concurrent workers can both call this
+    without raising.
     """
     key  = _suite_cache_key(description, num_tests)
     now  = _utc_now()
@@ -1462,50 +1146,31 @@ def save_test_suite_cache(description: str, num_tests: int, tests: list[dict]) -
 
     with _get_conn() as conn:
         cur = conn.cursor()
-        if _USE_PG:
-            cur.execute(
-                """
-                INSERT INTO test_suite_cache
-                    (cache_key, description, num_tests, tests_json, hit_count, created_at, last_used_at)
-                VALUES (%s, %s, %s, %s, 0, %s, %s)
-                ON CONFLICT (cache_key) DO NOTHING
-                """,
-                (key, description.strip(), int(num_tests), data, now, now),
-            )
-        else:
-            cur.execute(
-                """
-                INSERT OR IGNORE INTO test_suite_cache
-                    (cache_key, description, num_tests, tests_json, hit_count, created_at, last_used_at)
-                VALUES (?, ?, ?, ?, 0, ?, ?)
-                """,
-                (key, description.strip(), int(num_tests), data, now, now),
-            )
+        cur.execute(
+            """
+            INSERT INTO test_suite_cache
+                (cache_key, description, num_tests, tests_json, hit_count, created_at, last_used_at)
+            VALUES (%s, %s, %s, %s, 0, %s, %s)
+            ON CONFLICT (cache_key) DO NOTHING
+            """,
+            (key, description.strip(), int(num_tests), data, now, now),
+        )
 
-  # already imported at top of file — this line is just for reference
- 
+
+# ── Stuck / stale report helpers ──────────────────────────────────────────────
+
 STUCK_AFTER_MINUTES: int = int(os.getenv("STUCK_REPORT_MINUTES", "15"))
- 
- 
+
+
 def get_stuck_processing_reports(older_than_minutes: int = STUCK_AFTER_MINUTES) -> list[dict]:
     """
     Return reports stuck in 'processing' for longer than `older_than_minutes`.
- 
-    Also returns reports already marked 'stale' (older_than_minutes=0 trick
-    used by /health to count them). Pass 0 to get all stale reports regardless
-    of age.
- 
-    Logic:
-      - older_than_minutes > 0  → find 'processing' rows where updated_at is old
-      - older_than_minutes == 0 → find all 'stale' rows (for health/monitoring)
+
+    Pass 0 to get all already-marked 'stale' reports (used by /health).
     """
-    from datetime import timedelta
- 
     with _get_conn() as conn:
         cur = conn.cursor()
- 
         if older_than_minutes == 0:
-            # Health check path: count already-marked stale reports
             cur.execute(
                 f"SELECT report_id, client_name, updated_at FROM evaluation_reports WHERE status = {_P}",
                 ("stale",),
@@ -1525,10 +1190,9 @@ def get_stuck_processing_reports(older_than_minutes: int = STUCK_AFTER_MINUTES) 
                 """,
                 ("processing", cutoff),
             )
- 
         return [_row_to_dict(r) for r in cur.fetchall()]
- 
- 
+
+
 def mark_report_stale(report_id: str) -> None:
     """
     Transition a 'processing' report → 'stale'.
@@ -1548,16 +1212,13 @@ def mark_report_stale(report_id: str) -> None:
             (
                 "stale",
                 _utc_now(),
-                (
-                    "Report was in-flight when the server restarted. "
-                    "Re-run via POST /report/{id}/retry."
-                ).replace("{id}", report_id),
+                f"Report was in-flight when the server restarted. Re-run via POST /report/{report_id}/retry.",
                 report_id,
                 "processing",
             ),
         )
- 
- 
+
+
 def reset_report_for_retry(report_id: str, client_name: str) -> bool:
     """
     Reset a 'stale' report back to 'processing' so it can be re-enqueued.
@@ -1566,7 +1227,6 @@ def reset_report_for_retry(report_id: str, client_name: str) -> bool:
     """
     with _get_conn() as conn:
         cur = conn.cursor()
-        # Verify ownership and that it's actually stale
         cur.execute(
             f"""
             SELECT report_id FROM evaluation_reports
@@ -1578,7 +1238,7 @@ def reset_report_for_retry(report_id: str, client_name: str) -> bool:
         )
         if not cur.fetchone():
             return False
- 
+
         cur.execute(
             f"""
             UPDATE evaluation_reports
@@ -1592,7 +1252,7 @@ def reset_report_for_retry(report_id: str, client_name: str) -> bool:
         return True
 
 
-# -- Targets ---------------------------------------------------------------
+# ── Targets ───────────────────────────────────────────────────────────────────
 
 def create_target(
     *,
@@ -1613,7 +1273,7 @@ def create_target(
     target_id = str(uuid.uuid4())
     now = _utc_now()
     client_name = client.get("name") if isinstance(client, dict) else None
-    client_id = client.get("id") if isinstance(client, dict) else None
+    client_id   = client.get("id")   if isinstance(client, dict) else None
     with _get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
@@ -1625,23 +1285,10 @@ def create_target(
             ) VALUES ({_ph(17)})
             """,
             (
-                target_id,
-                client_id,
-                client_name,
-                name,
-                description,
-                base_url,
-                model_name,
-                api_key_enc,
-                repo_id,
-                endpoint_url,
-                payload_template,
+                target_id, client_id, client_name, name, description, base_url,
+                model_name, api_key_enc, repo_id, endpoint_url, payload_template,
                 json.dumps(headers or {}) if headers else None,
-                chain_import_path,
-                invoke_key,
-                target_type,
-                now,
-                now,
+                chain_import_path, invoke_key, target_type, now, now,
             ),
         )
     return {
@@ -1742,7 +1389,7 @@ def associate_report_with_target(report_id: str, target_id: str, client_name: st
             """,
             (target_id, _utc_now(), report_id, client_name),
         )
-        return cur.rowcount > 0
+        return (cur.rowcount or 0) > 0
 
 
 def delete_target(target_id: str, client_name: str) -> bool:
@@ -1765,7 +1412,7 @@ def delete_target(target_id: str, client_name: str) -> bool:
         return True
 
 
-# -- User account helpers --------------------------------------------------
+# ── User account helpers ──────────────────────────────────────────────────────
 
 def create_user(name: str, email: str, password_hash: str) -> dict:
     """Insert a new user row. Raises ValueError if email already exists."""
@@ -1774,24 +1421,14 @@ def create_user(name: str, email: str, password_hash: str) -> dict:
     with _get_conn() as conn:
         cur = conn.cursor()
         try:
-            if _USE_PG:
-                cur.execute(
-                    """
-                    INSERT INTO users
-                        (user_id, name, email, password_hash, is_active, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, TRUE, %s, %s)
-                    """,
-                    (user_id, name, email.lower().strip(), password_hash, now, now),
-                )
-            else:
-                cur.execute(
-                    """
-                    INSERT INTO users
-                        (user_id, name, email, password_hash, is_active, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, 1, ?, ?)
-                    """,
-                    (user_id, name, email.lower().strip(), password_hash, now, now),
-                )
+            cur.execute(
+                """
+                INSERT INTO users
+                    (user_id, name, email, password_hash, is_active, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, TRUE, %s, %s)
+                """,
+                (user_id, name, email.lower().strip(), password_hash, now, now),
+            )
         except Exception as exc:
             if "unique" in str(exc).lower() or "UNIQUE" in str(exc):
                 raise ValueError(f"Email already registered: {email}") from exc
@@ -1855,16 +1492,10 @@ def set_user_plan(user_id: str, plan: str, expires_at: str | None) -> bool:
     plan_value = (plan or "free").strip().lower() or "free"
     with _get_conn() as conn:
         cur = conn.cursor()
-        if _USE_PG:
-            cur.execute(
-                "UPDATE users SET plan=%s, plan_expires_at=%s, updated_at=%s WHERE user_id=%s",
-                (plan_value, expires_at, now, user_id),
-            )
-        else:
-            cur.execute(
-                "UPDATE users SET plan=?, plan_expires_at=?, updated_at=? WHERE user_id=?",
-                (plan_value, expires_at, now, user_id),
-            )
+        cur.execute(
+            "UPDATE users SET plan=%s, plan_expires_at=%s, updated_at=%s WHERE user_id=%s",
+            (plan_value, expires_at, now, user_id),
+        )
         return (cur.rowcount or 0) > 0
 
 
@@ -1878,28 +1509,16 @@ def set_user_billing_ids(
     now = _utc_now()
     with _get_conn() as conn:
         cur = conn.cursor()
-        if _USE_PG:
-            cur.execute(
-                """
-                UPDATE users
-                   SET paddle_customer_id=%s,
-                       paddle_subscription_id=%s,
-                       updated_at=%s
-                 WHERE user_id=%s
-                """,
-                (customer_id, subscription_id, now, user_id),
-            )
-        else:
-            cur.execute(
-                """
-                UPDATE users
-                   SET paddle_customer_id=?,
-                       paddle_subscription_id=?,
-                       updated_at=?
-                 WHERE user_id=?
-                """,
-                (customer_id, subscription_id, now, user_id),
-            )
+        cur.execute(
+            """
+            UPDATE users
+               SET paddle_customer_id=%s,
+                   paddle_subscription_id=%s,
+                   updated_at=%s
+             WHERE user_id=%s
+            """,
+            (customer_id, subscription_id, now, user_id),
+        )
         return (cur.rowcount or 0) > 0
 
 
@@ -1909,20 +1528,13 @@ def update_user_profile(user_id: str, name: str, email: str) -> dict | None:
     with _get_conn() as conn:
         cur = conn.cursor()
         try:
-            if _USE_PG:
-                cur.execute(
-                    "UPDATE users SET name=%s, email=%s, updated_at=%s WHERE user_id=%s",
-                    (name, email.lower().strip(), now, user_id),
-                )
-            else:
-                cur.execute(
-                    "UPDATE users SET name=?, email=?, updated_at=? WHERE user_id=?",
-                    (name, email.lower().strip(), now, user_id),
-                )
+            cur.execute(
+                "UPDATE users SET name=%s, email=%s, updated_at=%s WHERE user_id=%s",
+                (name, email.lower().strip(), now, user_id),
+            )
             if (cur.rowcount or 0) == 0:
                 return None
         except Exception as exc:
-            # Both SQLite and Postgres will throw on UNIQUE(email) constraint violations.
             if "unique" in str(exc).lower():
                 raise ValueError("That email is already in use by another account.") from exc
             raise
@@ -1934,16 +1546,10 @@ def update_user_password(user_id: str, new_password_hash: str) -> bool:
     now = _utc_now()
     with _get_conn() as conn:
         cur = conn.cursor()
-        if _USE_PG:
-            cur.execute(
-                "UPDATE users SET password_hash=%s, updated_at=%s WHERE user_id=%s",
-                (new_password_hash, now, user_id),
-            )
-        else:
-            cur.execute(
-                "UPDATE users SET password_hash=?, updated_at=? WHERE user_id=?",
-                (new_password_hash, now, user_id),
-            )
+        cur.execute(
+            "UPDATE users SET password_hash=%s, updated_at=%s WHERE user_id=%s",
+            (new_password_hash, now, user_id),
+        )
         return (cur.rowcount or 0) > 0
 
 
@@ -1952,16 +1558,10 @@ def deactivate_user(user_id: str) -> bool:
     now = _utc_now()
     with _get_conn() as conn:
         cur = conn.cursor()
-        if _USE_PG:
-            cur.execute(
-                "UPDATE users SET is_active=FALSE, updated_at=%s WHERE user_id=%s",
-                (now, user_id),
-            )
-        else:
-            cur.execute(
-                "UPDATE users SET is_active=0, updated_at=? WHERE user_id=?",
-                (now, user_id),
-            )
+        cur.execute(
+            "UPDATE users SET is_active=FALSE, updated_at=%s WHERE user_id=%s",
+            (now, user_id),
+        )
         return (cur.rowcount or 0) > 0
 
 
@@ -1970,16 +1570,10 @@ def create_password_reset_token(user_id: str, token: str) -> None:
     now = _utc_now()
     with _get_conn() as conn:
         cur = conn.cursor()
-        if _USE_PG:
-            cur.execute(
-                "INSERT INTO password_reset_tokens (token, user_id, created_at, used) VALUES (%s, %s, %s, FALSE)",
-                (token, user_id, now),
-            )
-        else:
-            cur.execute(
-                "INSERT INTO password_reset_tokens (token, user_id, created_at, used) VALUES (?, ?, ?, 0)",
-                (token, user_id, now),
-            )
+        cur.execute(
+            "INSERT INTO password_reset_tokens (token, user_id, created_at, used) VALUES (%s, %s, %s, FALSE)",
+            (token, user_id, now),
+        )
 
 
 def get_password_reset_token(token: str) -> dict | None:
@@ -1997,57 +1591,36 @@ def mark_password_reset_token_used(token: str) -> bool:
     """Mark a password reset token as used."""
     with _get_conn() as conn:
         cur = conn.cursor()
-        if _USE_PG:
-            cur.execute(
-                "UPDATE password_reset_tokens SET used=TRUE WHERE token=%s",
-                (token,),
-            )
-        else:
-            cur.execute(
-                "UPDATE password_reset_tokens SET used=1 WHERE token=?",
-                (token,),
-            )
+        cur.execute(
+            "UPDATE password_reset_tokens SET used=TRUE WHERE token=%s",
+            (token,),
+        )
         return (cur.rowcount or 0) > 0
 
 
-# -- Sales leads -----------------------------------------------------------
+# ── Sales leads ───────────────────────────────────────────────────────────────
 
 def create_lead(*, name: str, email: str, company: str, use_case: str) -> dict:
     lead = {
-        "name": (name or "").strip(),
-        "email": (email or "").strip(),
-        "company": (company or "").strip(),
+        "name":     (name or "").strip(),
+        "email":    (email or "").strip(),
+        "company":  (company or "").strip(),
         "use_case": (use_case or "").strip(),
     }
     now = _utc_now()
     with _get_conn() as conn:
         cur = conn.cursor()
-        if _USE_PG:
-            cur.execute(
-                """
-                INSERT INTO sales_leads (name, email, company, use_case, created_at, contacted)
-                VALUES (%s, %s, %s, %s, %s, FALSE)
-                RETURNING id
-                """,
-                (lead["name"], lead["email"], lead["company"], lead["use_case"], now),
-            )
-            row = _row_to_dict(cur.fetchone()) or {}
-            lead_id = row.get("id")
-        else:
-            cur.execute(
-                """
-                INSERT INTO sales_leads (name, email, company, use_case, created_at, contacted)
-                VALUES (?, ?, ?, ?, ?, 0)
-                """,
-                (lead["name"], lead["email"], lead["company"], lead["use_case"], now),
-            )
-            lead_id = cur.lastrowid
-    return {
-        "id": lead_id,
-        **lead,
-        "created_at": now,
-        "contacted": False,
-    }
+        cur.execute(
+            """
+            INSERT INTO sales_leads (name, email, company, use_case, created_at, contacted)
+            VALUES (%s, %s, %s, %s, %s, FALSE)
+            RETURNING id
+            """,
+            (lead["name"], lead["email"], lead["company"], lead["use_case"], now),
+        )
+        row = _row_to_dict(cur.fetchone()) or {}
+        lead_id = row.get("id")
+    return {"id": lead_id, **lead, "created_at": now, "contacted": False}
 
 
 def list_leads(contacted: bool | None = None) -> list[dict]:
@@ -2062,40 +1635,23 @@ def list_leads(contacted: bool | None = None) -> list[dict]:
                 """,
             )
         else:
-            if _USE_PG:
-                cur.execute(
-                    """
-                    SELECT id, name, email, company, use_case, created_at, contacted
-                    FROM sales_leads
-                    WHERE contacted = %s
-                    ORDER BY created_at DESC
-                    """,
-                    (bool(contacted),),
-                )
-            else:
-                cur.execute(
-                    """
-                    SELECT id, name, email, company, use_case, created_at, contacted
-                    FROM sales_leads
-                    WHERE contacted = ?
-                    ORDER BY created_at DESC
-                    """,
-                    (1 if contacted else 0,),
-                )
+            cur.execute(
+                """
+                SELECT id, name, email, company, use_case, created_at, contacted
+                FROM sales_leads
+                WHERE contacted = %s
+                ORDER BY created_at DESC
+                """,
+                (bool(contacted),),
+            )
         return [_row_to_dict(r) for r in cur.fetchall()]
 
 
 def mark_lead_contacted(lead_id: int) -> bool:
     with _get_conn() as conn:
         cur = conn.cursor()
-        if _USE_PG:
-            cur.execute(
-                "UPDATE sales_leads SET contacted=TRUE WHERE id=%s",
-                (lead_id,),
-            )
-        else:
-            cur.execute(
-                "UPDATE sales_leads SET contacted=1 WHERE id=?",
-                (lead_id,),
-            )
+        cur.execute(
+            "UPDATE sales_leads SET contacted=TRUE WHERE id=%s",
+            (lead_id,),
+        )
         return (cur.rowcount or 0) > 0
