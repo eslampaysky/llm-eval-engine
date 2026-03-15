@@ -30,6 +30,14 @@ export default function DriftPage() {
   }, []);
 
   const fetchDrift = async (mv) => {
+    const emptyDrift = {
+      baseline_score: 0,
+      current_score: 0,
+      drift_pct: 0,
+      drift_detected: false,
+      run_count: 0,
+      series: [],
+    };
     setLoading(true);
     setError('');
     try {
@@ -40,8 +48,16 @@ export default function DriftPage() {
       setDrift(data);
       setActiveModelVersion(mv || '');
     } catch (err) {
-      setError(err.message || 'Failed to load drift data');
-      setDrift(null);
+      // Treat 404 / empty responses as "no data yet" instead of a hard error.
+      if (err && (err.status === 404)) {
+        setDrift(emptyDrift);
+        setActiveModelVersion(mv || '');
+        setError('');
+      } else {
+        setError(err.message || 'Failed to load drift data');
+        setDrift(emptyDrift);
+        setActiveModelVersion(mv || '');
+      }
     } finally {
       setLoading(false);
     }
