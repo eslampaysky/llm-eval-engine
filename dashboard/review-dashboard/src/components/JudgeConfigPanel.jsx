@@ -235,7 +235,7 @@ function JudgeCard({ judge, index, onChange, onRemove, disabled }) {
   );
 }
 
-export default function JudgeConfigPanel({ judges, onChange, groqKeySupplied, disabled }) {
+export default function JudgeConfigPanel({ judges, onChange, groqKeySupplied, disabled, evalMode, onEvalModeChange, consensusThreshold, onConsensusThresholdChange, criticJudge, factCheckerJudge, onCriticJudgeChange, onFactCheckerJudgeChange }) {
   function addJudge(role) {
     onChange([...judges, emptyJudge(role)]);
   }
@@ -263,6 +263,95 @@ export default function JudgeConfigPanel({ judges, onChange, groqKeySupplied, di
           </div>
         </div>
       </div>
+
+      <div className="field" style={{ marginBottom: 12 }}>
+        <label className="label">Evaluation mode</label>
+        <select
+          className="select"
+          value={evalMode}
+          onChange={e => onEvalModeChange?.(e.target.value)}
+          disabled={disabled}
+        >
+          <option value="single">Single judge (default)</option>
+          <option value="debate">Debate mode — Critic + Fact-Checker</option>
+          <option value="chain">Multi-agent chain (Phase 4)</option>
+        </select>
+      </div>
+
+      {evalMode === 'debate' && (
+        <div
+          style={{
+            padding: '10px 14px',
+            borderRadius: 'var(--r)',
+            border: '1px solid var(--line2)',
+            background: 'rgba(255,255,255,.02)',
+            marginBottom: 12,
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 10,
+          }}
+        >
+          <div className="field" style={{ gridColumn: '1 / span 2' }}>
+            <label className="label">Debate mode judges</label>
+            <div style={{ fontSize: 11, color: 'var(--mid)' }}>
+              Select which configured judges act as the Critic and Fact-checker. If left blank, Groq will act as both.
+            </div>
+          </div>
+          <div className="field">
+            <label className="label">Critic judge</label>
+            <select
+              className="select"
+              value={criticJudge || ''}
+              onChange={e => onCriticJudgeChange?.(e.target.value || null)}
+              disabled={disabled || judges.length === 0}
+            >
+              <option value="">Groq primary (default)</option>
+              {judges.map(j => (
+                <option key={j.id} value={j.name || j.model}>
+                  {j.name || j.model}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label className="label">Fact-checker judge</label>
+            <select
+              className="select"
+              value={factCheckerJudge || ''}
+              onChange={e => onFactCheckerJudgeChange?.(e.target.value || null)}
+              disabled={disabled || judges.length === 0}
+            >
+              <option value="">Groq primary (default)</option>
+              {judges.map(j => (
+                <option key={j.id} value={j.name || j.model}>
+                  {j.name || j.model}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field" style={{ gridColumn: '1 / span 2' }}>
+            <label className="label">
+              Consensus threshold
+              <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--mute)' }}>
+                Both judges must agree above this score (0–1)
+              </span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="0.01"
+              className="input"
+              value={typeof consensusThreshold === 'number' ? consensusThreshold : 0.8}
+              onChange={e => {
+                const v = parseFloat(e.target.value);
+                onConsensusThresholdChange?.(Number.isFinite(v) ? v : 0.8);
+              }}
+              disabled={disabled}
+            />
+          </div>
+        </div>
+      )}
 
       <div
         style={{

@@ -1086,6 +1086,10 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
   const [showSavedTargets, setShowSavedTargets] = useState(false);
   const [selectedTargetId, setSelectedTargetId] = useState('');
   const [judges, setJudges] = useState([]);
+  const [evalMode, setEvalMode] = useState('single');
+  const [consensusThreshold, setConsensusThreshold] = useState(0.8);
+  const [criticJudge, setCriticJudge] = useState(null);
+  const [factCheckerJudge, setFactCheckerJudge] = useState(null);
   const [loading,  setLoading]  = useState(false);
   const [polling,  setPolling]  = useState(pollActive());
   const [stage,    setStage]    = useState(0);
@@ -1243,13 +1247,25 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
             ? { type: 'langchain', chain_import_path: form.chain_import_path, invoke_key: form.invoke_key || 'question' }
             : { type: 'webhook', endpoint_url: form.endpoint_url, payload_template: form.payload_template };
 
+    const debateJudges =
+      evalMode === 'debate'
+        ? [
+            ...(criticJudge ? [{ role: 'critic', name: criticJudge }] : []),
+            ...(factCheckerJudge ? [{ role: 'fact_checker', name: factCheckerJudge }] : []),
+          ]
+        : [];
+
     const payload = {
       target,
       description: form.description,
       num_tests: +form.num_tests,
       language: form.language || 'auto',
       ...(form.groq_api_key ? { groq_api_key: form.groq_api_key } : {}),
-      ...(configuredJudges.length > 0 ? { judges: configuredJudges } : {}),
+      ...(configuredJudges.length > 0 || debateJudges.length > 0
+        ? { judges: [...configuredJudges, ...debateJudges] }
+        : {}),
+      ...(evalMode ? { eval_mode: evalMode } : {}),
+      ...(evalMode === 'debate' ? { consensus_threshold: consensusThreshold } : {}),
     };
 
     try {
@@ -1503,6 +1519,14 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
             onChange={setJudges}
             groqKeySupplied={!!form.groq_api_key}
             disabled={busy}
+            evalMode={evalMode}
+            onEvalModeChange={setEvalMode}
+            consensusThreshold={consensusThreshold}
+            onConsensusThresholdChange={setConsensusThreshold}
+            criticJudge={criticJudge}
+            onCriticJudgeChange={setCriticJudge}
+            factCheckerJudge={factCheckerJudge}
+            onFactCheckerJudgeChange={setFactCheckerJudge}
           />
 
           <div className="card">

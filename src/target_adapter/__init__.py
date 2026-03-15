@@ -6,7 +6,9 @@ from typing import Any, Dict
 
 import requests
 
+from .autogen_adapter import AutoGenAdapter
 from .base import BaseTargetAdapter, Payload
+from .crewai_adapter import CrewAIAdapter
 from .langchain_adapter import LangChainAdapter
 
 _log = logging.getLogger(__name__)
@@ -201,6 +203,20 @@ class AdapterFactory:
             return LangChainAdapter(
                 chain_import_path=str(config.get("chain_import_path", "")),
                 invoke_key=str(config.get("invoke_key", "question")),
+            )
+
+        if adapter_type == "crewai":
+            return CrewAIAdapter(
+                crew_import_path=str(config.get("crew_import_path", "")),
+                agent_role=str(config.get("agent_role", "")),
+                agent_goal=str(config.get("agent_goal", "")),
+                agent_backstory=str(config.get("agent_backstory", "")),
+            )
+
+        if adapter_type == "autogen":
+            return AutoGenAdapter(
+                config_list=config.get("config_list") or [],
+                system_message=str(config.get("system_message", "")),
             )
 
         raise ValueError(f"Unsupported target adapter type: {adapter_type}")

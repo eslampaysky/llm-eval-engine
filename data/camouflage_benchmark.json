@@ -1,0 +1,150 @@
+[
+  {
+    "question": "Detective Mara was hired to audit the guest list of an exclusive gala. The organizer initially invited 12 guests, a mix of entrepreneurs, artists, and retired professors. During the cocktail hour, Mara overheard a rumor that three of the guests were actually impostors who had slipped in without invitations. She quietly verified this by cross-checking names against the official registry and security footage. After confirming the three impostors, the head of security escorted them out of the ballroom. The band kept playing, the remaining guests continued chatting, and no one else entered or left the venue for the rest of the night. Ignoring all the colorful details about professions, music, and rumors, focus only on the numbers involved in the guest list and the impostors. How many legitimate guests remained at the gala after the three impostors were removed?",
+    "ground_truth": "9",
+    "question_type": "camouflage",
+    "difficulty": "easy",
+    "camouflage_length": 162
+  },
+  {
+    "question": "On a rainy Sunday afternoon, Lila spread a large map of her city across the kitchen table. She marked four historic libraries, three art museums, and five quiet parks that she wanted to visit over the next month. Her notebook already had a list of eight places she'd visited earlier in the year, but those don't matter for this particular planning session. After some tea, she decided that for this new project she would only include locations that either contained books or artwork, because she wanted a purely cultural tour this time. Parks were postponed to a separate \"nature\" list she planned to make later. Ignoring the old notebook, weather, and her tea ritual, and focusing only on this new cultural tour, how many places did Lila select for her cultural route in total?",
+    "ground_truth": "7",
+    "question_type": "camouflage",
+    "difficulty": "easy",
+    "camouflage_length": 161
+  },
+  {
+    "question": "In a small robotics lab, an engineer named Oren had a shelf full of prototype drones. There were 15 units in total: some with experimental cameras, some with custom propellers, and a few with advanced navigation chips. One night a storm triggered a power surge that damaged 4 of the drones beyond repair. The next morning, Oren carefully inspected each unit, tagging the broken ones with bright red stickers and moving them to a scrap bin. The remaining drones stayed on the main shelf, ready for further tests. No new drones were added, and none of the working ones were removed that day. Forget the story about chips, cameras, and storms, and focus only on the counts. After moving the damaged units to the scrap bin, how many functioning drones were left on the main shelf?",
+    "ground_truth": "11",
+    "question_type": "camouflage",
+    "difficulty": "easy",
+    "camouflage_length": 166
+  },
+  {
+    "question": "A game designer was playtesting a puzzle in which players had to collect keys hidden in a sprawling haunted mansion. In one test run, a player started with 3 bronze keys already in their inventory from a tutorial level. Inside the mansion, they discovered 5 more keys scattered across the library, kitchen, and attic. However, one of those new keys turned out to be rusted and unusable, so the game automatically discarded it when picked up. The interface always shows only usable keys, not broken ones, and the player never dropped or traded any keys during this run. Ignoring the spooky mansion descriptions and where the keys were found, how many usable keys did the player end up with in total?",
+    "ground_truth": "7",
+    "question_type": "camouflage",
+    "difficulty": "easy",
+    "camouflage_length": 171
+  },
+  {
+    "question": "On a long train ride, Noor decided to track her reading progress across a multi-volume fantasy series. She had already finished 2 books before the journey began. During the trip, she completed 1 more book cover-to-cover and got halfway through another, which she planned to finish at home. The conductor announced several stops, people moved between cars, and a vendor passed selling snacks, but none of that affected Noor's reading. For her personal tracker, she only marks a book as completed when she reads it entirely. Ignoring all the details about the train, snacks, and half-finished volumes, how many books from the series could Noor honestly mark as completed by the time the train arrived at her destination?",
+    "ground_truth": "3",
+    "question_type": "camouflage",
+    "difficulty": "easy",
+    "camouflage_length": 184
+  },
+  {
+    "question": "A city planner was studying a busy intersection where cars, bikes, and buses crossed paths near a stadium. On a particular evening, traffic sensors recorded 40 vehicles passing through between 6:00 and 6:10 pm. Later that hour, a sports event ended and a large crowd began to leave the stadium on foot, but the planner's current analysis only cares about the earlier ten-minute window. Reviewing the logs, she noticed that 12 of the 40 vehicles were buses and 8 were bicycles, with the remaining being cars. She wanted to understand the car load specifically for that window, not counting anything that happened afterward or any pedestrians. Based solely on that ten-minute snapshot, how many cars went through the intersection?",
+    "ground_truth": "20",
+    "question_type": "camouflage",
+    "difficulty": "medium",
+    "camouflage_length": 191
+  },
+  {
+    "question": "In an escape-room scenario, a team entered a chamber filled with colored boxes stacked along three walls. On the left wall, there were 6 red boxes and 4 blue boxes. On the right wall, there were 3 green boxes and 5 yellow boxes. The back wall had 2 large black boxes that were purely decorative and never opened during the game. The host announced that only the boxes on the side walls (left and right) contained clues, while the back-wall boxes were irrelevant art pieces. During the game, the team opened every clue-containing box exactly once and ignored the decorative ones. Putting aside the color descriptions and decorations, how many clue-containing boxes did the team open in total?",
+    "ground_truth": "18",
+    "question_type": "camouflage",
+    "difficulty": "medium",
+    "camouflage_length": 189
+  },
+  {
+    "question": "A logistics manager was examining a warehouse layout where pallets of goods were arranged in long rows. In Row A, there were 10 pallets of electronics. In Row B, there were 7 pallets of clothing. In Row C, there were 5 pallets of seasonal items, but 2 of those were marked for immediate disposal due to damage. A marketing intern walked by asking questions about product categories and display ideas, but the manager focused solely on inventory counts. For the upcoming audit, only pallets that are not marked for disposal count as usable inventory. Ignoring the chatter about marketing and focusing only on the numbers, how many usable pallets were present across all three rows?",
+    "ground_truth": "20",
+    "question_type": "camouflage",
+    "difficulty": "medium",
+    "camouflage_length": 192
+  },
+  {
+    "question": "During a complex board game night, four friends managed a fictional kingdom with villages, forts, and trading posts. By mid-game, the kingdom's map showed 9 villages, of which 3 had been upgraded into forts. The rules state that when a village is upgraded, it's no longer counted as a village but becomes part of the fort count. There were also 4 separate trading posts that never change type. While players argued about storylines and alliances, the scorekeeper silently recalculated the counts according to the rules. Ignoring the roleplay and remembering that upgraded villages should only be counted as forts, how many distinct settlements (villages that remain villages, plus all forts, plus all trading posts) were on the map?",
+    "ground_truth": "13",
+    "question_type": "camouflage",
+    "difficulty": "medium",
+    "camouflage_length": 203
+  },
+  {
+    "question": "In a time-travel research story, a scientist logs experiments in a notebook. On Monday, they run 5 short simulations in a virtual environment but discover that 2 of them diverged too far from baseline and are discarded as invalid. On Tuesday, they perform 4 more simulations, all of which meet the criteria. Throughout the narrative, there are descriptions of humming machines, flickering lights, and side conversations with colleagues, but the analysis section of the paper only counts simulations considered valid. Ignoring the atmospheric details and the day labels, how many simulations in total are ultimately counted as valid in the research log?",
+    "ground_truth": "7",
+    "question_type": "camouflage",
+    "difficulty": "medium",
+    "camouflage_length": 189
+  },
+  {
+    "question": "A festival schedule described multiple music stages scattered around a lake. At the North stage, 3 bands performed before sunset and 2 more performed afterward. At the East stage, 4 bands were scheduled, but 1 canceled at the last minute due to illness. The South stage hosted 2 surprise acts that weren't on the printed program. The story goes into detail about sound checks, crowd reactions, and food trucks, but the final report for sponsors only counts bands that actually performed, not cancellations or hypothetical bookings. Considering all stages and ignoring extra narrative color, how many bands ended up performing at the festival?",
+    "ground_truth": "10",
+    "question_type": "camouflage",
+    "difficulty": "medium",
+    "camouflage_length": 199
+  },
+  {
+    "question": "In a locked-room mystery, the narrator explains that ten people were initially inside a seaside cottage: six long-time friends, three new acquaintances, and one housekeeper. As the storm intensified, two of the acquaintances decided to leave early and were seen driving away before the power cut out. Later, when the inspector arrives, the story spends several paragraphs describing the room, the sound of the waves, and the arrangement of chairs. However, the crucial logistical detail is simply who remained in the cottage when the lights went out. Ignoring the atmospheric description and focusing only on the counts, how many people stayed inside after the two acquaintances left?",
+    "ground_truth": "8",
+    "question_type": "camouflage",
+    "difficulty": "easy",
+    "camouflage_length": 199
+  },
+  {
+    "question": "An architect describes a futuristic building with three wings: East, West, and Central. The East wing contains 8 conference rooms, the West wing has 6, and the Central atrium is an open area with no rooms at all. During a planning meeting, the team decides that 3 conference rooms in the East wing will be repurposed into quiet focus pods and therefore no longer count as bookable conference rooms. The narration mentions artwork, lighting, and green plants, but the booking system only tracks active conference rooms. Ignoring the interior design commentary, how many conference rooms remain bookable across the entire building after the repurposing?",
+    "ground_truth": "11",
+    "question_type": "camouflage",
+    "difficulty": "medium",
+    "camouflage_length": 204
+  },
+  {
+    "question": "In a science-fiction voyage log, a starship's cargo deck is described as a maze of crates, fuel cells, and research containers. At departure, the manifest lists 14 research containers, but 5 of them are flagged as hazardous and must be jettisoned before crossing a radiation belt. The log spends several sentences on the appearance of the containers and the captain's hesitation, yet the final mission report only includes the containers that actually remain on board after the jettison event. No new containers are added afterward. Focusing purely on the numbers and ignoring the dramatic tension, how many research containers does the starship carry beyond the radiation belt?",
+    "ground_truth": "9",
+    "question_type": "camouflage",
+    "difficulty": "medium",
+    "camouflage_length": 199
+  },
+  {
+    "question": "A logic puzzle describes a row of five houses along a canal, each painted a different color and inhabited by people with distinct hobbies. The story dwells on which resident drinks tea, who owns a cat, and who collects stamps. However, buried in the text is a rule that says: the person in the second house from the left always lives immediately to the left of the person who plays the violin, and the violin player never lives at either end. If the houses are numbered from 1 on the left to 5 on the right, and the violin player cannot be in house 1 or 5, in which house number must the violin player live to satisfy the given constraint about their left neighbor?",
+    "ground_truth": "3",
+    "question_type": "camouflage",
+    "difficulty": "hard",
+    "camouflage_length": 184
+  },
+  {
+    "question": "In a time-based riddle, a train leaves City A at 14:30 headed toward City B, while another train leaves City B at 15:00 headed toward City A. The narrative spends several sentences describing the scenery each engineer observes from their window, but the crucial detail is this: both trains travel on the same track at constant speeds, and a monitoring station between the cities records when each train passes. Train 1 arrives at the midpoint at 15:30, and Train 2 arrives at the same midpoint at 16:00. Ignoring all story details about landscapes and focusing on timing, which train was traveling faster: the one departing City A at 14:30 or the one departing City B at 15:00?",
+    "ground_truth": "Train 1 from City A",
+    "question_type": "camouflage",
+    "difficulty": "hard",
+    "camouflage_length": 192
+  },
+  {
+    "question": "A treasure-hunt narrative describes three clues hidden along a forest trail marked with wooden posts. Clue A is found 2 km from the trailhead, Clue B is found 5 km from the trailhead, and Clue C is found 7 km from the trailhead. The story includes plenty of description about birds, leaves, and changing weather, but the actual rule of the puzzle is that the final treasure chest is always buried halfway between the farthest two clues along the trail. Ignoring all scenic commentary and focusing purely on distances, how many kilometers from the trailhead should the hunter dig to find the chest?",
+    "ground_truth": "6",
+    "question_type": "camouflage",
+    "difficulty": "hard",
+    "camouflage_length": 178
+  },
+  {
+    "question": "In a floor-plan puzzle, a museum is laid out as a grid of rooms. The entrance is at the southwest corner, and the exit is at the northeast corner. The narrative spends time describing paintings and statues, but the key constraint is this: from the entrance to the exit, the guide must walk a path that consists of exactly 4 steps north and 4 steps east in some order, without ever stepping south or west. Each distinct order of these steps counts as a different valid route. Ignoring the decorative details on the walls, how many distinct shortest routes from entrance to exit satisfy the movement rule?",
+    "ground_truth": "70",
+    "question_type": "camouflage",
+    "difficulty": "hard",
+    "camouflage_length": 190
+  },
+  {
+    "question": "A scheduling story describes a professor who has office hours between 1:00 pm and 3:00 pm. Students arrive at different times, and the narrative elaborates on their worries and questions. The concrete facts are: one student arrives at 1:10, another at 1:20, a third at 1:40, and a fourth at 2:10. Each appointment lasts exactly 20 minutes, and the professor never overlaps meetings. Assuming the professor starts the first appointment immediately at 1:10 and works continuously as long as students are waiting, at what time does the professor finish meeting with the fourth student? Ignore the emotional context and hallway chatter; focus only on the timeline.",
+    "ground_truth": "2:30 pm",
+    "question_type": "camouflage",
+    "difficulty": "hard",
+    "camouflage_length": 201
+  },
+  {
+    "question": "In a spatial reasoning vignette, a courier must deliver packages to three offices laid out along a straight road: Office X at kilometer 2, Office Y at kilometer 5, and Office Z at kilometer 9, measured from the depot. The story describes the weather, the traffic lights, and some small talk with receptionists, but the courier's real constraint is that they start and end at the depot and want the shortest route that visits all three offices at least once. Distances are along the same straight road with no shortcuts. Ignoring all narrative elements and focusing on route length only, what is the minimum total distance in kilometers the courier must travel to complete all deliveries and return to the depot?",
+    "ground_truth": "18",
+    "question_type": "camouflage",
+    "difficulty": "hard",
+    "camouflage_length": 203
+  },
+  {
+    "question": "A multi-step inference puzzle describes a charity auction where bidders raise paddles to signal offers. There are three items: a painting, a sculpture, and a rare book. The narration tells us that Alex bid on exactly two items, Bailey bid on the sculpture only, and Casey bid on every item that Alex did not bid on. Hidden in the text is the rule that at least one person bids on each item. Ignoring the dramatic commentary about the auctioneer and audience, which single item must have at least two bidders, based purely on the logical constraints given?",
+    "ground_truth": "Sculpture",
+    "question_type": "camouflage",
+    "difficulty": "hard",
+    "camouflage_length": 192
+  }
+]
+

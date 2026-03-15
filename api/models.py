@@ -24,6 +24,7 @@ class EvaluationRequest(BaseModel):
     dataset_id: Optional[str] = None
     model_version: Optional[str] = None
     judge_model: Optional[str] = None  # None = use all providers from config.yaml
+    eval_mode: str = "single"  # "single" | "debate"
     input_type: str = "text"
     image_b64: Optional[str] = None
     mime_type: Optional[str] = None
@@ -82,6 +83,7 @@ class BreakRequest(BaseModel):
         ),
     )
     disagreement_threshold: float | None = Field(default=None, ge=1.0, le=3.0)
+    consensus_threshold: float = Field(default=0.8, ge=0.0, le=1.0)
     force_refresh: bool = Field(
         default=False,
         description=(
@@ -111,6 +113,14 @@ class AgentEvalRequest(BaseModel):
     max_retries: int = Field(default=2, ge=0)
 
 
+class AgentScenario(BaseModel):
+    task: str
+    expected_tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    expected_outcome: str
+    trap_tools: list[dict[str, Any]] = Field(default_factory=list)
+    tool_connector: dict[str, Any] | None = None
+
+
 class TargetCreate(BaseModel):
     name: str = Field(..., min_length=2)
     description: Optional[str] = None
@@ -125,7 +135,15 @@ class TargetCreate(BaseModel):
     chain_import_path: Optional[str] = None
     invoke_key: Optional[str] = None
     engine_params: dict | None = None
-    target_type: str = Field(..., description="openai | huggingface | webhook | langchain")
+    agent_role: Optional[str] = None
+    agent_goal: Optional[str] = None
+    agent_backstory: Optional[str] = None
+    config_list: Optional[list[dict]] = None
+    system_message: Optional[str] = None
+    target_type: str = Field(
+        ...,
+        description="openai | huggingface | webhook | langchain | crewai | autogen",
+    )
 
 
 class TargetSummary(BaseModel):

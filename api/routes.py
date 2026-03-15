@@ -20,6 +20,7 @@ from typing import Annotated, Any
 from cryptography.fernet import Fernet
 import jwt as _jwt
 from core.agentic_evaluator import AgentEvaluator, AgentScenario
+from core.debate_evaluator import DebateEvaluator
 from api.multi_judge import (
     build_judges_from_request,
     score_answers,
@@ -1118,10 +1119,12 @@ def _finalize_report_failure(report_id, error_message):
     finalize_report_failure(report_id=report_id, error_message=error_message)
 
 
-def _run_pipeline(samples, judge_model):
+def _run_pipeline(samples, judge_model, eval_mode: str = "single"):
     config   = load_project_config()
     registry = build_default_evaluator_registry()
     pipeline = EvaluationPipeline(config=config, evaluator_registry=registry, max_workers=MAX_WORKERS)
+    # For now, debate evaluation is only enabled for /break; the /evaluate
+    # endpoint always uses the single-judge pipeline.
     results  = pipeline.run(samples=samples, judge_model=judge_model)
     return results, compute_metrics(results)
 
@@ -1379,7 +1382,9 @@ def _process_break_job(report_id, target_cfg, description, num_tests,
                        groq_api_key, force_refresh=False, language="auto",
                        judges_config: list[dict[str, Any]] | None = None,
                        disagreement_threshold: float | None = None,
-                       target_adapter: Any | None = None):
+                       target_adapter: Any | None = None,
+                       eval_mode: str = "single",
+                       consensus_threshold: float = 0.8):
     started = time.monotonic()
     try:
         judge_client = GroqJudgeClient(
@@ -1410,7 +1415,13 @@ def _process_break_job(report_id, target_cfg, description, num_tests,
         target_adapter = target_adapter or AdapterFactory.from_config(target_cfg)
         resolved_judges = [JudgeConfig(**j) for j in (judges_config or [])]
         judges = _resolve_break_judges(groq_api_key, resolved_judges)
-        results = score_answers(tests, target_adapter, judges)
+        results = score_answers(
+            tests,
+            target_adapter,
+            judges,
+            eval_mode=eval_mode,
+            consensus_threshold=consensus_threshold,
+        )
 
         # Inject agreement red-flag into metrics
         agreement_rate = compute_agreement_rate(results)
@@ -1759,6 +1770,8 @@ async def break_model(
         [j.model_dump() for j in (payload.judges or [])],
         payload.disagreement_threshold,
         None,
+        getattr(payload, "eval_mode", "single"),
+        getattr(payload, "consensus_threshold", 0.8),
         job_id=report_id,
     )
     return {

@@ -70,6 +70,10 @@ llm-eval-engine-legacy/
 `-- usage.db
 ```
 
+## Benchmarks
+
+- Narrative Camouflage benchmark (`data/camouflage_benchmark.json`): 20 samples testing multi-step reasoning under story distraction.
+
 ## Runtime entrypoints
 
 - Current deployment entrypoint: `main.py` (used by Dockerfile)

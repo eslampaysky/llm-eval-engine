@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
+import json
 import uuid
+
+from .tool_connector_validator import ToolConnectorValidator
 
 
 @dataclass
@@ -31,6 +34,8 @@ class AgentEvalResult:
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     correction_attempts: int = 0
     correction_history: list[dict[str, Any]] = field(default_factory=list)
+    trajectory_score: float | None = None
+    tool_connector_score: float | None = None
 
 
 class FakeToolEnvironment:
@@ -111,9 +116,15 @@ class FakeToolEnvironment:
 class AgentEvaluator:
     """Evaluate an agent against a scenario using a fake tool environment."""
 
-    def __init__(self, tool_definitions: list[dict[str, Any]], max_retries: int = 2) -> None:
+    def __init__(
+        self,
+        tool_definitions: list[dict[str, Any]],
+        max_retries: int = 2,
+        tool_connector_config: dict[str, Any] | None = None,
+    ) -> None:
         self._tool_definitions = tool_definitions
         self._max_retries = max(0, int(max_retries))
+        self._tool_connector_config = tool_connector_config or None
 
     def evaluate(
         self,
@@ -172,6 +183,31 @@ class AgentEvaluator:
                 trap_triggered=trap_triggered,
             )
 
+            # Optional: score the reasoning trajectory if provided via model_answer JSON.
+            trajectory_score = self._score_trajectory_from_model_answer(
+                agent_result.get("model_answer"),
+            )
+
+            # Optional: validate external tool-connector behavior.
+            tool_connector_score: float | None = None
+            if self._tool_connector_config and isinstance(agent_result, dict):
+                execution_steps = agent_result.get("execution_steps")
+                if isinstance(execution_steps, list):
+                    cfg = self._tool_connector_config
+                    connector = str(cfg.get("connector") or "")
+                    action_id = str(cfg.get("action_id") or "")
+                    if connector and action_id:
+                        validator = ToolConnectorValidator(
+                            connector=connector,
+                            action_id=action_id,
+                            validation_mode=str(cfg.get("validation_mode") or "agentic_trace"),
+                        )
+                        validation = validator.validate_tool_call(
+                            execution_steps=execution_steps,
+                            requirements=cfg.get("requirements") or {},
+                        )
+                        tool_connector_score = float(validation.get("score") or 0.0)
+
             attempt_result = AgentEvalResult(
                 task_success=task_success,
                 tool_accuracy=tool_accuracy,
@@ -180,6 +216,8 @@ class AgentEvaluator:
                 reasoning_errors=list(reasoning_errors),
                 overall_score=overall_score,
                 tool_calls=list(env.call_history),
+                trajectory_score=trajectory_score,
+                tool_connector_score=tool_connector_score,
             )
 
             correction_history.append(
@@ -219,6 +257,46 @@ class AgentEvaluator:
         best_result.correction_attempts = len(correction_history)
         best_result.correction_history = correction_history
         return best_result
+
+    def _score_trajectory_from_model_answer(self, model_answer: Any) -> float | None:
+        """
+        If the model_answer JSON contains a 'trajectory' key, compute a simple
+        trajectory_score = 10 * (steps_in_logical_order / total_steps),
+        where 'logical order' is defined by the step index matching its
+        1-based list position.
+        """
+        if not isinstance(model_answer, str):
+            return None
+
+        try:
+            parsed = json.loads(model_answer)
+        except json.JSONDecodeError:
+            return None
+
+        if not isinstance(parsed, dict):
+            return None
+
+        trajectory = parsed.get("trajectory")
+        if not isinstance(trajectory, list) or not trajectory:
+            return None
+
+        total_steps = len(trajectory)
+        steps_in_logical_order = 0
+
+        for idx, step in enumerate(trajectory, start=1):
+            if not isinstance(step, dict):
+                continue
+            try:
+                step_number = int(step.get("step", idx))
+            except (TypeError, ValueError):
+                continue
+            if step_number == idx:
+                steps_in_logical_order += 1
+
+        if total_steps == 0:
+            return None
+
+        return 10.0 * (steps_in_logical_order / total_steps)
 
     def _score_tool_usage(
         self,

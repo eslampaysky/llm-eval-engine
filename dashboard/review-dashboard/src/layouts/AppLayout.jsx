@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { to: '/app/agentic', label: 'Agentic', icon: '*' },
   { to: '/app/compare', label: 'Compare', icon: '⇌' },
   { to: '/app/api-keys', label: 'API Keys', icon: '⌘' },
+  { to: '/app/config-builder', label: 'Config Builder', icon: '⚙' },
   { to: '/app/settings', label: 'Settings', icon: '⚙' },
 ];
 

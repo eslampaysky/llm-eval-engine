@@ -1,0 +1,98 @@
+# Universal configuration schema for AI Breaker Lab
+# This is an illustrative YAML schema, not a JSON Schema.
+# It documents the supported configuration sections and fields.
+
+agent_framework:
+  # Which multi-agent framework or orchestration layer to use
+  # Supported values: crewai | langgraph | autogen
+  provider: crewai
+
+  # High-level agent persona settings passed to the framework
+  agent_settings:
+    role: "Senior evaluation agent"
+    goal: "Stress-test the target model and surface failure modes"
+    backstory: "You are an independent auditor tasked with probing weaknesses in AI systems."
+
+  # Which evaluation metrics to emphasize for agent behavior
+  # Example options: trajectory_accuracy, tool_call_precision
+  eval_metrics:
+    - trajectory_accuracy
+    - tool_call_precision
+
+infra_target:
+  # Inference provider / runtime for the target model
+  # Supported values: vllm | ollama | siliconflow | openai | huggingface
+  provider: vllm
+
+  # Base URL or host endpoint for the inference server
+  api_base: "http://localhost:8001/v1"
+
+  # Low-level engine tuning knobs for deployment
+  engine_params:
+    gpu_memory_utilization: 0.9          # Fraction of GPU memory to use (0–1)
+    max_model_len: 32768                 # Maximum context length in tokens
+    quantization: "gptq"                 # Quantization mode, e.g. gptq, awq, 8bit, 4bit
+    enable_prefix_caching: true          # Whether to enable prefix / KV caching
+
+retrieval_system:
+  # Vector database backend for RAG
+  # Supported values: pinecone | milvus | pgvector
+  vector_db: pinecone
+
+  # Logical index or collection name
+  index_name: "abl-eval-index"
+
+  # Evaluation-time retrieval parameters
+  eval_params:
+    retrieval_k: 5
+    metrics:
+      - faithfulness
+      - hit_rate
+      - mrr
+
+tool_connector:
+  # External automation / tool orchestration provider
+  # Supported values: zapier | make | mcp | custom
+  connector: zapier
+
+  # Identifier of the concrete action or workflow being validated
+  action_id: "send_email_notification"
+
+  # How the evaluator inspects executions (e.g. via agentic trace)
+  validation_mode: agentic_trace
+
+  # Requirements that must be satisfied by a tool call
+  requirements:
+    auth_type: "oauth2"                  # e.g. api_key, oauth2, custom
+    params:
+      - "to_address"
+      - "subject"
+      - "body"
+
+multimodal_target:
+  # Name or identifier of the multimodal model
+  model: "gpt-4.1-vision-preview"
+
+  # Supported input MIME types for this target
+  input_types:
+    - "image/jpeg"
+    - "application/pdf"
+
+  # Criteria used when evaluating multimodal performance
+  validation_criteria:
+    - ocr_accuracy
+    - spatial_reasoning
+
+agentic_evaluator:
+  # High-level evaluation mode for judges
+  # Supported values: single | debate
+  mode: debate
+
+  # Threshold (0–1) above which both judges must agree
+  consensus_threshold: 0.8
+
+  # Roles of the agents involved in evaluation
+  agents:
+    - role: critic          # focuses on logical flaws and reasoning errors
+    - role: fact_checker    # focuses on factual correctness and grounding
+

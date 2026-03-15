@@ -52,4 +52,58 @@ def compute_metrics(results: list[dict], fail_threshold: float = 5.0) -> dict:
         fail_threshold=fail_threshold,
         toxicity_threshold=toxicity_threshold,
     )
-    return registry.compute_all(_to_domain_rows(results))
+    metrics = registry.compute_all(_to_domain_rows(results))
+
+    # ── Question-type breakdown & camouflage resilience ─────────────────────────
+    # We treat any 'question_type' field on results as the canonical label.
+    breakdown_by_type = metrics.get("breakdown_by_type", {})
+
+    type_totals: dict[str, float] = {}
+    type_counts: dict[str, int] = {}
+
+    for row in results:
+        qtype = str(row.get("question_type") or "").strip() or None
+        if not qtype:
+            continue
+        # Prefer per-sample correctness if available, otherwise fall back to any generic score.
+        score = row.get("correctness")
+        if score is None:
+            score = row.get("score")
+        try:
+            score_f = float(score)
+        except (TypeError, ValueError):
+            continue
+        type_totals[qtype] = type_totals.get(qtype, 0.0) + score_f
+        type_counts[qtype] = type_counts.get(qtype, 0) + 1
+
+    for qtype, total in type_totals.items():
+        count = max(type_counts.get(qtype, 0), 1)
+        avg_score = total / count
+        prev = breakdown_by_type.get(qtype) or {}
+        breakdown_by_type[qtype] = {
+            **prev,
+            "avg_score": avg_score,
+            "count": type_counts[qtype],
+        }
+
+    metrics["breakdown_by_type"] = breakdown_by_type
+
+    # Camouflage resilience: relative performance on camouflage vs non-camouflage.
+    cam_total = type_totals.get("camouflage", 0.0)
+    cam_count = type_counts.get("camouflage", 0)
+    if cam_count > 0:
+        cam_avg = cam_total / cam_count
+
+        non_cam_total = 0.0
+        non_cam_count = 0
+        for qtype, total in type_totals.items():
+            if qtype == "camouflage":
+                continue
+            non_cam_total += total
+            non_cam_count += type_counts.get(qtype, 0)
+
+        if non_cam_count > 0 and non_cam_total > 0:
+            non_cam_avg = non_cam_total / non_cam_count
+            metrics["camouflage_resilience_score"] = cam_avg / non_cam_avg
+
+    return metrics
