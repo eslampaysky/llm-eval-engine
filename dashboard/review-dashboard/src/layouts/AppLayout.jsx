@@ -53,18 +53,26 @@ function AppLayoutFrame() {
             {NAV_ITEMS.map((item) => {
               const isActive = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
               const isPlayground = item.to === '/app/playground' && running && POLL.mode === 'break';
+              const isHitl = item.to === '/app/hitl';
               return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={`nav-btn${isActive ? ' active' : ''}`}
-                  style={{ textDecoration: 'none' }}
-                  onClick={() => setNavOpen(false)}
-                >
-                  <span className="nav-icon">{item.icon}</span>
-                  {item.label}
-                  {isPlayground && <span className="nav-badge">running</span>}
-                </NavLink>
+                <>
+                  {isHitl && (
+                    <div className="nav-group-label" key="results-label">
+                      results
+                    </div>
+                  )}
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={`nav-btn${isActive ? ' active' : ''}`}
+                    style={{ textDecoration: 'none' }}
+                    onClick={() => setNavOpen(false)}
+                  >
+                    <span className="nav-icon">{item.icon}</span>
+                    {item.label}
+                    {isPlayground && <span className="nav-badge">running</span>}
+                  </NavLink>
+                </>
               );
             })}
 
