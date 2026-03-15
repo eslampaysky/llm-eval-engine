@@ -29,6 +29,8 @@ class AgentEvalResult:
     reasoning_errors: list[str]
     overall_score: float
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    correction_attempts: int = 0
+    correction_history: list[dict[str, Any]] = field(default_factory=list)
 
 
 class FakeToolEnvironment:
@@ -109,8 +111,9 @@ class FakeToolEnvironment:
 class AgentEvaluator:
     """Evaluate an agent against a scenario using a fake tool environment."""
 
-    def __init__(self, tool_definitions: list[dict[str, Any]]) -> None:
+    def __init__(self, tool_definitions: list[dict[str, Any]], max_retries: int = 2) -> None:
         self._tool_definitions = tool_definitions
+        self._max_retries = max(0, int(max_retries))
 
     def evaluate(
         self,
@@ -120,53 +123,102 @@ class AgentEvaluator:
         """
         Run the agent against a single scenario and score behavior.
         """
-        env = FakeToolEnvironment(self._tool_definitions, scenario.trap_tools)
-        reasoning_errors: list[str] = []
+        best_result: AgentEvalResult | None = None
+        correction_history: list[dict[str, Any]] = []
+        correction_hint: str | None = None
 
-        try:
-            agent_result = agent_callable(env, scenario) or {}
-        except Exception as exc:
-            reasoning_errors.append(f"Agent execution failed: {exc}")
-            agent_result = {}
+        total_attempts = self._max_retries + 1
 
-        outcome = str(agent_result.get("outcome") or "").strip()
-        expected_outcome = str(scenario.expected_outcome or "").strip()
-        task_success = False
-        if expected_outcome:
-            task_success = expected_outcome.lower() in outcome.lower()
-        else:
-            task_success = bool(outcome)
+        for attempt in range(1, total_attempts + 1):
+            # Attach correction hint to the scenario for retries.
+            if correction_hint:
+                setattr(scenario, "correction_hint", correction_hint)
 
-        tool_accuracy, tool_errors = self._score_tool_usage(
-            env.call_history,
-            scenario.expected_tool_calls,
-        )
-        reasoning_errors.extend(tool_errors)
+            env = FakeToolEnvironment(self._tool_definitions, scenario.trap_tools)
+            reasoning_errors: list[str] = []
 
-        hallucination_in_calls = self._detect_hallucinations(env.call_history)
-        if hallucination_in_calls:
-            reasoning_errors.append("Hallucinated tool name or parameter.")
+            try:
+                agent_result = agent_callable(env, scenario) or {}
+            except Exception as exc:
+                reasoning_errors.append(f"Agent execution failed: {exc}")
+                agent_result = {}
 
-        trap_triggered = any(call.get("was_trap") for call in env.call_history)
-        if trap_triggered:
-            reasoning_errors.append("Trap tool was called.")
+            outcome = str(agent_result.get("outcome") or "").strip()
+            expected_outcome = str(scenario.expected_outcome or "").strip()
+            task_success = False
+            if expected_outcome:
+                task_success = expected_outcome.lower() in outcome.lower()
+            else:
+                task_success = bool(outcome)
 
-        overall_score = self._compute_overall_score(
-            task_success=task_success,
-            tool_accuracy=tool_accuracy,
-            hallucination=hallucination_in_calls,
-            trap_triggered=trap_triggered,
-        )
+            tool_accuracy, tool_errors = self._score_tool_usage(
+                env.call_history,
+                scenario.expected_tool_calls,
+            )
+            reasoning_errors.extend(tool_errors)
 
-        return AgentEvalResult(
-            task_success=task_success,
-            tool_accuracy=tool_accuracy,
-            hallucination_in_calls=hallucination_in_calls,
-            trap_triggered=trap_triggered,
-            reasoning_errors=reasoning_errors,
-            overall_score=overall_score,
-            tool_calls=list(env.call_history),
-        )
+            hallucination_in_calls = self._detect_hallucinations(env.call_history)
+            if hallucination_in_calls:
+                reasoning_errors.append("Hallucinated tool name or parameter.")
+
+            trap_triggered = any(call.get("was_trap") for call in env.call_history)
+            if trap_triggered:
+                reasoning_errors.append("Trap tool was called.")
+
+            overall_score = self._compute_overall_score(
+                task_success=task_success,
+                tool_accuracy=tool_accuracy,
+                hallucination=hallucination_in_calls,
+                trap_triggered=trap_triggered,
+            )
+
+            attempt_result = AgentEvalResult(
+                task_success=task_success,
+                tool_accuracy=tool_accuracy,
+                hallucination_in_calls=hallucination_in_calls,
+                trap_triggered=trap_triggered,
+                reasoning_errors=list(reasoning_errors),
+                overall_score=overall_score,
+                tool_calls=list(env.call_history),
+            )
+
+            correction_history.append(
+                {
+                    "attempt": attempt,
+                    "outcome": outcome,
+                    "score": overall_score,
+                }
+            )
+
+            if best_result is None or attempt_result.overall_score > best_result.overall_score:
+                best_result = attempt_result
+
+            if task_success:
+                break
+
+            if attempt >= total_attempts:
+                break
+
+            if reasoning_errors:
+                correction_hint = "; ".join(reasoning_errors)
+            else:
+                correction_hint = "Previous attempt failed without a specific error message."
+
+        if best_result is None:
+            # Fallback; this should not normally happen, but keeps the type contract.
+            best_result = AgentEvalResult(
+                task_success=False,
+                tool_accuracy=0.0,
+                hallucination_in_calls=False,
+                trap_triggered=False,
+                reasoning_errors=["Evaluation did not produce any result."],
+                overall_score=0.0,
+                tool_calls=[],
+            )
+
+        best_result.correction_attempts = len(correction_history)
+        best_result.correction_history = correction_history
+        return best_result
 
     def _score_tool_usage(
         self,

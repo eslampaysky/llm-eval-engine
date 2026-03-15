@@ -10,6 +10,7 @@ class EvaluationSample:
     ground_truth: str
     model_answer: str
     context: Optional[str] = None
+    question_type: Optional[str] = None
 
 
 @dataclass
@@ -35,6 +36,7 @@ class EvaluatedSample:
     hallucination: bool
     reason: str
     judges: dict[str, JudgeResult]
+    fusing_result: Optional[dict] = None
 
 
 __all__ = ["EvaluationSample", "EvaluatedSample", "JudgeResult"]

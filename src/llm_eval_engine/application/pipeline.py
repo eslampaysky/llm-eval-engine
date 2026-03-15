@@ -11,6 +11,7 @@ import pandas as pd
 
 from .registry import EvaluatorRegistry
 from ..domain.models import EvaluatedSample, EvaluationSample, JudgeResult
+from validators import FusingRegistry
 try:
     from src.target_adapter import AdapterFactory, BaseTargetAdapter
 except ImportError:
@@ -126,6 +127,7 @@ class EvaluationPipeline:
                     ground_truth=str(sample["ground_truth"]),
                     model_answer=str(sample.get("model_answer", "")),
                     context=str(sample.get("context")) if sample.get("context") is not None else None,
+                    question_type=str(sample.get("question_type")) if sample.get("question_type") is not None else None,
                 )
                 for sample in samples
             ]
@@ -142,6 +144,7 @@ class EvaluationPipeline:
                     ground_truth=str(row["ground_truth"]),
                     model_answer=str(row.get("model_answer", "")),
                     context=str(row["context"]) if row.get("context") is not None else None,
+                    question_type=str(row.get("question_type")) if row.get("question_type") is not None else None,
                 )
                 for row in frame.to_dict(orient="records")
             ]
@@ -153,6 +156,11 @@ class EvaluationPipeline:
             target_answer = self._target_adapter.call(sample.question)
         except Exception as exc:
             failure_reason = f"Target adapter error: {exc}"
+            fusing_result = None
+            if getattr(sample, "question_type", None):
+                validator = FusingRegistry.get(sample.question_type)
+                if validator:
+                    fusing_result = validator.validate("")
             unavailable = {
                 provider: JudgeResult(
                     correctness=None,
@@ -173,6 +181,7 @@ class EvaluationPipeline:
                 hallucination=True,
                 reason=failure_reason,
                 judges=unavailable,
+                fusing_result=fusing_result,
             )
 
         judge_results: dict[str, JudgeResult] = {
@@ -241,6 +250,12 @@ class EvaluationPipeline:
             f"{provider}: {result.reason}" for provider, result in judge_results.items()
         )
 
+        fusing_result = None
+        if getattr(sample, "question_type", None):
+            validator = FusingRegistry.get(sample.question_type)
+            if validator:
+                fusing_result = validator.validate(target_answer)
+
         return EvaluatedSample(
             question=sample.question,
             ground_truth=sample.ground_truth,
@@ -251,4 +266,5 @@ class EvaluationPipeline:
             hallucination=hallucination,
             reason=composed_reason,
             judges=judge_results,
+            fusing_result=fusing_result,
         )

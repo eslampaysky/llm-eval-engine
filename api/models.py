@@ -46,6 +46,7 @@ class BreakTarget(BaseModel):
     payload_template: Optional[str] = None
     chain_import_path: Optional[str] = None
     invoke_key: Optional[str] = None
+    engine_params: dict | None = None
 
 
 class JudgeConfig(BaseModel):
@@ -94,6 +95,13 @@ class DemoBreakRequest(BaseModel):
     num_tests: int = Field(default=5, ge=1)
 
 
+class AgentEvalRequest(BaseModel):
+    agent_description: str = Field(..., min_length=1)
+    target: dict[str, Any] = Field(..., description="Target config for the agent model")
+    scenarios: list[dict[str, Any]] = Field(default_factory=list)
+    max_retries: int = Field(default=2, ge=0)
+
+
 class TargetCreate(BaseModel):
     name: str = Field(..., min_length=2)
     description: Optional[str] = None
@@ -107,6 +115,7 @@ class TargetCreate(BaseModel):
     payload_template: Optional[str] = None
     chain_import_path: Optional[str] = None
     invoke_key: Optional[str] = None
+    engine_params: dict | None = None
     target_type: str = Field(..., description="openai | huggingface | webhook | langchain")
 
 

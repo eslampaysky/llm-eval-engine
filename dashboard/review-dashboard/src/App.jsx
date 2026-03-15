@@ -1080,6 +1080,7 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
     endpoint_url: '', payload_template: '{"input":"{question}"}',
     chain_import_path: '', invoke_key: 'question',
     description: '', num_tests: 20, groq_api_key: initialGroqApiKey || '', language: 'auto',
+    quantization: '', gpu_memory_utilization: 0.9,
   });
   const [savedTargets, setSavedTargets] = useState([]);
   const [showSavedTargets, setShowSavedTargets] = useState(false);
@@ -1219,11 +1220,28 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
       .filter(judge => judge.api_key && judge.model && judge.base_url)
       .map(({ id, provider, ...judge }) => judge);
 
+    const engineParams =
+      (form.quantization || form.gpu_memory_utilization)
+        ? {
+            ...(form.quantization ? { quantization: form.quantization } : {}),
+            ...(form.gpu_memory_utilization ? { gpu_memory_utilization: Number(form.gpu_memory_utilization) } : {}),
+          }
+        : null;
+
     const target =
-      targetType === 'openai'      ? { type: 'openai', base_url: form.base_url || 'https://api.openai.com', api_key: form.api_key, model_name: form.model_name }
-      : targetType === 'huggingface' ? { type: 'huggingface', repo_id: form.repo_id, api_token: form.api_token }
-      : targetType === 'langchain' ? { type: 'langchain', chain_import_path: form.chain_import_path, invoke_key: form.invoke_key || 'question' }
-      : { type: 'webhook', endpoint_url: form.endpoint_url, payload_template: form.payload_template };
+      targetType === 'openai'
+        ? {
+            type: 'openai',
+            base_url: form.base_url || 'https://api.openai.com',
+            api_key: form.api_key,
+            model_name: form.model_name,
+            ...(engineParams ? { engine_params: engineParams } : {}),
+          }
+        : targetType === 'huggingface'
+          ? { type: 'huggingface', repo_id: form.repo_id, api_token: form.api_token }
+          : targetType === 'langchain'
+            ? { type: 'langchain', chain_import_path: form.chain_import_path, invoke_key: form.invoke_key || 'question' }
+            : { type: 'webhook', endpoint_url: form.endpoint_url, payload_template: form.payload_template };
 
     const payload = {
       target,
@@ -1321,6 +1339,49 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
             </div>
 
             {targetType === 'openai' && <>
+              <div className="field" style={{ marginBottom: 6 }}>
+                <label className="label">Quick-fill presets</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-g"
+                    style={{ padding: '4px 8px', fontSize: 11 }}
+                    disabled={busy}
+                    onClick={() => {
+                      set('base_url', 'http://localhost:8000/v1');
+                      set('model_name', '');
+                      set('quantization', 'FP8');
+                      set('gpu_memory_utilization', 0.9);
+                    }}
+                  >
+                    vLLM local
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-g"
+                    style={{ padding: '4px 8px', fontSize: 11 }}
+                    disabled={busy}
+                    onClick={() => {
+                      set('base_url', 'http://localhost:11434/v1');
+                      set('model_name', 'llama3');
+                    }}
+                  >
+                    Ollama local
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-g"
+                    style={{ padding: '4px 8px', fontSize: 11 }}
+                    disabled={busy}
+                    onClick={() => {
+                      set('base_url', 'https://api.siliconflow.cn/v1');
+                      set('model_name', '');
+                    }}
+                  >
+                    SiliconFlow
+                  </button>
+                </div>
+              </div>
               <div className="field">
                 <label className="label">Base URL</label>
                 <input className="input" value={form.base_url} onChange={e => set('base_url', e.target.value)} placeholder="https://api.openai.com" disabled={busy} />
@@ -1333,6 +1394,36 @@ export function BreakPage({ onReportReady, initialGroqApiKey = '', onGroqApiKeyC
                 <label className="label">API key (target)</label>
                 <PwInput value={form.api_key} onChange={e => set('api_key', e.target.value)} placeholder="sk-…" disabled={busy} />
               </div>
+              {(form.base_url && form.base_url.includes('localhost:8000')) && (
+                <div className="field">
+                  <label className="label">vLLM engine params (optional)</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div>
+                      <div className="label" style={{ fontSize: 11 }}>Quantization</div>
+                      <input
+                        className="input"
+                        placeholder="FP8"
+                        value={form.quantization}
+                        onChange={(e) => set('quantization', e.target.value)}
+                        disabled={busy}
+                      />
+                    </div>
+                    <div>
+                      <div className="label" style={{ fontSize: 11 }}>GPU memory utilization</div>
+                      <input
+                        className="input"
+                        type="number"
+                        min={0}
+                        max={1}
+                        step="0.01"
+                        value={form.gpu_memory_utilization}
+                        onChange={(e) => set('gpu_memory_utilization', e.target.value)}
+                        disabled={busy}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </>}
 
             {targetType === 'huggingface' && <>

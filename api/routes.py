@@ -175,6 +175,7 @@ class AgentEvalRequest(BaseModel):
     agent_description: str = Field(..., min_length=1)
     target: dict[str, Any] = Field(..., description="Target config for the agent model")
     scenarios: list[AgentScenarioRequest] = Field(default_factory=list)
+    max_retries: int = Field(default=2, ge=0)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1496,7 +1497,7 @@ def evaluate_agent(
         raise HTTPException(status_code=422, detail="scenarios must be a non-empty list")
 
     tool_definitions = _build_agent_tool_definitions(payload.scenarios)
-    evaluator = AgentEvaluator(tool_definitions)
+    evaluator = AgentEvaluator(tool_definitions, max_retries=payload.max_retries)
 
     try:
         adapter = AdapterFactory.from_config(payload.target)
