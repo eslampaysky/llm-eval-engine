@@ -5,6 +5,7 @@ import { AppShellProvider, useAppShell } from '../context/AppShellContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const NAV_ITEMS = [
+  { to: '/app/vibe-check', label: 'Vibe Check', icon: '🚀' },
   { to: '/app/dashboard', label: 'Dashboard', icon: '◆' },
   { to: '/app/targets', label: 'Targets', icon: '◈' },
   { to: '/app/runs', label: 'Runs', icon: '◷' },

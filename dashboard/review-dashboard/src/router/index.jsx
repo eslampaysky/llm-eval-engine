@@ -29,6 +29,7 @@ import DriftPage from '../pages/app/DriftPage.jsx';
 import EsgPage from '../pages/app/EsgPage.jsx';
 import AuditPage from '../pages/app/AuditPage.jsx';
 import WebAuditPage from '../pages/app/WebAuditPage.jsx';
+import VibeCheckPage from '../pages/app/VibeCheckPage.jsx';
 import AgentAuditPage from '../pages/app/AgentAuditPage.jsx';
 import MonitorRunPage from '../pages/app/MonitorRunPage.jsx';
 import AuditHistoryPage from '../pages/app/AuditHistoryPage.jsx';
@@ -63,7 +64,8 @@ const router = createBrowserRouter([
       </PrivateRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/app/dashboard" replace /> },
+      { index: true, element: <Navigate to="/app/vibe-check" replace /> },
+      { path: 'vibe-check', element: <VibeCheckPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'targets', element: <TargetsPage /> },
       { path: 'targets/:id', element: <TargetDetailPage /> },
