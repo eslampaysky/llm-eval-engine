@@ -17,7 +17,7 @@ const TIERS = [
       'Community support',
     ],
     cta: 'Get Started Free',
-    ctaTo: '/auth/signup',
+    ctaTo: '/app/vibe-check',
   },
   {
     key: 'deep',
@@ -253,7 +253,7 @@ export default function PricingPage() {
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Not sure which tier fits?</div>
           <div style={{ fontSize: '.85rem', color: '#8ea8c7' }}>Start with a free Vibe Check — upgrade anytime.</div>
         </div>
-        <Link to="/auth/signup" style={{
+        <Link to="/app/vibe-check" style={{
           textDecoration: 'none',
           background: 'linear-gradient(120deg, var(--accent), var(--accent2))',
           color: '#020810', borderRadius: 10, padding: '12px 28px',

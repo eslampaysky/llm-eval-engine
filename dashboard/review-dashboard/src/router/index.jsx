@@ -45,6 +45,15 @@ const router = createBrowserRouter([
       { path: 'auth/forgot-password', element: <ForgotPasswordPage /> },
     ],
   },
+  // Vibe Check is public — no sign-up required (matches landing page promise)
+  {
+    path: '/app/vibe-check',
+    element: <AppLayout />,
+    children: [
+      { index: true, element: <VibeCheckPage /> },
+    ],
+  },
+  // All other /app routes require authentication
   {
     path: '/app',
     element: (
@@ -54,7 +63,6 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Navigate to="/app/vibe-check" replace /> },
-      { path: 'vibe-check', element: <VibeCheckPage /> },
       { path: 'overview', element: <OverviewPage /> },
       { path: 'web-audit', element: <WebAuditPage /> },
       { path: 'agent-audit', element: <AgentAuditPage /> },

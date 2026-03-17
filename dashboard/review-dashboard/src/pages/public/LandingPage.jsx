@@ -7,14 +7,14 @@ export default function LandingPage() {
 
   function handleCTA() {
     if (url.trim()) {
-      navigate(`/auth/signup?url=${encodeURIComponent(url.trim())}`);
+      navigate(`/app/vibe-check?url=${encodeURIComponent(url.trim())}`);
     } else {
-      navigate('/auth/signup');
+      navigate('/app/vibe-check');
     }
   }
 
   return (
-    <div style={{ overflow: 'hidden' }}>
+    <div style={{ overflowX: 'hidden' }}>
 
       {/* ═══════ HERO ═══════ */}
       <section style={{
@@ -234,7 +234,7 @@ export default function LandingPage() {
           <p style={{ color: '#8ea8c7', margin: '0 0 28px', fontSize: '.92rem', position: 'relative' }}>
             Every broken flow is a churned user. Start catching them in 60 seconds.
           </p>
-          <Link to="/auth/signup" style={{
+          <Link to="/app/vibe-check" style={{
             display: 'inline-block', textDecoration: 'none',
             background: 'linear-gradient(120deg, var(--accent), var(--accent2))',
             color: '#020810', borderRadius: 12, padding: '14px 36px',
