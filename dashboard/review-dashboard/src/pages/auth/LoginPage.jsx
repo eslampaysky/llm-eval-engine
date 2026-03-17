@@ -1,230 +1,111 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function LoginPage() {
-  const { login, loading: authLoading } = useAuth();
+  const { login, error, clearError, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const from = location.state?.from?.pathname || '/app/dashboard';
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError('');
-    setSubmitting(true);
-    const result = await login({ email, password });
-    setSubmitting(false);
-    if (result.success) {
-      navigate(from, { replace: true });
-    } else {
-      setError(result.error || 'Login failed.');
-    }
+  if (isAuthenticated) {
+    navigate('/app/overview', { replace: true });
+    return null;
   }
 
-  const inputStyle = {
-    width: '100%',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(33,57,90,0.9)',
-    borderRadius: 8,
-    color: 'rgba(232,244,255,0.95)',
-    fontFamily: 'Space Grotesk, sans-serif',
-    fontSize: 14,
-    padding: '11px 14px',
-    outline: 'none',
-    transition: 'border-color 0.12s',
-    boxSizing: 'border-box',
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    clearError();
+    const result = await login({ email, password });
+    setLoading(false);
+    if (result.success) navigate('/app/overview');
   };
 
-  const labelStyle = {
-    display: 'block',
-    marginBottom: 6,
-    fontSize: 11,
-    color: 'rgba(142,168,199,0.8)',
-    fontFamily: 'JetBrains Mono, monospace',
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
+  const handleGoogleClick = () => {
+    alert('Google OAuth coming soon! Use email login for now.');
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--bg, #05070d)',
-      padding: 20,
+    <div className="fade-in" style={{
+      maxWidth: 420,
+      margin: '0 auto',
+      padding: '64px 24px 80px',
     }}>
-      <div style={{ width: '100%', maxWidth: 420 }}>
-        <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <div style={{
-            width: 52,
-            height: 52,
-            borderRadius: 14,
-            background: 'linear-gradient(140deg, var(--accent, #3bb4ff), var(--accent2, #26f0b9))',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontFamily: 'JetBrains Mono, monospace',
-            fontWeight: 700,
-            fontSize: 18,
-            color: '#011320',
-            marginBottom: 14,
-          }}>
-            AB
-          </div>
-          <div style={{
-            fontSize: 24,
-            fontWeight: 700,
-            fontFamily: 'Space Grotesk, sans-serif',
-            color: 'rgba(232,244,255,0.97)',
-            letterSpacing: '-0.02em',
-          }}>
-            Welcome back
-          </div>
-          <div style={{ color: 'rgba(142,168,199,0.7)', fontSize: 13, marginTop: 4 }}>
-            Sign in to AI Breaker Labs
-          </div>
-        </div>
-
-        <div style={{
-          background: '#0c1220',
-          border: '1px solid rgba(33,57,90,0.9)',
-          borderRadius: 14,
-          padding: '28px 30px',
-          boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+      <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <h1 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 28,
+          fontWeight: 700,
+          color: 'var(--text-primary)',
+          marginBottom: 8,
         }}>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <div>
-              <label style={labelStyle}>Email</label>
-              <input
-                type="email"
-                style={inputStyle}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                autoComplete="email"
-                onFocus={(e) => { e.target.style.borderColor = 'var(--accent, #3bb4ff)'; }}
-                onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
-              />
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <label style={{ ...labelStyle, marginBottom: 0 }}>Password</label>
-                <Link
-                  to="/auth/forgot-password"
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--accent, #3bb4ff)',
-                    textDecoration: 'none',
-                    fontFamily: 'JetBrains Mono, monospace',
-                  }}
-                >
-                  Forgot password?
-                </Link>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type={showPw ? 'text' : 'password'}
-                  style={{ ...inputStyle, flex: 1 }}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  autoComplete="current-password"
-                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent, #3bb4ff)'; }}
-                  onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((s) => !s)}
-                  style={{
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(33,57,90,0.9)',
-                    borderRadius: 8,
-                    color: 'rgba(142,168,199,0.7)',
-                    padding: '0 14px',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                  }}
-                >
-                  {showPw ? 'Hide' : 'Show'}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <div style={{
-                background: 'rgba(255,77,109,0.08)',
-                border: '1px solid rgba(255,77,109,0.3)',
-                borderRadius: 8,
-                padding: '10px 14px',
-                color: '#ff4d6d',
-                fontSize: 13,
-              }}>
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={submitting || authLoading}
-              style={{
-                padding: '12px',
-                borderRadius: 9,
-                marginTop: 4,
-                background: 'rgba(59,180,255,0.12)',
-                border: '1px solid rgba(59,180,255,0.4)',
-                color: 'var(--accent, #3bb4ff)',
-                fontFamily: 'JetBrains Mono, monospace',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: submitting ? 'wait' : 'pointer',
-                opacity: submitting ? 0.7 : 1,
-                transition: 'all 0.12s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-              }}
-            >
-              {submitting ? (
-                <>
-                  <div style={{
-                    width: 13,
-                    height: 13,
-                    border: '2px solid rgba(59,180,255,0.3)',
-                    borderTopColor: 'var(--accent, #3bb4ff)',
-                    borderRadius: '50%',
-                    animation: 'spin 0.7s linear infinite',
-                  }} />
-                  Signing in...
-                </>
-              ) : 'Sign in'}
-            </button>
-          </form>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'rgba(142,168,199,0.6)' }}>
-          Don't have an account?{' '}
-          <Link
-            to="/auth/signup"
-            style={{ color: 'var(--accent, #3bb4ff)', textDecoration: 'none', fontWeight: 600 }}
-          >
-            Sign up free
-          </Link>
-        </div>
+          Welcome back
+        </h1>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
+          Log in to your AiBreaker account.
+        </p>
       </div>
 
-      <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
+      {/* Google OAuth */}
+      <button
+        onClick={handleGoogleClick}
+        style={{
+          width: '100%', padding: '12px 20px', borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--line)', background: 'var(--bg-surface)',
+          color: 'var(--text-primary)', fontSize: 14, fontWeight: 500,
+          cursor: 'pointer', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', gap: 10, transition: 'all 0.15s',
+          fontFamily: 'var(--font-body)',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--line-light)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--line)'; }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Continue with Google
+      </button>
+
+      <div className="divider">or</div>
+
+      <form onSubmit={handleSubmit}>
+        {error && <div className="error-box">{error}</div>}
+
+        <div style={{ marginBottom: 14 }}>
+          <label className="form-label">Email</label>
+          <input className="form-input" type="email" value={email}
+            onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" required />
+        </div>
+
+        <div style={{ marginBottom: 8 }}>
+          <label className="form-label">Password</label>
+          <input className="form-input" type="password" value={password}
+            onChange={(e) => setPassword(e.target.value)} placeholder="Your password" required />
+        </div>
+
+        <div style={{ textAlign: 'right', marginBottom: 20 }}>
+          <Link to="/auth/forgot-password" style={{
+            fontSize: 12, color: 'var(--text-muted)', textDecoration: 'none',
+          }}>
+            Forgot password?
+          </Link>
+        </div>
+
+        <button type="submit" className="btn btn-primary" disabled={loading}
+          style={{ width: '100%', justifyContent: 'center', padding: '12px 20px' }}>
+          {loading ? 'Signing in...' : 'Sign In'}
+        </button>
+      </form>
+
+      <div style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'var(--text-muted)' }}>
+        Don't have an account?{' '}
+        <Link to="/auth/signup" style={{ color: 'var(--accent)', fontWeight: 500 }}>Sign up</Link>
+      </div>
     </div>
   );
 }

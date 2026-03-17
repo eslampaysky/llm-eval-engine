@@ -2,36 +2,24 @@ import { Navigate, createBrowserRouter } from 'react-router-dom';
 import PrivateRoute from './PrivateRoute.jsx';
 import PublicLayout from '../layouts/PublicLayout.jsx';
 import AppLayout from '../layouts/AppLayout.jsx';
+
 import LandingPage from '../pages/public/LandingPage.jsx';
 import DemoPage from '../pages/public/DemoPage.jsx';
-import DocsPage from '../pages/public/DocsPage.jsx';
 import PricingPage from '../pages/public/PricingPage.jsx';
-import ConfigBuilderPage from '../pages/app/ConfigBuilderPage.jsx';
-import BillingSuccessPage from '../pages/public/BillingSuccessPage.jsx';
 import PublicReportPage from '../pages/public/PublicReportPage.jsx';
-import PublicWebAuditPage from '../pages/public/PublicWebAuditPage.jsx';
+
 import LoginPage from '../pages/auth/LoginPage.jsx';
 import SignupPage from '../pages/auth/SignupPage.jsx';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage.jsx';
-import DashboardPage from '../pages/app/DashboardPage.jsx';
-import TargetsPage from '../pages/app/TargetsPage.jsx';
-import TargetDetailPage from '../pages/app/TargetDetailPage.jsx';
-import RunsPage from '../pages/app/RunsPage.jsx';
-import RunDetailPage from '../pages/app/RunDetailPage.jsx';
-import PlaygroundPage from '../pages/app/PlaygroundPage.jsx';
-import HitlPage from '../pages/app/HitlPage.jsx';
-import AgenticPage from '../pages/app/AgenticPage.jsx';
-import RagPage from '../pages/app/RagPage.jsx';
-import VisionPage from '../pages/app/VisionPage.jsx';
-import ComparePage from '../pages/app/ComparePage.jsx';
-import ApiKeysPage from '../pages/app/ApiKeysPage.jsx';
-import DriftPage from '../pages/app/DriftPage.jsx';
-import EsgPage from '../pages/app/EsgPage.jsx';
-import AuditPage from '../pages/app/AuditPage.jsx';
+
+import OverviewPage from '../pages/app/OverviewPage.jsx';
+import VibeCheckPage from '../pages/app/VibeCheckPage.jsx';
 import WebAuditPage from '../pages/app/WebAuditPage.jsx';
 import AgentAuditPage from '../pages/app/AgentAuditPage.jsx';
-import MonitorRunPage from '../pages/app/MonitorRunPage.jsx';
-import AuditHistoryPage from '../pages/app/AuditHistoryPage.jsx';
+import AuditsPage from '../pages/app/AuditsPage.jsx';
+import AuditDetailPage from '../pages/app/AuditDetailPage.jsx';
+import MonitoringPage from '../pages/app/MonitoringPage.jsx';
+import ApiKeysPage from '../pages/app/ApiKeysPage.jsx';
 import SettingsLayout from '../pages/app/settings/SettingsLayout.jsx';
 import ProfilePage from '../pages/app/settings/ProfilePage.jsx';
 import SecurityPage from '../pages/app/settings/SecurityPage.jsx';
@@ -45,11 +33,8 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <LandingPage /> },
       { path: 'demo', element: <DemoPage /> },
-      { path: 'docs', element: <DocsPage /> },
       { path: 'pricing', element: <PricingPage /> },
-      { path: 'billing/success', element: <BillingSuccessPage /> },
       { path: 'report/:reportId', element: <PublicReportPage /> },
-      { path: 'web-audit/share/:token', element: <PublicWebAuditPage /> },
       { path: 'auth/login', element: <LoginPage /> },
       { path: 'auth/signup', element: <SignupPage /> },
       { path: 'auth/forgot-password', element: <ForgotPasswordPage /> },
@@ -63,27 +48,15 @@ const router = createBrowserRouter([
       </PrivateRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/app/dashboard" replace /> },
-      { path: 'dashboard', element: <DashboardPage /> },
-      { path: 'targets', element: <TargetsPage /> },
-      { path: 'targets/:id', element: <TargetDetailPage /> },
-      { path: 'runs', element: <RunsPage /> },
-      { path: 'runs/:runId', element: <RunDetailPage /> },
-      { path: 'hitl', element: <HitlPage /> },
-      { path: 'playground', element: <PlaygroundPage /> },
-      { path: 'agentic', element: <AgenticPage /> },
-      { path: 'config-builder', element: <ConfigBuilderPage /> },
-      { path: 'rag', element: <RagPage /> },
-      { path: 'vision', element: <VisionPage /> },
-      { path: 'compare', element: <ComparePage /> },
-      { path: 'api-keys', element: <ApiKeysPage /> },
-      { path: 'drift', element: <DriftPage /> },
-      { path: 'esg', element: <EsgPage /> },
-      { path: 'audit', element: <AuditPage /> },
+      { index: true, element: <Navigate to="/app/overview" replace /> },
+      { path: 'overview', element: <OverviewPage /> },
+      { path: 'vibe-check', element: <VibeCheckPage /> },
       { path: 'web-audit', element: <WebAuditPage /> },
       { path: 'agent-audit', element: <AgentAuditPage /> },
-      { path: 'monitors', element: <MonitorRunPage /> },
-      { path: 'audit-history', element: <AuditHistoryPage /> },
+      { path: 'audits', element: <AuditsPage /> },
+      { path: 'audits/:auditId', element: <AuditDetailPage /> },
+      { path: 'monitoring', element: <MonitoringPage /> },
+      { path: 'api-keys', element: <ApiKeysPage /> },
       {
         path: 'settings',
         element: <SettingsLayout />,

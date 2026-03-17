@@ -1,178 +1,36 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { API_BASE, ReportPage, apiFetch, getApiKey } from '../../App.jsx';
-import { getAuthHeader } from '../../context/AuthContext.jsx';
+import ScoreRing from '../../components/ScoreRing.jsx';
+import FindingCard from '../../components/FindingCard.jsx';
 
 export default function PublicReportPage() {
-  const { reportId } = useParams();
-  const [report, setReport] = useState(null);
-  const [status, setStatus] = useState('loading');
-  const [error, setError] = useState('');
-  const [pdfBusy, setPdfBusy] = useState(false);
-  const [pdfError, setPdfError] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    setStatus('loading');
-    setError('');
-
-    apiFetch(`/report/${encodeURIComponent(reportId)}`, {}, false)
-      .then((data) => {
-        if (!active) return;
-        if (data?.status && data.status !== 'done' && !data.report_id) {
-          setStatus(data.status || 'processing');
-          setReport(null);
-          return;
-        }
-        setReport(data);
-        setStatus('done');
-      })
-      .catch((err) => {
-        if (!active) return;
-        setError(err?.message || 'Report not found.');
-        setStatus('error');
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [reportId]);
-
-  if (status === 'loading') {
-    return (
-      <div className="page">
-        <div className="empty">
-          <div className="spinner" style={{ margin: '0 auto' }} />
-        </div>
-      </div>
-    );
-  }
-
-  if (status !== 'done') {
-    const statusMessage = status && status !== 'processing'
-      ? `Report status: ${status}.`
-      : 'Report is still processing. Please refresh in a moment.';
-    return (
-      <div className="page">
-        <div className="empty">
-          {error ? `Warning: ${error}` : statusMessage}
-        </div>
-      </div>
-    );
-  }
-
-  const downloadPdf = async () => {
-    if (!report?.report_id || pdfBusy) return;
-    setPdfBusy(true);
-    setPdfError('');
-    try {
-      const res = await fetch(`${API_BASE}/report/${encodeURIComponent(report.report_id)}/pdf`, {
-        headers: {
-          ...getAuthHeader(),
-          'X-API-KEY': getApiKey(),
-        },
-      });
-      if (!res.ok) throw new Error(`Download failed (${res.status})`);
-      const blob = await res.blob();
-      const disposition = res.headers.get('content-disposition') || '';
-      const match = disposition.match(/filename=([^;]+)/i);
-      const filename = match ? match[1].replace(/\"/g, '') : `aibreaker-audit-${report.report_id}.pdf`;
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setPdfError(err?.message || 'Failed to download PDF.');
-    } finally {
-      setPdfBusy(false);
-    }
-  };
-
   return (
-    <>
-      <ReportPage report={report} persona="dev" />
-      {report?.status === 'done' && (
-        <div className="page fade-in" style={{ paddingTop: 0 }}>
-          <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-            <div>
-              <div className="card-label">Audit export</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--mid)' }}>
-                Download a PDF version for enterprise audits.
-              </div>
-              {pdfError && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 6 }}>{pdfError}</div>}
-            </div>
-            <button className="btn btn-primary" onClick={downloadPdf} disabled={pdfBusy}>
-              {pdfBusy ? 'Downloading...' : 'Download PDF Audit Report'}
-            </button>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
-            <div className="card" style={{
-              padding: 20,
-              background: 'linear-gradient(135deg, rgba(91,155,245,0.12), rgba(17,21,32,0.95))',
-              borderColor: 'rgba(91,155,245,0.35)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 8,
-                  display: 'grid', placeItems: 'center',
-                  background: 'rgba(91,155,245,0.18)', color: '#9cc4ff',
-                  fontFamily: 'var(--mono)', fontSize: 11,
-                }}>PLAN</div>
-                <div>
-                  <div className="card-label" style={{ marginBottom: 2 }}>Explore plans</div>
-                  <div style={{ fontSize: 12, color: 'var(--mid)' }}>
-                    Compare Pro and Enterprise features, billing, and limits.
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'grid', gap: 6, marginBottom: 12, fontSize: 12, color: 'var(--mid)' }}>
-                <span>Unlimited runs and higher test caps</span>
-                <span>Team sharing and audit exports</span>
-                <span>Priority support and SLAs</span>
-              </div>
-              <a className="btn btn-ghost" href="/pricing">View Pricing</a>
-            </div>
-            <div className="card" style={{
-              padding: 20,
-              borderColor: 'rgba(38,240,185,0.4)',
-              background: 'linear-gradient(135deg, rgba(38,240,185,0.16), rgba(17,21,32,0.95))',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 8,
-                  display: 'grid', placeItems: 'center',
-                  background: 'rgba(38,240,185,0.18)', color: '#7df2c9',
-                  fontFamily: 'var(--mono)', fontSize: 11,
-                }}>PRO</div>
-                <div>
-                  <div className="card-label" style={{ marginBottom: 2 }}>Get Full Access</div>
-                  <div style={{ fontSize: 12, color: 'var(--mid)' }}>
-                    Unlock unlimited runs, team sharing, and audit-ready exports.
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                {['Unlimited runs', 'Team sharing', 'Audit PDFs'].map((chip) => (
-                  <span key={chip} style={{
-                    padding: '4px 8px',
-                    borderRadius: 999,
-                    border: '1px solid rgba(38,240,185,0.35)',
-                    background: 'rgba(38,240,185,0.12)',
-                    color: '#b8f8e5',
-                    fontSize: 10.5,
-                    fontFamily: 'var(--mono)',
-                  }}>{chip}</span>
-                ))}
-              </div>
-              <a className="btn btn-primary" href="/auth/signup">Get Full Access</a>
-            </div>
+    <div className="fade-in" style={{ maxWidth: 'var(--max-width)', margin: '0 auto', padding: '48px 40px 80px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', marginBottom: 28 }}>
+        <ScoreRing score={83} size={100} label="/100" />
+        <div>
+          <div className="page-eyebrow">Public Report</div>
+          <h1 className="page-title" style={{ fontSize: 24 }}>myapp.vercel.app</h1>
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <span className="badge badge-blue">Vibe Check</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Mar 18, 2026</span>
           </div>
         </div>
-      )}
-    </>
+      </div>
+
+      <div className="card-label" style={{ marginBottom: 12 }}>Findings (3)</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <FindingCard severity="critical" category="flow" title="Navigation dropdown not accessible on mobile"
+          description="Hamburger menu fails below 390px." fixPrompt="Add touch-action: manipulation" />
+        <FindingCard severity="warning" category="layout" title="Content overflows horizontally"
+          fixPrompt="Add overflow-x: hidden" />
+        <FindingCard severity="info" category="accessibility" title="2 form inputs missing labels" />
+      </div>
+
+      <div style={{ textAlign: 'center', marginTop: 48, padding: '32px 0', borderTop: '1px solid var(--line)' }}>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 12 }}>
+          Want to audit your own app?
+        </p>
+        <a href="/auth/signup" className="btn btn-primary">Get Started Free</a>
+      </div>
+    </div>
   );
 }

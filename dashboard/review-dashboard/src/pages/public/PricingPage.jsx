@@ -1,309 +1,331 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Check, ChevronDown, ChevronUp, ArrowRight, Zap, Search, Wrench } from 'lucide-react';
 
-import { apiFetch } from '../../App.jsx';
-
-const PLANS = [
+const TIERS = [
   {
-    key: 'free',
-    name: 'Free',
-    price: '$0',
-    period: '/month',
-    desc: 'For solo builders shipping AI-built web apps.',
-    current: true,
+    id: 'vibe',
+    name: 'Vibe Check',
+    price: 'Free',
+    period: 'forever',
+    tagline: 'Quick reliability scan',
+    icon: Zap,
+    cta: 'Get Started Free',
+    ctaLink: '/auth/signup',
+    popular: false,
     features: [
-      '3 web audits / month',
-      '20 tests per run',
-      'Video replays',
-      'AI fix prompts',
-      'Community support',
+      '5 audits per month',
+      'Desktop + mobile scan',
+      'Reliability score (0-100)',
+      'Top 5 findings',
+      'Copy-paste fix prompts',
+      'Public share links',
     ],
-    cta: 'Get Started',
-    ctaTo: '/auth/signup',
-    highlight: false,
   },
   {
-    key: 'pro',
-    name: 'Pro',
-    price: '$99',
+    id: 'deep',
+    name: 'Deep Dive',
+    price: '$29',
     period: '/month',
-    desc: 'For teams shipping AI-powered web apps.',
-    current: false,
-    features: [
-      '200 web audits / month',
-      '75 tests per run',
-      'PR comment bot',
-      'Team sharing + share links',
-      'Audit exports',
-      'Priority support',
-    ],
-    cta: 'Upgrade to Pro',
-    ctaTo: '/auth/signup',
-    highlight: true,
-  },
-  {
-    key: 'enterprise',
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    desc: 'For orgs with compliance, security, and scale.',
-    current: false,
+    tagline: 'Full audit with video replay',
+    icon: Search,
+    cta: 'Start Deep Dive',
+    ctaLink: '/auth/signup',
+    popular: true,
     features: [
       'Unlimited audits',
-      'Custom test suites',
-      'SSO / SAML',
-      'Audit logs + exports',
+      'Everything in Vibe Check',
+      'Video session replay',
+      'User journey testing',
+      'Screenshot comparisons',
+      'Monitoring & alerts',
+      'API access',
+      'Priority support',
+    ],
+  },
+  {
+    id: 'fix',
+    name: 'Fix & Verify',
+    price: '$79',
+    period: '/month',
+    tagline: 'AI-powered fixes + verification',
+    icon: Wrench,
+    cta: 'Start Fixing',
+    ctaLink: '/auth/signup',
+    popular: false,
+    features: [
+      'Everything in Deep Dive',
+      'AI fix generation',
+      'Re-run verification',
+      'Source code analysis',
+      'CI/CD integration',
+      'Custom reporting',
       'Dedicated support',
       'SLA guarantee',
     ],
-    cta: 'Contact Sales',
-    ctaTo: '',
-    highlight: false,
   },
 ];
 
+const COMPARISON = [
+  { feature: 'Monthly audits', vibe: '5', deep: 'Unlimited', fix: 'Unlimited' },
+  { feature: 'Reliability score', vibe: true, deep: true, fix: true },
+  { feature: 'Fix prompts', vibe: true, deep: true, fix: true },
+  { feature: 'Video replay', vibe: false, deep: true, fix: true },
+  { feature: 'Journey testing', vibe: false, deep: true, fix: true },
+  { feature: 'Monitoring', vibe: false, deep: true, fix: true },
+  { feature: 'AI fix generation', vibe: false, deep: false, fix: true },
+  { feature: 'Source code analysis', vibe: false, deep: false, fix: true },
+  { feature: 'CI/CD integration', vibe: false, deep: false, fix: true },
+  { feature: 'API access', vibe: false, deep: true, fix: true },
+  { feature: 'Priority support', vibe: false, deep: true, fix: true },
+];
+
+const FAQS = [
+  {
+    q: 'What exactly does AiBreaker test?',
+    a: 'AiBreaker crawls your app like a real user on both desktop and mobile. It screens for broken UI flows, dead clicks, visual bugs, accessibility issues, and logic errors — then hands you a fix prompt for each one.',
+  },
+  {
+    q: 'Do I need to install anything?',
+    a: 'Nope. Just paste your public URL and hit "Run Audit." AiBreaker uses its own headless browser — no SDK, no code changes, no deploys required.',
+  },
+  {
+    q: 'How is this different from Lighthouse or Playwright?',
+    a: 'Lighthouse measures performance. Playwright requires you to write scripts. AiBreaker does visual + behavioral QA with AI — no script writing, and it generates fix prompts automatically.',
+  },
+  {
+    q: 'Can I cancel anytime?',
+    a: 'Yes. No contracts, no lock-in. Cancel from your billing settings and your plan ends at the next billing cycle. Your audit history stays available on the free tier.',
+  },
+  {
+    q: 'Is my site data secure?',
+    a: 'We only audit publicly accessible pages. Screenshots and recordings are encrypted at rest and deleted after 30 days. We never access your source code unless you explicitly paste it in the Fix & Verify tier.',
+  },
+];
+
+function renderCell(val) {
+  if (val === true) return <Check size={16} style={{ color: 'var(--green)' }} />;
+  if (val === false) return <span style={{ color: 'var(--text-dim)' }}>—</span>;
+  return <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{val}</span>;
+}
+
 export default function PricingPage() {
-  const [planLoading, setPlanLoading] = useState({});
-  const [planError, setPlanError] = useState({});
-  const [contactOpen, setContactOpen] = useState(false);
-  const [contactSubmitting, setContactSubmitting] = useState(false);
-  const [contactSuccess, setContactSuccess] = useState(false);
-  const [contactError, setContactError] = useState('');
-  const [contactForm, setContactForm] = useState({ name: '', email: '', company: '', use_case: '' });
-
-  async function startPlanCheckout(planKey) {
-    if (planLoading[planKey]) return;
-    setPlanLoading((prev) => ({ ...prev, [planKey]: true }));
-    setPlanError((prev) => ({ ...prev, [planKey]: '' }));
-    try {
-      const data = await apiFetch('/billing/checkout', {
-        method: 'POST',
-        body: JSON.stringify({ plan: planKey }),
-      });
-      if (!data?.checkout_url) throw new Error('Missing checkout URL');
-      window.location.href = data.checkout_url;
-    } catch (e) {
-      setPlanError((prev) => ({ ...prev, [planKey]: e?.message || 'Failed to start checkout' }));
-    } finally {
-      setPlanLoading((prev) => ({ ...prev, [planKey]: false }));
-    }
-  }
-
-  async function submitContactSales(e) {
-    e.preventDefault();
-    if (contactSubmitting) return;
-    setContactSubmitting(true);
-    setContactError('');
-    try {
-      const res = await fetch(`${API_BASE}/contact-sales`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(contactForm),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.detail || `Request failed (${res.status})`);
-      setContactSuccess(true);
-    } catch (err) {
-      setContactError(err?.message || 'Failed to submit.');
-    } finally {
-      setContactSubmitting(false);
-    }
-  }
+  const [openFaq, setOpenFaq] = useState(null);
 
   return (
-    <section className="page fade-in" style={{ maxWidth: 980, margin: '0 auto' }}>
-      <div className="page-header">
-        <div className="page-eyebrow">// public · pricing</div>
-        <div className="page-title">Simple, transparent pricing</div>
-        <div className="page-desc">Start free. Upgrade when you need more runs, longer test suites, or team features.</div>
+    <div className="fade-in" style={{
+      maxWidth: 'var(--max-width)',
+      margin: '0 auto',
+      padding: '56px 40px 80px',
+    }}>
+      {/* Header */}
+      <div style={{ textAlign: 'center', marginBottom: 48 }}>
+        <div className="page-eyebrow">Pricing</div>
+        <h1 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'clamp(28px, 4vw, 44px)',
+          fontWeight: 700,
+          color: 'var(--text-primary)',
+          letterSpacing: '-0.02em',
+          marginBottom: 12,
+        }}>
+          Simple, transparent pricing
+        </h1>
+        <p style={{ fontSize: 17, color: 'var(--text-secondary)', maxWidth: 500, margin: '0 auto' }}>
+          Start free. Upgrade when you need deeper audits and AI-powered fixes.
+        </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
-        {PLANS.map((plan) => (
-          <div
-            key={plan.key}
-            className="card"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
-              border: plan.highlight ? '1px solid var(--accent, #3bb4ff)' : undefined,
+      {/* Tier cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: 20,
+        marginBottom: 56,
+        alignItems: 'start',
+      }}>
+        {TIERS.map((tier) => {
+          const Icon = tier.icon;
+          return (
+            <div key={tier.id} style={{
+              background: 'var(--bg-raised)',
+              border: tier.popular
+                ? '2px solid var(--accent)'
+                : '1px solid var(--line)',
+              borderRadius: 'var(--radius-xl)',
+              padding: 28,
               position: 'relative',
-            }}
-          >
-            {plan.highlight && (
-              <div style={{
-                position: 'absolute', top: -1, left: '50%', transform: 'translateX(-50%)',
-                background: 'var(--accent, #3bb4ff)', color: '#000',
-                fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-                padding: '3px 12px', borderRadius: '0 0 6px 6px',
-              }}>
-                MOST POPULAR
+              boxShadow: tier.popular
+                ? '0 0 40px rgba(59, 180, 255, 0.1), 0 0 80px rgba(59, 180, 255, 0.05)'
+                : 'none',
+              transform: tier.popular ? 'scale(1.02)' : 'none',
+            }}>
+              {tier.popular && (
+                <div style={{
+                  position: 'absolute',
+                  top: -12,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  padding: '4px 16px',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'var(--accent)',
+                  color: '#020810',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}>
+                  Most Popular
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <div style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 'var(--radius-md)',
+                  background: tier.popular ? 'var(--accent-dim)' : 'var(--bg-surface)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: tier.popular ? 'var(--accent)' : 'var(--text-muted)',
+                }}>
+                  <Icon size={18} />
+                </div>
+                <div>
+                  <div style={{
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    fontFamily: 'var(--font-display)',
+                  }}>
+                    {tier.name}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {tier.tagline}
+                  </div>
+                </div>
               </div>
-            )}
 
-            <div>
-              <div className="card-label">{plan.name}</div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, margin: '8px 0 4px' }}>
-                <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--hi)' }}>{plan.price}</span>
-                <span style={{ fontSize: 13, color: 'var(--mid)' }}>{plan.period}</span>
+              <div style={{ marginBottom: 20 }}>
+                <span style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 40,
+                  fontWeight: 700,
+                  color: 'var(--text-primary)',
+                }}>
+                  {tier.price}
+                </span>
+                <span style={{
+                  fontSize: 14,
+                  color: 'var(--text-muted)',
+                  marginLeft: 4,
+                }}>
+                  {tier.period}
+                </span>
               </div>
-              <div style={{ fontSize: 13, color: 'var(--mid)' }}>{plan.desc}</div>
-            </div>
 
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {plan.features.map((f) => (
-                <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--mid)' }}>
-                  <span style={{ color: 'var(--accent, #3bb4ff)', flexShrink: 0 }}>✓</span>
-                  {f}
-                </li>
-              ))}
-            </ul>
-
-            {plan.key === 'pro' ? (
-              <button
-                type="button"
-                className={`btn ${plan.highlight ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => startPlanCheckout(plan.key)}
-                disabled={!!planLoading[plan.key]}
-                style={{ marginTop: 'auto', textAlign: 'center' }}
-              >
-                {planLoading[plan.key] ? 'Redirecting to checkout...' : plan.cta}
-              </button>
-            ) : plan.key === 'enterprise' ? (
-              <button
-                type="button"
-                className={`btn ${plan.highlight ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => {
-                  setContactOpen(true);
-                  setContactSuccess(false);
-                  setContactError('');
-                }}
-                style={{ marginTop: 'auto', textAlign: 'center' }}
-              >
-                {plan.cta}
-              </button>
-            ) : (
               <Link
-                className={`btn ${plan.highlight ? 'btn-primary' : 'btn-ghost'}`}
-                to={plan.ctaTo}
-                style={{ marginTop: 'auto', textAlign: 'center' }}
+                to={tier.ctaLink}
+                className={tier.popular ? 'btn btn-primary' : 'btn btn-ghost'}
+                style={{ width: '100%', textAlign: 'center', marginBottom: 20, justifyContent: 'center' }}
               >
-                {plan.cta}
+                {tier.cta}
               </Link>
-            )}
-            {plan.key === 'pro' && planError[plan.key] && (
-              <div style={{ marginTop: 8, fontSize: 12, color: '#ff7b91' }}>
-                {planError[plan.key]}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {tier.features.map((feature) => (
+                  <div key={feature} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    fontSize: 13,
+                    color: 'var(--text-secondary)',
+                  }}>
+                    <Check size={14} style={{ color: 'var(--green)', flexShrink: 0 }} />
+                    {feature}
+                  </div>
+                ))}
               </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Comparison table */}
+      <div style={{ marginBottom: 56 }}>
+        <h2 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 24,
+          fontWeight: 700,
+          color: 'var(--text-primary)',
+          textAlign: 'center',
+          marginBottom: 24,
+        }}>
+          Feature comparison
+        </h2>
+        <div className="card" style={{ padding: 0, overflow: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th style={{ width: '40%' }}>Feature</th>
+                <th style={{ textAlign: 'center' }}>Vibe Check</th>
+                <th style={{ textAlign: 'center' }}>Deep Dive</th>
+                <th style={{ textAlign: 'center' }}>Fix &amp; Verify</th>
+              </tr>
+            </thead>
+            <tbody>
+              {COMPARISON.map((row) => (
+                <tr key={row.feature}>
+                  <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{row.feature}</td>
+                  <td style={{ textAlign: 'center' }}>{renderCell(row.vibe)}</td>
+                  <td style={{ textAlign: 'center' }}>{renderCell(row.deep)}</td>
+                  <td style={{ textAlign: 'center' }}>{renderCell(row.fix)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* FAQ */}
+      <div style={{ marginBottom: 56, maxWidth: 700, margin: '0 auto 56px' }}>
+        <h2 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 24,
+          fontWeight: 700,
+          color: 'var(--text-primary)',
+          textAlign: 'center',
+          marginBottom: 24,
+        }}>
+          Frequently asked questions
+        </h2>
+        {FAQS.map((faq, i) => (
+          <div key={i} className="accordion-item">
+            <button
+              className="accordion-trigger"
+              onClick={() => setOpenFaq(openFaq === i ? null : i)}
+            >
+              {faq.q}
+              {openFaq === i ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            {openFaq === i && (
+              <div className="accordion-content">{faq.a}</div>
             )}
           </div>
         ))}
       </div>
 
-      {contactOpen && (
-        <div
-          className="card"
-          style={{
-            marginTop: 16,
-            minHeight: 400,
-            padding: 18,
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid var(--line)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
-            <div>
-              <div className="card-label">Contact Sales</div>
-              <div style={{ fontSize: 13, color: 'var(--mid)' }}>Tell us what you’re building and we’ll follow up.</div>
-            </div>
-            <button type="button" className="btn btn-ghost" onClick={() => setContactOpen(false)} style={{ whiteSpace: 'nowrap' }}>
-              Close
-            </button>
-          </div>
-
-          {contactSuccess ? (
-            <div style={{ padding: '14px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r)', background: 'var(--bg2)' }}>
-              <div style={{ fontWeight: 800, color: 'var(--hi)', marginBottom: 6 }}>Received</div>
-              <div style={{ fontSize: 13, color: 'var(--mid)' }}>We'll reach out within 1 business day.</div>
-            </div>
-          ) : (
-            <form onSubmit={submitContactSales} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginTop: 10 }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Name</span>
-                <input
-                  value={contactForm.name}
-                  onChange={(e) => setContactForm((s) => ({ ...s, name: e.target.value }))}
-                  required
-                  style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)', color: 'var(--hi)' }}
-                />
-              </label>
-
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Work email</span>
-                <input
-                  type="email"
-                  value={contactForm.email}
-                  onChange={(e) => setContactForm((s) => ({ ...s, email: e.target.value }))}
-                  required
-                  style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)', color: 'var(--hi)' }}
-                />
-              </label>
-
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Company</span>
-                <input
-                  value={contactForm.company}
-                  onChange={(e) => setContactForm((s) => ({ ...s, company: e.target.value }))}
-                  required
-                  style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)', color: 'var(--hi)' }}
-                />
-              </label>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Plan</span>
-                <div style={{ fontSize: 13, color: 'var(--hi)', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)' }}>
-                  Enterprise
-                </div>
-              </div>
-
-              <label style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Tell us about your use case</span>
-                <textarea
-                  value={contactForm.use_case}
-                  onChange={(e) => setContactForm((s) => ({ ...s, use_case: e.target.value }))}
-                  required
-                  rows={6}
-                  style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)', color: 'var(--hi)', resize: 'vertical' }}
-                />
-              </label>
-
-              {contactError && (
-                <div style={{ gridColumn: '1 / -1', fontSize: 13, color: '#ff7b91' }}>
-                  {contactError}
-                </div>
-              )}
-
-              <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setContactOpen(false)} disabled={contactSubmitting}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={contactSubmitting}>
-                  {contactSubmitting ? 'Sending…' : 'Send'}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
-
-      <div style={{ marginTop: 32, padding: '20px 24px', border: '1px solid var(--line)', borderRadius: 'var(--r)', background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div style={{ fontWeight: 700, color: 'var(--hi)', marginBottom: 4 }}>Not sure which plan fits?</div>
-          <div style={{ fontSize: 13, color: 'var(--mid)' }}>Try the live demo — no account needed.</div>
-        </div>
-        <Link className="btn btn-ghost" to="/demo">Try Live Demo →</Link>
+      {/* Bottom CTA */}
+      <div style={{ textAlign: 'center', padding: '32px 0' }}>
+        <p style={{ fontSize: 15, color: 'var(--text-secondary)', marginBottom: 12 }}>
+          Still not sure? Watch the demo first.
+        </p>
+        <Link to="/demo" className="btn btn-ghost">
+          Watch Demo <ArrowRight size={16} />
+        </Link>
       </div>
-    </section>
+    </div>
   );
 }

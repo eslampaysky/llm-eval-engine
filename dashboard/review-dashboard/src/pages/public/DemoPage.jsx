@@ -1,459 +1,355 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  API_BASE,
-  api,
-  currentTestType,
-  grade,
-  LiveProgress,
-  ls,
-  overallScore,
-  pollStart,
-  pollSub,
-  ts,
-} from '../../App.jsx';
+  ArrowRight, Globe, Smartphone, Monitor, Camera,
+  Cpu, Wrench, Play, Copy, Check, ExternalLink
+} from 'lucide-react';
+import ScoreRing from '../../components/ScoreRing.jsx';
+import FindingCard from '../../components/FindingCard.jsx';
+import LoadingSteps from '../../components/LoadingSteps.jsx';
+import CopyButton from '../../components/CopyButton.jsx';
 
-const COUNTER_TARGETS = {
-  models: 1847,
-  failures: 23492,
-  redFlags: 4201,
-};
+const DEMO_URL = 'https://demo-saas-app.vercel.app';
 
-const DEFAULT_DESCRIPTION = 'Customer support chatbot for an e-commerce platform';
+const LOADING_STEPS = [
+  { label: 'Launching browser...', icon: <Globe size={14} /> },
+  { label: 'Crawling pages — desktop + mobile...', icon: <Monitor size={14} /> },
+  { label: 'Capturing screenshots...', icon: <Camera size={14} /> },
+  { label: 'Sending to AI vision model...', icon: <Cpu size={14} /> },
+  { label: 'Generating fix prompts...', icon: <Wrench size={14} /> },
+];
 
-function formatNumber(num) {
-  return Number(num || 0).toLocaleString();
-}
+const FINDINGS = [
+  {
+    severity: 'critical',
+    category: 'flow',
+    title: 'Checkout button unreachable on mobile',
+    description: 'The checkout button is positioned behind the footer on screens below 430px. Users on iPhone cannot complete a purchase.',
+    fixPrompt: 'In your CheckoutForm component add:\n  position: relative;\n  z-index: 10;\nand ensure the parent has overflow: visible',
+  },
+  {
+    severity: 'critical',
+    category: 'logic',
+    title: 'Signup form accepts empty emails',
+    description: 'The signup form submits successfully with an empty email field, creating invalid user accounts.',
+    fixPrompt: 'Before calling createUser() add:\n  if (!email || !email.includes(\'@\')) {\n    setError(\'Please enter a valid email\');\n    return;\n  }',
+  },
+  {
+    severity: 'warning',
+    category: 'layout',
+    title: 'Hero headline overflows on tablet',
+    description: null,
+    fixPrompt: 'Add word-wrap: break-word and max-width: 100% to your HeroHeadline CSS class',
+  },
+  {
+    severity: 'warning',
+    category: 'accessibility',
+    title: 'CTA button contrast ratio 2.1:1 — fails WCAG AA',
+    description: null,
+    fixPrompt: 'Change button text color from #AAAAAA to #1A1A1A',
+  },
+  {
+    severity: 'warning',
+    category: 'layout',
+    title: 'Pricing table collapses incorrectly on tablet',
+    description: null,
+    fixPrompt: 'Change grid-template-columns: repeat(3, 1fr) to repeat(auto-fit, minmax(220px, 1fr))',
+  },
+  {
+    severity: 'info',
+    category: 'accessibility',
+    title: '3 images missing alt text',
+    description: null,
+    fixPrompt: null,
+  },
+];
 
-function stageFromProgress(pct) {
-  const safe = Math.max(0, Math.min(100, Number(pct) || 0));
-  if (safe < 10) return 0;
-  if (safe < 30) return 1;
-  if (safe < 70) return 2;
-  if (safe < 90) return 3;
-  return 4;
-}
+const ALL_FIX_PROMPTS = FINDINGS
+  .filter(f => f.fixPrompt)
+  .map((f, i) => `${i + 1}. ${f.title}\n${f.fixPrompt}`)
+  .join('\n\n');
 
 export default function DemoPage() {
-  const [description, setDescription] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [polling, setPolling] = useState(false);
-  const [stage, setStage] = useState(0);
-  const [pct, setPct] = useState(0);
-  const [error, setError] = useState('');
-  const [report, setReport] = useState(null);
-  const [logs, setLogs] = useState([]);
-  const [runId, setRunId] = useState(ls.get('abl_demo_active_run_id'));
-  const [activeType, setActiveType] = useState(currentTestType(0, 0));
-  const [progressLive, setProgressLive] = useState(false);
-  const [finishing, setFinishing] = useState(false);
-  const [shareMsg, setShareMsg] = useState('');
-  const [counters, setCounters] = useState({ models: 0, failures: 0, redFlags: 0 });
-  const logRef = useRef(null);
+  const [phase, setPhase] = useState('idle'); // idle | loading | results
+  const [currentStep, setCurrentStep] = useState(0);
 
-  const addLog = useCallback((msg, type = 'info') => {
-    setLogs((p) => [...p, { msg, type, t: ts() }]);
-    setTimeout(() => {
-      if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-    }, 40);
+  const startDemo = useCallback(() => {
+    setPhase('loading');
+    setCurrentStep(0);
+
+    // Animate through steps
+    const stepDuration = 2000;
+    for (let i = 1; i <= LOADING_STEPS.length; i++) {
+      setTimeout(() => {
+        setCurrentStep(i);
+        if (i === LOADING_STEPS.length) {
+          setTimeout(() => setPhase('results'), 800);
+        }
+      }, stepDuration * i);
+    }
   }, []);
-
-  useEffect(() => {
-    let active = true;
-    const start = performance.now();
-    const duration = 1600;
-
-    function tick(now) {
-      if (!active) return;
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setCounters({
-        models: Math.floor(COUNTER_TARGETS.models * eased),
-        failures: Math.floor(COUNTER_TARGETS.failures * eased),
-        redFlags: Math.floor(COUNTER_TARGETS.redFlags * eased),
-      });
-      if (t < 1) requestAnimationFrame(tick);
-    }
-
-    requestAnimationFrame(tick);
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function reattachIfStillProcessing() {
-      const savedId = ls.get('abl_demo_active_run_id');
-      if (!savedId) return;
-      try {
-        const savedReport = await api.getDemoReport(savedId);
-        if (!mounted) return;
-        if (savedReport?.status === 'processing') {
-          setPolling(true);
-          setRunId(savedId);
-          pollStart(savedId, savedReport.sample_count || 20, api.getDemoReport, 'demo');
-          addLog('Resumed demo run after refresh.', 'info');
-        } else if (savedReport?.status === 'done') {
-          setReport(savedReport);
-          setPolling(false);
-          ls.set('abl_demo_active_run_id', null);
-        } else {
-          ls.set('abl_demo_active_run_id', null);
-        }
-      } catch {
-        ls.set('abl_demo_active_run_id', null);
-      }
-    }
-
-    reattachIfStillProcessing();
-
-    const unsub = pollSub((ev) => {
-      if (ev.mode !== 'demo') return;
-      if (ev.type === 'done') {
-        ls.set('abl_demo_active_run_id', null);
-        addLog(`Demo complete - ${ev.report.results?.length || ev.report.sample_count || 0} tests completed.`, 'ok');
-        setFinishing(true);
-        setStage(3);
-        setPct(95);
-        setActiveType('Scoring responses');
-        setTimeout(() => {
-          setStage(4);
-          setPct(100);
-          setActiveType('Compiling report');
-        }, 600);
-        setTimeout(() => {
-          setPolling(false);
-          setFinishing(false);
-          setReport(ev.report);
-        }, 1100);
-      } else if (ev.type === 'failed') {
-        setPolling(false);
-        setFinishing(false);
-        ls.set('abl_demo_active_run_id', null);
-        setError(ev.error || 'Demo run failed.');
-        addLog(`Failed: ${ev.error}`, 'err');
-      } else if (ev.type === 'timeout') {
-        setPolling(false);
-        setFinishing(false);
-        ls.set('abl_demo_active_run_id', null);
-        setError('Timed out after 7 minutes.');
-        addLog('Timed out.', 'err');
-      } else if (ev.type === 'error') {
-        addLog(`Poll error: ${ev.error}`, 'err');
-      } else if (ev.type === 'tick') {
-        if (!progressLive) {
-          setStage(ev.stage ?? 0);
-          setPct(ev.pct ?? 0);
-          setActiveType(currentTestType(ev.stage ?? 0, ev.pct ?? 0));
-          if ((ev.attempts || 0) % 5 === 0) {
-            addLog(`Stage update: ${ev.attempts * 3}s elapsed.`, 'info');
-          }
-        }
-      }
-    });
-
-    return () => {
-      mounted = false;
-      unsub();
-    };
-  }, [addLog]);
-
-  useEffect(() => {
-    if (!polling || !runId || finishing) return undefined;
-    let active = true;
-    const tick = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/report/${encodeURIComponent(runId)}/progress`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!active) return;
-        const pctValue = Number(data?.progress_pct ?? 0);
-        setProgressLive(true);
-        setPct(pctValue);
-        setStage(stageFromProgress(pctValue));
-        if (data?.current_step) {
-          setActiveType(data.current_step);
-        }
-      } catch {}
-    };
-    tick();
-    const timer = setInterval(tick, 2000);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [polling, runId, finishing]);
-
-  const derivedMetrics = useMemo(() => {
-    const breakdown = report?.metrics?.breakdown_by_type || report?.metrics?.breakdown || report?.metrics?.test_type_breakdown || {};
-    const hallucinations = report?.metrics?.hallucinations_detected
-      ?? breakdown?.hallucination?.failures
-      ?? breakdown?.hallucination?.failed
-      ?? null;
-    const failures = Array.isArray(report?.metrics?.failed_rows)
-      ? report.metrics.failed_rows.length
-      : null;
-    const adversarialScore = breakdown?.adversarial?.avg_score
-      ?? breakdown?.adversarial?.average_score
-      ?? report?.metrics?.adversarial_score
-      ?? null;
-    return { hallucinations, failures, adversarialScore };
-  }, [report]);
-
-  const score = overallScore(report || {});
-  const letter = grade(score || 0);
-
-  async function handleSubmit() {
-    if (loading || polling) return;
-    setError('');
-    setReport(null);
-    setLogs([]);
-    setStage(0);
-    setPct(0);
-    setActiveType(currentTestType(0, 0));
-    setProgressLive(false);
-    setFinishing(false);
-    setLoading(true);
-
-    try {
-      addLog('Submitting public demo request...', 'info');
-      const res = await api.demoBreak({
-        description: description.trim() || DEFAULT_DESCRIPTION,
-        model_name: 'gemini-3-flash-preview',
-        num_tests: 20,
-      });
-      addLog(`Job queued - ID: ${res.report_id}`, 'ok');
-      addLog('Generating adversarial tests...', 'info');
-      setRunId(res.report_id);
-      ls.set('abl_demo_active_run_id', res.report_id);
-      setPolling(true);
-      pollStart(res.report_id, res.num_tests || 20, api.getDemoReport, 'demo');
-    } catch (e) {
-      setError(e.message || 'Unable to start demo run.');
-      addLog(`Failed: ${e.message || 'unknown error'}`, 'err');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const shareReport = async () => {
-    if (!report?.report_id) return;
-    const url = `${window.location.origin}/report/${report.report_id}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setShareMsg('Copied link to clipboard.');
-    } catch {
-      setShareMsg('Copy failed.');
-    }
-    setTimeout(() => setShareMsg(''), 2500);
-  };
 
   return (
-    <section className="page fade-in" style={{ maxWidth: 1100, margin: '0 auto', paddingTop: 48, paddingBottom: 64 }}>
-      <div className="card" style={{ padding: 28, marginBottom: 22 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 320px)', gap: 24, alignItems: 'center' }}>
-          <div>
-            <div className="page-eyebrow">// public demo</div>
-            <h1 className="page-title" style={{ fontSize: 40, lineHeight: 1.05, marginBottom: 10 }}>
-              Is your AI agent production-ready?
-            </h1>
-            <div className="page-desc" style={{ fontSize: 16, maxWidth: 560 }}>
-              Find out in 60 seconds. No signup required.
-            </div>
-          </div>
-          <div className="card" style={{ margin: 0, padding: 18, background: 'var(--bg3)' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--mute)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.12em' }}>
-              Live activity
-            </div>
-            <div style={{ display: 'grid', gap: 10 }}>
-              <div style={{ fontSize: 13, color: 'var(--hi)' }}>
-                {formatNumber(counters.models)} models tested
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--hi)' }}>
-                {formatNumber(counters.failures)} failures caught
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--hi)' }}>
-                {formatNumber(counters.redFlags)} red flags found today
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="fade-in" style={{
+      maxWidth: 'var(--max-width)',
+      margin: '0 auto',
+      padding: '48px 40px 80px',
+    }}>
+      {/* ── Hero ──────────────────────────────────────────── */}
+      <div style={{ textAlign: 'center', marginBottom: 40 }}>
+        <div className="page-eyebrow">Live Demo</div>
+        <h1 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'clamp(28px, 4vw, 48px)',
+          fontWeight: 700,
+          color: 'var(--text-primary)',
+          letterSpacing: '-0.03em',
+          lineHeight: 1.1,
+          marginBottom: 12,
+        }}>
+          See AiBreaker in action
+        </h1>
+        <p style={{
+          fontSize: 17,
+          color: 'var(--text-secondary)',
+          maxWidth: 520,
+          margin: '0 auto',
+        }}>
+          Watch it find real bugs in a real AI-built app.
+          No signup, no waiting.
+        </p>
       </div>
 
-      <div className="card" style={{ padding: 24, marginBottom: 22 }}>
-        <div className="card-label">Describe your AI model or agent in one sentence</div>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="e.g. Customer support chatbot for an e-commerce platform"
-          rows={3}
-          style={{
-            width: '100%',
-            marginTop: 10,
-            marginBottom: 12,
-            background: 'var(--bg2)',
-            border: '1px solid var(--line2)',
-            color: 'var(--text)',
-            padding: 12,
-            borderRadius: 'var(--r)',
-            fontFamily: 'var(--sans)',
-          }}
-        />
-        <button className="btn btn-primary" onClick={handleSubmit} disabled={loading || polling}>
-          {loading || polling ? 'Running...' : 'Run Free Test'}
-        </button>
-        <div style={{ marginTop: 10, fontSize: 11, color: 'var(--mute)' }}>
-          Takes ~30 seconds - 20 adversarial tests - Free forever
+      {/* ── URL bar + trigger ─────────────────────────────── */}
+      <div className="card" style={{
+        padding: 28,
+        marginBottom: 24,
+        background: 'var(--bg-raised)',
+      }}>
+        <div className="card-label">Target URL</div>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--line)',
+          borderRadius: 'var(--radius-md)',
+          padding: '12px 16px',
+          marginBottom: 20,
+        }}>
+          <Globe size={16} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 14,
+            color: 'var(--text-muted)',
+            flex: 1,
+          }}>
+            {DEMO_URL}
+          </span>
+          <ExternalLink size={14} style={{ color: 'var(--text-dim)' }} />
         </div>
-        {error && (
-          <div style={{ marginTop: 10, color: 'var(--red)', fontSize: 11 }}>
-            {error}
-          </div>
+
+        {phase === 'idle' && (
+          <button
+            className="btn btn-primary-lg"
+            onClick={startDemo}
+            style={{ width: '100%' }}
+          >
+            Watch Demo Audit <ArrowRight size={18} />
+          </button>
         )}
       </div>
 
-      {(polling || finishing) && (
-        <LiveProgress
-          stage={stage}
-          pct={pct}
-          logs={logs}
-          logRef={logRef}
-          done={finishing}
-          reportId={runId}
-          activeType={activeType}
-        />
+      {/* ── Loading sequence ──────────────────────────────── */}
+      {phase === 'loading' && (
+        <div className="slide-up" style={{ marginBottom: 24 }}>
+          <LoadingSteps
+            steps={LOADING_STEPS}
+            currentStep={currentStep}
+            done={currentStep >= LOADING_STEPS.length}
+          />
+        </div>
       )}
 
-      {!polling && report && (
-        <>
-          <div
-            className="card"
-            style={{
-              padding: 28,
-              background: 'linear-gradient(135deg, rgba(59,180,255,0.12), rgba(38,240,185,0.08))',
-              borderColor: 'rgba(59,180,255,0.25)',
-              marginBottom: 18,
-            }}
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 280px)', gap: 24, alignItems: 'center' }}>
+      {/* ── Results ───────────────────────────────────────── */}
+      {phase === 'results' && (
+        <div className="slide-up">
+          {/* Score header */}
+          <div className="card" style={{
+            padding: 32,
+            marginBottom: 24,
+            background: 'linear-gradient(135deg, rgba(59, 180, 255, 0.06), rgba(251, 191, 36, 0.04))',
+            borderColor: 'rgba(59, 180, 255, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 32,
+            flexWrap: 'wrap',
+          }}>
+            <ScoreRing score={67} size={140} label="/100" />
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 28,
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                marginBottom: 8,
+              }}>
+                Reliability Score: 67
+              </div>
+              <div style={{
+                display: 'flex',
+                gap: 12,
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                marginBottom: 12,
+              }}>
+                <span className="badge badge-amber">Needs Work</span>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 12px',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'var(--accent-dim)',
+                  border: '1px solid rgba(59, 180, 255, 0.2)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  color: 'var(--accent)',
+                }}>
+                  84% confident
+                </span>
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                2 critical issues, 3 warnings, 1 informational finding detected across desktop and mobile viewports.
+              </p>
+            </div>
+          </div>
+
+          {/* Findings */}
+          <div style={{ marginBottom: 24 }}>
+            <div className="card-label" style={{ marginBottom: 12 }}>
+              Findings ({FINDINGS.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {FINDINGS.map((f, i) => (
+                <FindingCard key={i} {...f} />
+              ))}
+            </div>
+          </div>
+
+          {/* Video replay placeholder */}
+          <div className="card" style={{
+            padding: 0,
+            marginBottom: 24,
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              background: 'var(--bg-deepest)',
+              height: 280,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 16,
+              cursor: 'pointer',
+              position: 'relative',
+            }}>
+              <div style={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                background: 'rgba(59, 180, 255, 0.15)',
+                border: '2px solid rgba(59, 180, 255, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Play size={24} style={{ color: 'var(--accent)', marginLeft: 2 }} />
+              </div>
               <div>
-                <div className="card-label">Your AI readiness score</div>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 14, alignItems: 'center' }}>
-                  <div style={{
-                    width: 128,
-                    height: 128,
-                    borderRadius: '50%',
-                    border: '2px solid rgba(59,180,255,0.45)',
-                    display: 'grid',
-                    placeItems: 'center',
-                    fontSize: 40,
-                    fontFamily: 'var(--display)',
-                    color: 'var(--hi)',
-                    background: 'radial-gradient(circle at 30% 30%, rgba(59,180,255,0.22), rgba(17,21,32,0.9))',
-                    boxShadow: '0 0 0 4px rgba(59,180,255,0.1)',
-                  }}>
-                    {letter}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 30, fontFamily: 'var(--display)' }}>{score.toFixed(1)} / 10</div>
-                    <div style={{ fontSize: 12, color: 'var(--mid)' }}>Overall audit score</div>
-                  </div>
+                <div style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  color: 'var(--text-muted)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  textAlign: 'center',
+                }}>
+                  Session Replay
+                </div>
+                <div style={{
+                  fontSize: 14,
+                  color: 'var(--text-secondary)',
+                  marginTop: 4,
+                }}>
+                  Checkout Flow Failure
                 </div>
               </div>
-              <div style={{ display: 'grid', gap: 10 }}>
-                <div className="card" style={{ margin: 0, padding: 12, background: 'rgba(17,21,32,0.9)', borderColor: 'rgba(59,180,255,0.2)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--mute)' }}>Hallucinations</div>
-                  <div style={{ fontSize: 20, color: 'var(--hi)' }}>
-                    {derivedMetrics.hallucinations != null ? derivedMetrics.hallucinations : '--'}
-                  </div>
-                </div>
-                <div className="card" style={{ margin: 0, padding: 12, background: 'rgba(17,21,32,0.9)', borderColor: 'rgba(255,92,114,0.25)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--mute)' }}>Failures</div>
-                  <div style={{ fontSize: 20, color: 'var(--hi)' }}>
-                    {derivedMetrics.failures != null ? derivedMetrics.failures : '--'}
-                  </div>
-                </div>
-                <div className="card" style={{ margin: 0, padding: 12, background: 'rgba(17,21,32,0.9)', borderColor: 'rgba(38,240,185,0.25)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--mute)' }}>Adversarial Score</div>
-                  <div style={{ fontSize: 20, color: 'var(--hi)' }}>
-                    {derivedMetrics.adversarialScore != null ? Number(derivedMetrics.adversarialScore).toFixed(1) : '--'}
-                  </div>
-                </div>
+              <div style={{
+                position: 'absolute',
+                bottom: 12,
+                right: 16,
+                fontSize: 11,
+                color: 'var(--text-dim)',
+                fontFamily: 'var(--font-mono)',
+              }}>
+                0:42
               </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
-              <button className="btn btn-ghost" onClick={shareReport}>Share This Report</button>
-              <Link className="btn btn-ghost" to={`/report/${report.report_id}`}>View Full Report</Link>
-              <Link className="btn btn-primary" to="/auth/signup">Get Full Access</Link>
-              {shareMsg && <span style={{ fontSize: 11, color: 'var(--accent)' }}>{shareMsg}</span>}
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div className="card" style={{
-              padding: 20,
-              background: 'linear-gradient(135deg, rgba(91,155,245,0.12), rgba(17,21,32,0.95))',
-              borderColor: 'rgba(91,155,245,0.35)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 8,
-                  display: 'grid', placeItems: 'center',
-                  background: 'rgba(91,155,245,0.18)', color: '#9cc4ff',
-                  fontFamily: 'var(--mono)', fontSize: 11,
-                }}>PLAN</div>
-                <div>
-                  <div className="card-label" style={{ marginBottom: 2 }}>Explore plans</div>
-                  <div style={{ fontSize: 12, color: 'var(--mid)' }}>
-                    Compare Pro and Enterprise features, billing, and limits.
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'grid', gap: 6, marginBottom: 12, fontSize: 12, color: 'var(--mid)' }}>
-                <span>Unlimited runs and higher test caps</span>
-                <span>Team sharing and audit exports</span>
-                <span>Priority support and SLAs</span>
-              </div>
-              <Link className="btn btn-ghost" to="/pricing">View Pricing</Link>
-            </div>
-            <div className="card" style={{
-              padding: 20,
-              borderColor: 'rgba(38,240,185,0.4)',
-              background: 'linear-gradient(135deg, rgba(38,240,185,0.16), rgba(17,21,32,0.95))',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 8,
-                  display: 'grid', placeItems: 'center',
-                  background: 'rgba(38,240,185,0.18)', color: '#7df2c9',
-                  fontFamily: 'var(--mono)', fontSize: 11,
-                }}>PRO</div>
-                <div>
-                  <div className="card-label" style={{ marginBottom: 2 }}>Get Full Access</div>
-                  <div style={{ fontSize: 12, color: 'var(--mid)' }}>
-                    Unlock unlimited runs, team sharing, and audit-ready exports.
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                {['Unlimited runs', 'Agentic evals', 'Audit PDFs'].map((chip) => (
-                  <span key={chip} style={{
-                    padding: '4px 8px',
-                    borderRadius: 999,
-                    border: '1px solid rgba(38,240,185,0.35)',
-                    background: 'rgba(38,240,185,0.12)',
-                    color: '#b8f8e5',
-                    fontSize: 10.5,
-                    fontFamily: 'var(--mono)',
-                  }}>{chip}</span>
-                ))}
-              </div>
-              <Link className="btn btn-primary" to="/auth/signup">Get Full Access</Link>
-            </div>
+          {/* Copy all fix prompts */}
+          <div style={{ marginBottom: 40 }}>
+            <CopyButton
+              text={ALL_FIX_PROMPTS}
+              label="Copy All Fix Prompts"
+              size="lg"
+            />
           </div>
-        </>
+
+          {/* Bottom CTA */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(59, 180, 255, 0.08), rgba(52, 211, 153, 0.05))',
+            border: '1px solid rgba(59, 180, 255, 0.15)',
+            borderRadius: 'var(--radius-xl)',
+            padding: '60px 40px',
+            textAlign: 'center',
+          }}>
+            <h2 style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(24px, 3.5vw, 36px)',
+              fontWeight: 700,
+              color: 'var(--text-primary)',
+              letterSpacing: '-0.02em',
+              marginBottom: 12,
+            }}>
+              That was someone else's app.
+              <br />
+              What about <span style={{ color: 'var(--accent)' }}>yours</span>?
+            </h2>
+            <p style={{
+              fontSize: 16,
+              color: 'var(--text-secondary)',
+              marginBottom: 28,
+              maxWidth: 440,
+              margin: '0 auto 28px',
+            }}>
+              Sign up free and run a real audit on your app in 60 seconds.
+            </p>
+            <Link to="/auth/signup" className="btn btn-primary-lg">
+              Audit My App Free <ArrowRight size={18} />
+            </Link>
+            <p style={{
+              fontSize: 12,
+              color: 'var(--text-dim)',
+              fontFamily: 'var(--font-mono)',
+              marginTop: 14,
+            }}>
+              No credit card · Free forever · Cancel anytime
+            </p>
+          </div>
+        </div>
       )}
-    </section>
+    </div>
   );
 }

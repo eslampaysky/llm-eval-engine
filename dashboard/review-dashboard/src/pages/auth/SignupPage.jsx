@@ -1,259 +1,165 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { ArrowLeft } from 'lucide-react';
 
 export default function SignupPage() {
-  const { register: registerUser } = useAuth();
+  const { register, error, clearError, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
-  const [showPw, setShowPw] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError('');
-
-    if (form.password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-    if (form.password !== form.confirm) {
-      setError('Passwords do not match.');
-      return;
-    }
-
-    setSubmitting(true);
-    const result = await registerUser({
-      name: form.name.trim(),
-      email: form.email.trim(),
-      password: form.password,
-    });
-    setSubmitting(false);
-
-    if (result.success) {
-      navigate('/app/dashboard', { replace: true });
-    } else {
-      setError(result.error || 'Registration failed.');
-    }
+  if (isAuthenticated) {
+    navigate('/app/vibe-check', { replace: true });
+    return null;
   }
 
-  const inputStyle = {
-    width: '100%',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(33,57,90,0.9)',
-    borderRadius: 8,
-    color: 'rgba(232,244,255,0.95)',
-    fontFamily: 'Space Grotesk, sans-serif',
-    fontSize: 14,
-    padding: '11px 14px',
-    outline: 'none',
-    transition: 'border-color 0.12s',
-    boxSizing: 'border-box',
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    clearError();
+    const result = await register({ name, email, password });
+    setLoading(false);
+    if (result.success) navigate('/app/vibe-check');
   };
 
-  const labelStyle = {
-    display: 'block',
-    marginBottom: 6,
-    fontSize: 11,
-    color: 'rgba(142,168,199,0.8)',
-    fontFamily: 'JetBrains Mono, monospace',
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
+  const handleGoogleClick = () => {
+    alert('Google OAuth coming soon! Use email signup for now.');
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--bg, #05070d)',
-      padding: 20,
+    <div className="fade-in" style={{
+      maxWidth: 420,
+      margin: '0 auto',
+      padding: '64px 24px 80px',
     }}>
-      <div style={{ width: '100%', maxWidth: 420 }}>
-        <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <div style={{
-            width: 52,
-            height: 52,
-            borderRadius: 14,
-            background: 'linear-gradient(140deg, var(--accent, #3bb4ff), var(--accent2, #26f0b9))',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontFamily: 'JetBrains Mono, monospace',
-            fontWeight: 700,
-            fontSize: 18,
-            color: '#011320',
-            marginBottom: 14,
-          }}>
-            AB
-          </div>
-          <div style={{
-            fontSize: 24,
-            fontWeight: 700,
-            fontFamily: 'Space Grotesk, sans-serif',
-            color: 'rgba(232,244,255,0.97)',
-            letterSpacing: '-0.02em',
-          }}>
-            Create your account
-          </div>
-          <div style={{ color: 'rgba(142,168,199,0.7)', fontSize: 13, marginTop: 4 }}>
-            Start stress-testing AI systems in minutes
-          </div>
-        </div>
-
-        <div style={{
-          background: '#0c1220',
-          border: '1px solid rgba(33,57,90,0.9)',
-          borderRadius: 14,
-          padding: '28px 30px',
-          boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+      <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <h1 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 28,
+          fontWeight: 700,
+          color: 'var(--text-primary)',
+          marginBottom: 8,
         }}>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label style={labelStyle}>Full Name</label>
-              <input
-                type="text"
-                style={inputStyle}
-                value={form.name}
-                onChange={(e) => set('name', e.target.value)}
-                placeholder="Alice Smith"
-                required
-                autoComplete="name"
-                onFocus={(e) => { e.target.style.borderColor = 'var(--accent, #3bb4ff)'; }}
-                onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Email</label>
-              <input
-                type="email"
-                style={inputStyle}
-                value={form.email}
-                onChange={(e) => set('email', e.target.value)}
-                placeholder="you@example.com"
-                required
-                autoComplete="email"
-                onFocus={(e) => { e.target.style.borderColor = 'var(--accent, #3bb4ff)'; }}
-                onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Password</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type={showPw ? 'text' : 'password'}
-                  style={{ ...inputStyle, flex: 1 }}
-                  value={form.password}
-                  onChange={(e) => set('password', e.target.value)}
-                  placeholder="Min. 8 characters"
-                  required
-                  autoComplete="new-password"
-                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent, #3bb4ff)'; }}
-                  onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((s) => !s)}
-                  style={{
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(33,57,90,0.9)',
-                    borderRadius: 8,
-                    color: 'rgba(142,168,199,0.7)',
-                    padding: '0 14px',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                  }}
-                >
-                  {showPw ? 'Hide' : 'Show'}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label style={labelStyle}>Confirm Password</label>
-              <input
-                type={showPw ? 'text' : 'password'}
-                style={inputStyle}
-                value={form.confirm}
-                onChange={(e) => set('confirm', e.target.value)}
-                placeholder="Repeat your password"
-                required
-                autoComplete="new-password"
-                onFocus={(e) => { e.target.style.borderColor = 'var(--accent, #3bb4ff)'; }}
-                onBlur={(e) => { e.target.style.borderColor = 'rgba(33,57,90,0.9)'; }}
-              />
-            </div>
-
-            {error && (
-              <div style={{
-                background: 'rgba(255,77,109,0.08)',
-                border: '1px solid rgba(255,77,109,0.3)',
-                borderRadius: 8,
-                padding: '10px 14px',
-                color: '#ff4d6d',
-                fontSize: 13,
-              }}>
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={submitting}
-              style={{
-                padding: '12px',
-                borderRadius: 9,
-                marginTop: 4,
-                background: 'rgba(38,240,185,0.1)',
-                border: '1px solid rgba(38,240,185,0.35)',
-                color: 'var(--accent2, #26f0b9)',
-                fontFamily: 'JetBrains Mono, monospace',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: submitting ? 'wait' : 'pointer',
-                opacity: submitting ? 0.7 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-              }}
-            >
-              {submitting ? (
-                <>
-                  <div style={{
-                    width: 13,
-                    height: 13,
-                    border: '2px solid rgba(38,240,185,0.3)',
-                    borderTopColor: 'var(--accent2, #26f0b9)',
-                    borderRadius: '50%',
-                    animation: 'spin 0.7s linear infinite',
-                  }} />
-                  Creating account...
-                </>
-              ) : 'Create account'}
-            </button>
-          </form>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'rgba(142,168,199,0.6)' }}>
-          Already have an account?{' '}
-          <Link
-            to="/auth/login"
-            style={{ color: 'var(--accent, #3bb4ff)', textDecoration: 'none', fontWeight: 600 }}
-          >
-            Sign in
-          </Link>
-        </div>
+          Create your account
+        </h1>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
+          Join 200+ founders who ship with confidence.
+        </p>
       </div>
 
-      <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
+      {/* Google OAuth */}
+      <button
+        onClick={handleGoogleClick}
+        style={{
+          width: '100%',
+          padding: '12px 20px',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--line)',
+          background: 'var(--bg-surface)',
+          color: 'var(--text-primary)',
+          fontSize: 14,
+          fontWeight: 500,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 10,
+          transition: 'all 0.15s',
+          fontFamily: 'var(--font-body)',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--line-light)'; e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.background = 'var(--bg-surface)'; }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Continue with Google
+      </button>
+
+      <div className="divider">or</div>
+
+      {/* Email form */}
+      <form onSubmit={handleSubmit}>
+        {error && <div className="error-box">{error}</div>}
+
+        <div style={{ marginBottom: 14 }}>
+          <label className="form-label">Name</label>
+          <input
+            className="form-input"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your name"
+            required
+          />
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label className="form-label">Email</label>
+          <input
+            className="form-input"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
+            required
+          />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label className="form-label">Password</label>
+          <input
+            className="form-input"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Min 8 characters"
+            required
+            minLength={8}
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={loading}
+          style={{ width: '100%', justifyContent: 'center', padding: '12px 20px' }}
+        >
+          {loading ? 'Creating account...' : 'Create Account'}
+        </button>
+      </form>
+
+      <div style={{
+        textAlign: 'center',
+        marginTop: 24,
+        fontSize: 13,
+        color: 'var(--text-muted)',
+      }}>
+        Already have an account?{' '}
+        <Link to="/auth/login" style={{ color: 'var(--accent)', fontWeight: 500 }}>
+          Log in
+        </Link>
+      </div>
+
+      <div style={{ textAlign: 'center', marginTop: 16 }}>
+        <Link to="/demo" style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 12,
+          color: 'var(--text-dim)',
+          textDecoration: 'none',
+        }}>
+          <ArrowLeft size={14} />
+          See the demo first
+        </Link>
+      </div>
     </div>
   );
 }
