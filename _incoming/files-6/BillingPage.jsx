@@ -13,7 +13,7 @@ import { useAuth, getAuthHeader } from '../../../context/AuthContext';
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL ||
-  'https://llm-eval-engine-production.up.railway.app';
+  'https://ai-breaker-labs.vercel.app';
 
 function getApiKey() {
   try { return JSON.parse(localStorage.getItem('abl_api_key')) || 'client_key'; }

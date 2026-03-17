@@ -43,7 +43,7 @@ export default function AuditHistoryPage() {
       {loading ? <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div> : (
         rows.length === 0 ? (
           <div className="empty">
-            No audits yet. <a href="/app/web-audit">Start with a Web Audit -></a>
+            No audits yet. <a href="/app/web-audit">Start with a Web Audit →</a>
           </div>
         ) : (
           <div className="card">

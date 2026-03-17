@@ -8,6 +8,10 @@ const NAV_ITEMS = [
   { to: '/app/vibe-check', label: 'Vibe Check', icon: '🚀' },
   { to: '/app/web-audit', label: 'Deep Dive', icon: '🔍' },
   { to: '/app/agent-audit', label: 'Fix & Verify', icon: '🔧' },
+  { to: '/app/overview', label: 'Overview', icon: '📊' },
+  { to: '/app/audits', label: 'Audits', icon: '📋' },
+  { to: '/app/monitoring', label: 'Monitoring', icon: '📡' },
+  { to: '/app/api-keys', label: 'API Keys', icon: '🔑' },
   { to: '/app/settings', label: 'Settings', icon: '⚙' },
 ];
 
@@ -46,56 +50,6 @@ function AppLayoutFrame() {
           <nav className="nav">
             <div className="nav-group-label">workspace</div>
             {NAV_ITEMS.map((item) => {
-              const isActive = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
-              const isPlayground = item.to === '/app/playground' && running && POLL.mode === 'break';
-              const isHitl = item.to === '/app/hitl';
-              return (
-                <>
-                  {isHitl && (
-                    <div className="nav-group-label" key="results-label">
-                      results
-                    </div>
-                  )}
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={`nav-btn${isActive ? ' active' : ''}`}
-                    style={{ textDecoration: 'none' }}
-                    onClick={() => setNavOpen(false)}
-                  >
-                    <span className="nav-icon">{item.icon}</span>
-                    {item.label}
-                    {isPlayground && <span className="nav-badge">running</span>}
-                  </NavLink>
-                </>
-              );
-            })}
-
-            <div className="nav-group-label" style={{ marginTop: 16 }}>testing</div>
-            {[
-              { to: '/app/rag', label: 'RAG Eval', icon: '◈' },
-              { to: '/app/vision', label: 'Vision', icon: '◎' },
-            ].map((item) => {
-              const isActive = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={`nav-btn${isActive ? ' active' : ''}`}
-                  style={{ textDecoration: 'none' }}
-                  onClick={() => setNavOpen(false)}
-                >
-                  <span className="nav-icon">{item.icon}</span>
-                  {item.label}
-                </NavLink>
-              );
-            })}
-
-            <div className="nav-group-label" style={{ marginTop: 16 }}>observability</div>
-            {[
-              { to: '/app/drift', label: 'Drift Monitor', icon: '↗' },
-              { to: '/app/esg', label: 'ESG / Energy', icon: '♻' },
-            ].map((item) => {
               const isActive = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
               return (
                 <NavLink

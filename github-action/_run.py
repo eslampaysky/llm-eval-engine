@@ -72,7 +72,7 @@ def main() -> int:
         return 1
 
     api_key = _env("INPUT_API_KEY")
-    endpoint = _env("INPUT_ENDPOINT", "https://llm-eval-engine-production.up.railway.app")
+    endpoint = _env("INPUT_ENDPOINT", "https://ai-breaker-labs.vercel.app")
     description = _env("INPUT_DESCRIPTION")
     num_tests = int(_env("INPUT_NUM_TESTS", "20"))
     threshold = float(_env("INPUT_FAIL_THRESHOLD", "5.0"))

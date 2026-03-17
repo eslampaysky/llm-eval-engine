@@ -11,7 +11,7 @@ const STATUS_MSGS = {
   failed: 'Failed',
 };
 
-export default function MonitorRunPage() {
+export default function MonitoringPage() {
   const [target, setTarget] = useState({
     type: 'webhook',
     base_url: '',
@@ -138,10 +138,10 @@ export default function MonitorRunPage() {
   return (
     <div className="page fade-in">
       <div className="page-header">
-        <div className="page-eyebrow">// app - monitoring</div>
-        <div className="page-title">AI Feature Monitoring</div>
+        <div className="page-eyebrow">// app — monitoring</div>
+        <div className="page-title">Continuous Monitoring</div>
         <div className="page-desc">
-          Capture a baseline, schedule checks, and get alerted when AI quality drifts.
+          Automatically re-tests your app every time you deploy.
         </div>
       </div>
 
@@ -218,112 +218,33 @@ export default function MonitorRunPage() {
 
         {target.type === 'openai' && (
           <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-            <div>
-              <label className="label">Base URL</label>
-              <input
-                className="input"
-                placeholder="https://api.openai.com/v1"
-                value={target.base_url}
-                onChange={(e) => setTarget((prev) => ({ ...prev, base_url: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="label">API key</label>
-              <input
-                className="input"
-                placeholder="sk-..."
-                value={target.api_key}
-                onChange={(e) => setTarget((prev) => ({ ...prev, api_key: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="label">Model name</label>
-              <input
-                className="input"
-                placeholder="gpt-4o-mini"
-                value={target.model_name}
-                onChange={(e) => setTarget((prev) => ({ ...prev, model_name: e.target.value }))}
-              />
-            </div>
+            <div><label className="label">Base URL</label><input className="input" placeholder="https://api.openai.com/v1" value={target.base_url} onChange={(e) => setTarget((prev) => ({ ...prev, base_url: e.target.value }))} /></div>
+            <div><label className="label">API key</label><input className="input" placeholder="sk-..." value={target.api_key} onChange={(e) => setTarget((prev) => ({ ...prev, api_key: e.target.value }))} /></div>
+            <div><label className="label">Model name</label><input className="input" placeholder="gpt-4o-mini" value={target.model_name} onChange={(e) => setTarget((prev) => ({ ...prev, model_name: e.target.value }))} /></div>
           </div>
         )}
 
         {target.type === 'huggingface' && (
           <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            <div>
-              <label className="label">Repo ID</label>
-              <input
-                className="input"
-                placeholder="meta-llama/Llama-3-8B-Instruct"
-                value={target.repo_id}
-                onChange={(e) => setTarget((prev) => ({ ...prev, repo_id: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="label">API token</label>
-              <input
-                className="input"
-                placeholder="hf_..."
-                value={target.api_token}
-                onChange={(e) => setTarget((prev) => ({ ...prev, api_token: e.target.value }))}
-              />
-            </div>
+            <div><label className="label">Repo ID</label><input className="input" placeholder="meta-llama/Llama-3-8B-Instruct" value={target.repo_id} onChange={(e) => setTarget((prev) => ({ ...prev, repo_id: e.target.value }))} /></div>
+            <div><label className="label">API token</label><input className="input" placeholder="hf_..." value={target.api_token} onChange={(e) => setTarget((prev) => ({ ...prev, api_token: e.target.value }))} /></div>
           </div>
         )}
 
         {target.type === 'langchain' && (
           <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            <div>
-              <label className="label">Chain import path</label>
-              <input
-                className="input"
-                placeholder="my_module.my_chain"
-                value={target.chain_import_path}
-                onChange={(e) => setTarget((prev) => ({ ...prev, chain_import_path: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="label">Invoke key</label>
-              <input
-                className="input"
-                placeholder="question"
-                value={target.invoke_key}
-                onChange={(e) => setTarget((prev) => ({ ...prev, invoke_key: e.target.value }))}
-              />
-            </div>
+            <div><label className="label">Chain import path</label><input className="input" placeholder="my_module.my_chain" value={target.chain_import_path} onChange={(e) => setTarget((prev) => ({ ...prev, chain_import_path: e.target.value }))} /></div>
+            <div><label className="label">Invoke key</label><input className="input" placeholder="question" value={target.invoke_key} onChange={(e) => setTarget((prev) => ({ ...prev, invoke_key: e.target.value }))} /></div>
           </div>
         )}
 
         {target.type === 'webhook' && (
           <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            <div>
-              <label className="label">Endpoint URL</label>
-              <input
-                className="input"
-                placeholder="https://your-api.com/feature"
-                value={target.endpoint_url}
-                onChange={(e) => setTarget((prev) => ({ ...prev, endpoint_url: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="label">Headers (JSON)</label>
-              <textarea
-                className="textarea"
-                rows={3}
-                placeholder='{"Authorization": "Bearer ..."}'
-                value={target.headers}
-                onChange={(e) => setTarget((prev) => ({ ...prev, headers: e.target.value }))}
-              />
-            </div>
+            <div><label className="label">Endpoint URL</label><input className="input" placeholder="https://your-api.com/feature" value={target.endpoint_url} onChange={(e) => setTarget((prev) => ({ ...prev, endpoint_url: e.target.value }))} /></div>
+            <div><label className="label">Headers (JSON)</label><textarea className="textarea" rows={3} placeholder='{"Authorization": "Bearer ..."}' value={target.headers} onChange={(e) => setTarget((prev) => ({ ...prev, headers: e.target.value }))} /></div>
           </div>
         )}
-        <button
-          type="button"
-          className="btn btn-primary"
-          style={{ marginTop: 12 }}
-          onClick={createMonitor}
-          disabled={!canCreate}
-        >
+        <button type="button" className="btn btn-primary" style={{ marginTop: 12 }} onClick={createMonitor} disabled={!canCreate}>
           {creating ? 'Creating...' : 'Create Monitor ->'}
         </button>
       </div>
@@ -337,39 +258,25 @@ export default function MonitorRunPage() {
         {monitors.map((m) => {
           let baseline = null;
           if (m.baseline_json) {
-            try {
-              baseline = JSON.parse(m.baseline_json);
-            } catch {
-              baseline = null;
-            }
+            try { baseline = JSON.parse(m.baseline_json); } catch { baseline = null; }
           }
           const changedSamples = Array.isArray(m.changed_samples) ? m.changed_samples : [];
           return (
-            <div
-              key={m.monitor_id}
-              className="card"
-              style={{ marginTop: 10, border: '1px solid var(--line2)' }}
-            >
+            <div key={m.monitor_id} className="card" style={{ marginTop: 10, border: '1px solid var(--line2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
                 <div style={{ fontWeight: 600 }}>{m.feature_name}</div>
                 <div style={{ fontSize: 11, color: 'var(--mid)' }}>
                   {STATUS_MSGS[m.last_status] || m.last_status || 'pending'}
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--mid)', marginBottom: 8 }}>
-                {m.description}
-              </div>
+              <div style={{ fontSize: 12, color: 'var(--mid)', marginBottom: 8 }}>{m.description}</div>
               {baseline && (
                 <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8 }}>
                   Baseline: {baseline.captured_at || 'unknown'} - Samples: {baseline.samples?.length || 0}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => runCheck(m.monitor_id)}
-                >
+                <button type="button" className="btn btn-ghost" onClick={() => runCheck(m.monitor_id)}>
                   Run Regression Check
                 </button>
                 <div style={{ fontSize: 11, color: 'var(--mid)' }}>Monitor ID: {m.monitor_id}</div>

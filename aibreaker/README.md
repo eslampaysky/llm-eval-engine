@@ -1,6 +1,6 @@
 # aibreaker
 
-Official Python SDK for [AI Breaker Lab](https://llm-eval-engine-production.up.railway.app).
+Official Python SDK for [AI Breaker Lab](https://ai-breaker-labs.vercel.app).
 
 ## Install
 
@@ -87,7 +87,7 @@ from aibreaker import BreakerClient, BreakerError
 
 client = BreakerClient(
     api_key="client_key",
-    endpoint="https://llm-eval-engine-production.up.railway.app",
+    endpoint="https://ai-breaker-labs.vercel.app",
     poll_interval=5,  # seconds between GET /report/{id}
     timeout=600,      # total seconds to wait before giving up
 )
@@ -128,7 +128,7 @@ one-step CI integration.
 - uses: your-org/aibreaker-action@v1
   with:
     api_key: ${{ secrets.BREAKER_API_KEY }}
-    endpoint: https://llm-eval-engine-production.up.railway.app
+    endpoint: https://ai-breaker-labs.vercel.app
     description: "Customer support chatbot"
     fail_threshold: "5.0"
     comment_on_pr: "true"

@@ -11,7 +11,7 @@ from .models import Report
 
 _log = logging.getLogger(__name__)
 
-DEFAULT_ENDPOINT = "https://llm-eval-engine-production.up.railway.app"
+DEFAULT_ENDPOINT = "https://ai-breaker-labs.vercel.app"
 DEFAULT_POLL_INTERVAL = 5       # seconds between GET /report/{id} polls
 DEFAULT_TIMEOUT       = 600     # seconds before giving up on a running job
 

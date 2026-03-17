@@ -11,10 +11,10 @@ function clamp01(v) {
   return Math.max(0, Math.min(1, n));
 }
 
-export default function RunDetailPage() {
-  const { runId } = useParams();
+export default function AuditDetailPage() {
+  const { auditId } = useParams();
   const { persona, report, setReport } = useAppShell();
-  const [loading, setLoading] = useState(!report || report.report_id !== runId);
+  const [loading, setLoading] = useState(!report || report.report_id !== auditId);
   const [error, setError] = useState('');
   const [shareCopied, setShareCopied] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
@@ -24,20 +24,20 @@ export default function RunDetailPage() {
   const [progress, setProgress] = useState(null);
 
   useEffect(() => {
-    if (report?.report_id === runId) {
+    if (report?.report_id === auditId) {
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    api.getReport(runId)
+    api.getReport(auditId)
       .then((nextReport) => {
         setReport(nextReport);
         setError('');
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [runId, report?.report_id, setReport]);
+  }, [auditId, report?.report_id, setReport]);
 
   useEffect(() => {
     if (!report || report.status !== 'processing') {
@@ -47,7 +47,7 @@ export default function RunDetailPage() {
     let active = true;
     const tick = async () => {
       try {
-        const res = await fetch(`${API_BASE}/report/${encodeURIComponent(runId)}/progress`);
+        const res = await fetch(`${API_BASE}/report/${encodeURIComponent(auditId)}/progress`);
         if (!res.ok) return;
         const data = await res.json();
         if (!active) return;
@@ -60,11 +60,11 @@ export default function RunDetailPage() {
       active = false;
       clearInterval(timer);
     };
-  }, [report, runId]);
+  }, [report, auditId]);
 
   if (loading) return <div className="page"><div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div></div>;
   if (error) return <div className="page"><div className="err-box">⚠ {error}</div></div>;
-  if (!report) return <div className="page"><div className="empty">Run not found.</div></div>;
+  if (!report) return <div className="page"><div className="empty">Audit not found.</div></div>;
 
   const publicUrl = `${typeof window !== 'undefined' ? window.location.origin : SHARE_BASE}/report/${report.report_id}`;
   const results = Array.isArray(report.results) ? report.results : [];
@@ -148,7 +148,7 @@ export default function RunDetailPage() {
       {report.status === 'processing' && progress && (
         <div className="page fade-in" style={{ paddingBottom: 0 }}>
           <div className="card">
-            <div className="card-label">Run progress</div>
+            <div className="card-label">Audit progress</div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--mid)', marginBottom: 8 }}>
               {progress.current_step || 'Processing'} 
             </div>
@@ -172,12 +172,12 @@ export default function RunDetailPage() {
         <div className="page fade-in" style={{ paddingBottom: 0 }}>
           <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
             <div>
-              <div className="card-label">Public report link</div>
+              <div className="card-label">Public audit link</div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--mid)' }}>{publicUrl}</div>
               {shareError && <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 6 }}>{shareError}</div>}
             </div>
             <button className="btn btn-primary" onClick={shareReport} disabled={shareBusy}>
-              {shareCopied ? 'Copied' : shareBusy ? 'Sharing...' : 'Share Report'}
+              {shareCopied ? 'Copied' : shareBusy ? 'Sharing...' : 'Share Audit'}
             </button>
           </div>
         </div>

@@ -4,11 +4,13 @@ web_agent.py — Playwright-based browser crawler for AiBreaker.
 Captures dual-viewport screenshots (desktop + mobile), console errors,
 failed network requests, page metadata, and optional user journey execution.
 Records video for Deep Dive / Fix & Verify tiers.
+Self-healing locators: retries failed selectors via Gemini suggestion.
 """
 
 import asyncio
 import base64
 import json
+import logging
 import os
 import re
 import tempfile
@@ -16,6 +18,7 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
+_log = logging.getLogger(__name__)
 
 # ── Default viewport sizes ────────────────────────────────────────────────────
 
@@ -37,6 +40,76 @@ async def _take_screenshot(page, viewport: dict) -> str | None:
         return None
 
 
+# ── Self-healing locators ─────────────────────────────────────────────────────
+
+_SELECTOR_NOT_FOUND_HINTS = (
+    "waiting for selector",
+    "could not resolve",
+    "no element found",
+    "selector resolved to hidden",
+    "timeout",
+)
+
+
+async def _suggest_replacement_selector(page, failed_selector: str) -> str | None:
+    """
+    Ask Gemini to find a replacement CSS selector in the current page HTML.
+    Returns the suggested selector string, or None on failure.
+    """
+    try:
+        from core.gemini_judge import _get_gemini_model
+
+        html = await page.content()
+        # Truncate to ~15k chars to fit Gemini context
+        html_truncated = html[:15000]
+
+        model = _get_gemini_model()
+        prompt = (
+            f"The element with selector `{failed_selector}` was not found. "
+            f"Look at this HTML and find the most likely replacement CSS selector "
+            f"for the same element. Return ONLY the CSS selector, nothing else.\n\n"
+            f"{html_truncated}"
+        )
+        response = model.generate_content(prompt)
+        suggestion = (response.text or "").strip().strip("`").strip("'").strip('"')
+        if suggestion and len(suggestion) < 300:
+            _log.info(
+                "[SelfHeal] Suggested replacement: %s → %s",
+                failed_selector,
+                suggestion,
+            )
+            return suggestion
+    except Exception as exc:
+        _log.warning("[SelfHeal] Could not get replacement selector: %s", exc)
+    return None
+
+
+def _is_selector_not_found(error_msg: str) -> bool:
+    """Check if an error message indicates a selector was not found."""
+    lower = error_msg.lower()
+    return any(hint in lower for hint in _SELECTOR_NOT_FOUND_HINTS)
+
+
+async def _execute_step_action(page, action: str, selector: str, value: str, url: str):
+    """Execute a single journey step action on the page."""
+    if action == "click":
+        await page.click(selector, timeout=8000)
+    elif action == "fill":
+        await page.fill(selector, value, timeout=8000)
+    elif action == "submit":
+        if selector:
+            await page.click(selector, timeout=8000)
+        else:
+            await page.keyboard.press("Enter")
+    elif action == "wait":
+        ms = int(value) if value else 2000
+        await page.wait_for_timeout(min(ms, 10000))
+    elif action == "navigate":
+        await page.goto(url or value, timeout=15000, wait_until="domcontentloaded")
+    else:
+        raise ValueError(f"Unknown action: {action}")
+
+
 async def _run_user_journeys(page, journeys: list[dict]) -> list[dict]:
     """
     Execute a list of user journey steps on the page.
@@ -48,6 +121,8 @@ async def _run_user_journeys(page, journeys: list[dict]) -> list[dict]:
        "url": "url to navigate" (optional)}
 
     Returns a list of step results with status and any errors.
+    Self-healing: if a selector is not found, asks Gemini for a replacement
+    and retries once before marking the step as failed.
     """
     results = []
     for step in journeys:
@@ -55,29 +130,54 @@ async def _run_user_journeys(page, journeys: list[dict]) -> list[dict]:
         selector = step.get("selector", "")
         value = step.get("value", "")
         url = step.get("url", "")
-        result = {"action": action, "selector": selector, "status": "ok", "error": None}
+        result = {
+            "action": action,
+            "selector": selector,
+            "status": "ok",
+            "error": None,
+            "healed_selector": None,
+        }
 
         try:
-            if action == "click":
-                await page.click(selector, timeout=8000)
-            elif action == "fill":
-                await page.fill(selector, value, timeout=8000)
-            elif action == "submit":
-                if selector:
-                    await page.click(selector, timeout=8000)
-                else:
-                    await page.keyboard.press("Enter")
-            elif action == "wait":
-                ms = int(value) if value else 2000
-                await page.wait_for_timeout(min(ms, 10000))
-            elif action == "navigate":
-                await page.goto(url or value, timeout=15000, wait_until="domcontentloaded")
-            else:
-                result["status"] = "skipped"
-                result["error"] = f"Unknown action: {action}"
-        except Exception as e:
-            result["status"] = "failed"
+            await _execute_step_action(page, action, selector, value, url)
+        except ValueError as e:
+            # Unknown action — skip, no healing needed
+            result["status"] = "skipped"
             result["error"] = str(e)[:300]
+        except Exception as e:
+            error_msg = str(e)[:300]
+
+            # ── Self-healing: retry with Gemini-suggested selector ────
+            if selector and _is_selector_not_found(error_msg):
+                _log.info(
+                    "[SelfHeal] Selector not found: %s — asking Gemini for replacement",
+                    selector,
+                )
+                healed = await _suggest_replacement_selector(page, selector)
+                if healed:
+                    try:
+                        await _execute_step_action(page, action, healed, value, url)
+                        result["status"] = "healed"
+                        result["healed_selector"] = healed
+                        result["error"] = None
+                        _log.info(
+                            "[SelfHeal] SUCCESS — original: %s → healed: %s",
+                            selector,
+                            healed,
+                        )
+                    except Exception as retry_exc:
+                        result["status"] = "failed"
+                        result["error"] = (
+                            f"Original: {error_msg} | "
+                            f"Healed selector '{healed}' also failed: {str(retry_exc)[:200]}"
+                        )
+                        result["healed_selector"] = healed
+                else:
+                    result["status"] = "failed"
+                    result["error"] = error_msg
+            else:
+                result["status"] = "failed"
+                result["error"] = error_msg
 
         results.append(result)
         # Brief pause between steps so the page can settle

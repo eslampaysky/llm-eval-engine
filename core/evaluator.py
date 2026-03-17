@@ -4,8 +4,8 @@ import logging
 import os
 import time
 
-from src.llm_eval_engine.infrastructure.config_loader import load_project_config
-from src.llm_eval_engine.application.pipeline import EvaluationPipeline
+from src.core_engine.infrastructure.config_loader import load_project_config
+from src.core_engine.application.pipeline import EvaluationPipeline
 from core.providers import build_default_evaluator_registry
 
 MAX_WORKERS = int(os.getenv("MAX_WORKERS", "4"))

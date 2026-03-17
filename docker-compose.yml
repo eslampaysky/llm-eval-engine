@@ -1,14 +1,6 @@
 services:
 
-  ai-breaker-lab-ollama:
-    image: ollama/ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama   # persists downloaded models
-    restart: unless-stopped
-
-  ai-breaker-lab-api:
+  aibreaker-api:
     build: .
     ports:
       - "8000:8000"
@@ -16,12 +8,10 @@ services:
       - .env
     volumes:
       - ./reports:/app/reports
-    depends_on:
-      - ai-breaker-lab-ollama       # wait for ollama to start first
     environment:
-      - OLLAMA_URL=http://ai-breaker-lab-ollama:11434   # use service name, not localhost
+      - PYTHONUNBUFFERED=1
 
-  ai-breaker-lab-dashboard:
+  aibreaker-dashboard:
     build:
       context: ./dashboard/review-dashboard
       dockerfile: Dockerfile
@@ -32,10 +22,9 @@ services:
       - dashboard_node_modules:/app/node_modules
     command: sh -c "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then npm ci; fi; npm run dev -- --host 0.0.0.0 --port 5173"
     depends_on:
-      - ai-breaker-lab-api
+      - aibreaker-api
     environment:
       - CHOKIDAR_USEPOLLING=true
 
 volumes:
-  ollama_data:
   dashboard_node_modules:

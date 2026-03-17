@@ -126,7 +126,7 @@ if not report.passed: raise SystemExit(1)`}</pre>
         <pre style={codeStyle}>{`- uses: your-org/aibreaker-action@v1
   with:
     api_key: \${{ secrets.BREAKER_API_KEY }}
-    endpoint: https://llm-eval-engine-production.up.railway.app
+    endpoint: https://ai-breaker-labs.vercel.app
     description: "Customer support chatbot"
     fail_threshold: "5.0"
     comment_on_pr: "true"

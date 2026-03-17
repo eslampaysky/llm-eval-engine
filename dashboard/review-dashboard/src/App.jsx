@@ -31,9 +31,9 @@ import JudgeConfigPanel from './components/JudgeConfigPanel';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL
-  || 'https://llm-eval-engine-production.up.railway.app';
+  || 'https://ai-breaker-labs.vercel.app';
 export const SHARE_BASE = import.meta.env.VITE_SHARE_BASE_URL
-  || (typeof window !== 'undefined' ? window.location.origin : 'https://llm-eval-engine-production.up.railway.app');
+  || (typeof window !== 'undefined' ? window.location.origin : 'https://ai-breaker-labs.vercel.app');
 
 const STAGES = [
   { id: 'init',     label: 'Initialising',          icon: '◈', detail: 'Connecting to target model' },

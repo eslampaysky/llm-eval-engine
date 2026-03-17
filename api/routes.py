@@ -114,21 +114,21 @@ from api.plans import get_plan_limits, resolve_plan
 from api.user_auth import decode_access_token
 from reports.report_generator import ReportGenerator, generate_html_report, generate_premium_report
 from reports.compliance_report import generate_compliance_report
-from src.llm_eval_engine.infrastructure.config_loader import load_project_config
-from src.llm_eval_engine.infrastructure.evaluator_factories import (
+from src.core_engine.infrastructure.config_loader import load_project_config
+from src.core_engine.infrastructure.evaluator_factories import (
     build_default_evaluator_registry,
 )
 from src.arabic_test_generator import ArabicTestGenerator, detect_language
 from src.metrics import compute_metrics
 from src.target_adapter import AdapterFactory, GeminiDemoAdapter
 from src.test_generator import GroqJudgeClient, TestSuiteGenerator
-from src.llm_eval_engine.application.pipeline import EvaluationPipeline
+from src.core_engine.application.pipeline import EvaluationPipeline
 from core.energy_tracker import EnergyTracker
 from core.rag_evaluator import RagEvaluator
 from core.web_agent import run_web_audit
-from core.web_judge import judge_web_audit
+from core.report_builder import judge_web_audit
 from core.agent_probe import generate_scenarios, run_scenario, judge_scenario
-from core.feature_monitor import capture_baseline, check_regression
+from core.regression_monitor import capture_baseline, check_regression
 
 
 def _compute_drift_from_series(
@@ -559,7 +559,7 @@ def _send_email_notification(to_email: str, report: dict[str, Any]) -> None:
 def _report_html_url(report_id: str) -> str:
     base = (os.getenv("PUBLIC_BASE_URL") or os.getenv("APP_BASE_URL") or "").strip().rstrip("/")
     if not base:
-        base = "https://llm-eval-engine-production.up.railway.app"
+        base = "https://ai-breaker-labs.vercel.app"
     return f"{base}/report/{report_id}/html"
 
 
