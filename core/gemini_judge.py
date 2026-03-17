@@ -19,7 +19,7 @@ _log = logging.getLogger(__name__)
 
 # ── Gemini client ─────────────────────────────────────────────────────────────
 
-_MODEL_NAME = "gemini-1.5-flash"
+_MODEL_NAME = "gemini-1.5-flash-latest"
 
 
 def _get_gemini_model():
