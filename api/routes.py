@@ -89,6 +89,11 @@ from api.database import (
     upsert_demo_run,
     update_report_esg_metrics,
     get_model_scores,
+    insert_agentic_qa_report,
+    update_agentic_qa_status,
+    finalize_agentic_qa_success,
+    finalize_agentic_qa_failure,
+    get_agentic_qa_row,
 )
 from api.job_queue import enqueue_job
 from api.models import (
@@ -102,27 +107,28 @@ from api.models import (
     WebAuditRequest,
     AgentAuditRequest,
     FeatureMonitorConfig,
+    AgenticQAStartRequest,
 )
 from api.rate_limit import LIMIT_BREAK, LIMIT_DELETE, LIMIT_EVALUATE, LIMIT_READ, limiter ,LIMIT_RETRY
 from api.plans import get_plan_limits, resolve_plan
 from api.user_auth import decode_access_token
 from reports.report_generator import ReportGenerator, generate_html_report, generate_premium_report
 from reports.compliance_report import generate_compliance_report
-from src.llm_eval_engine.infrastructure.config_loader import load_project_config
-from src.llm_eval_engine.infrastructure.evaluator_factories import (
+from src.core_engine.infrastructure.config_loader import load_project_config
+from src.core_engine.infrastructure.evaluator_factories import (
     build_default_evaluator_registry,
 )
 from src.arabic_test_generator import ArabicTestGenerator, detect_language
 from src.metrics import compute_metrics
 from src.target_adapter import AdapterFactory, GeminiDemoAdapter
 from src.test_generator import GroqJudgeClient, TestSuiteGenerator
-from src.llm_eval_engine.application.pipeline import EvaluationPipeline
+from src.core_engine.application.pipeline import EvaluationPipeline
 from core.energy_tracker import EnergyTracker
 from core.rag_evaluator import RagEvaluator
 from core.web_agent import run_web_audit
-from core.web_judge import judge_web_audit
+from core.report_builder import judge_web_audit
 from core.agent_probe import generate_scenarios, run_scenario, judge_scenario
-from core.feature_monitor import capture_baseline, check_regression
+from core.regression_monitor import capture_baseline, check_regression
 
 
 def _compute_drift_from_series(
@@ -553,7 +559,7 @@ def _send_email_notification(to_email: str, report: dict[str, Any]) -> None:
 def _report_html_url(report_id: str) -> str:
     base = (os.getenv("PUBLIC_BASE_URL") or os.getenv("APP_BASE_URL") or "").strip().rstrip("/")
     if not base:
-        base = "https://llm-eval-engine-production.up.railway.app"
+        base = "https://ai-breaker-labs.vercel.app"
     return f"{base}/report/{report_id}/html"
 
 
@@ -3242,3 +3248,124 @@ def review_rules(
     auth_ctx: dict[str, Any] = Depends(validate_api_key),
 ) -> dict[str, Any]:
     return _load_review_rules()
+
+
+# ── Agentic QA routes ─────────────────────────────────────────────────────────
+
+@router.post("/agentic-qa/start", response_model=dict, status_code=202)
+@limiter.limit("20/hour")
+async def start_agentic_qa(
+    request: Request,
+    payload: AgenticQAStartRequest,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict:
+    """Start an agentic QA audit. Poll GET /agentic-qa/status/{id}."""
+    audit_id = str(uuid.uuid4())
+    total_steps = {"vibe": 3, "deep": 4, "fix": 5}.get(payload.tier, 3)
+    _init_progress(audit_id, total_steps)
+    insert_agentic_qa_report(
+        audit_id=audit_id,
+        client_name=auth_ctx.get("client_name"),
+        url=payload.url,
+        tier=payload.tier,
+        status="queued",
+    )
+    await enqueue_job(
+        _run_agentic_qa_job,
+        audit_id,
+        payload.url,
+        payload.tier,
+        payload.journeys,
+        auth_ctx.get("client_name"),
+        job_id=audit_id,
+    )
+    return {
+        "audit_id": audit_id,
+        "status": "queued",
+        "poll_url": f"/agentic-qa/status/{audit_id}",
+    }
+
+
+@router.get("/agentic-qa/status/{audit_id}")
+@limiter.limit(LIMIT_READ)
+def get_agentic_qa_status(
+    request: Request,
+    audit_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict:
+    """Poll until status == 'done'."""
+    row = get_agentic_qa_row(audit_id)
+    if not row or row.get("client_name") != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=404, detail="Audit not found")
+
+    findings = None
+    if row.get("findings_json"):
+        try:
+            findings = json.loads(row["findings_json"])
+        except json.JSONDecodeError:
+            findings = None
+
+    return {
+        "audit_id": audit_id,
+        "status": row.get("status"),
+        "url": row.get("url") or "",
+        "tier": row.get("tier") or "vibe",
+        "score": row.get("score"),
+        "confidence": row.get("confidence"),
+        "findings": findings,
+        "summary": row.get("summary"),
+        "bundled_fix_prompt": row.get("bundled_fix"),
+        "video_url": f"/agentic-qa/{audit_id}/video" if row.get("video_path") else None,
+        "desktop_screenshot_url": f"/agentic-qa/{audit_id}/screenshot/desktop" if row.get("desktop_ss_b64") else None,
+        "mobile_screenshot_url": f"/agentic-qa/{audit_id}/screenshot/mobile" if row.get("mobile_ss_b64") else None,
+        "created_at": row.get("created_at"),
+    }
+
+
+def _run_agentic_qa_job(audit_id, url, tier, journeys, client_name):
+    """Background job: run the agentic QA orchestrator."""
+    from core.agentic_qa import run_agentic_qa, result_to_dict
+    from dataclasses import asdict
+
+    try:
+        update_agentic_qa_status(audit_id, "processing")
+
+        def _on_progress(step, total, msg):
+            _update_progress(audit_id, step, total, msg)
+
+        result = run_agentic_qa(
+            url=url,
+            tier=tier,
+            journeys=journeys,
+            on_progress=_on_progress,
+        )
+
+        findings_dicts = [
+            {
+                "severity": f.severity,
+                "category": f.category,
+                "title": f.title,
+                "description": f.description,
+                "fix_prompt": f.fix_prompt,
+                "confidence": f.confidence,
+            }
+            for f in result.findings
+        ]
+
+        finalize_agentic_qa_success(
+            audit_id=audit_id,
+            score=result.score,
+            confidence=result.confidence,
+            findings_json=json.dumps(findings_dicts, ensure_ascii=False),
+            summary=result.summary,
+            bundled_fix=result.bundled_fix_prompt,
+            video_path=result.video_path,
+            desktop_ss_b64=result.desktop_screenshot_b64,
+            mobile_ss_b64=result.mobile_screenshot_b64,
+        )
+        _finish_progress(audit_id, "done")
+
+    except Exception as e:
+        _log.error("[AgenticQA] Job %s failed: %s", audit_id, e, exc_info=True)
+        finalize_agentic_qa_failure(audit_id)
+        _finish_progress(audit_id, "failed")

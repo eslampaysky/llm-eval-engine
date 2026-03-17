@@ -1,5 +1,10 @@
-# Environment variables — NEVER commit real keys
+# Environment variables & secrets — NEVER commit real keys
 .env
+.env.*
+*.key
+*.pem
+*.secret
+**/secrets/
 
 # Python
 __pycache__/
@@ -28,3 +33,9 @@ usage.db
 # IDE
 .vscode/
 .idea/
+
+# Node
+node_modules/
+
+# Gemini file cache (free-tier rate-limit helper)
+aibreaker_gemini_cache/

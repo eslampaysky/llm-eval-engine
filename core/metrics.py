@@ -1,8 +1,8 @@
 """Core metrics API wrapper."""
 
-from src.llm_eval_engine.application.metrics import build_default_metric_registry
-from src.llm_eval_engine.domain.models import EvaluatedSample, JudgeResult
-from src.llm_eval_engine.infrastructure.config_loader import load_project_config
+from src.core_engine.application.metrics import build_default_metric_registry
+from src.core_engine.domain.models import EvaluatedSample, JudgeResult
+from src.core_engine.infrastructure.config_loader import load_project_config
 
 
 def _to_domain_rows(results: list[dict]) -> list[EvaluatedSample]:

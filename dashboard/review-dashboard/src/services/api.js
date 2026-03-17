@@ -137,4 +137,13 @@ export const api = {
   getAuditHistory() {
     return request('/audit-history');
   },
+  startAgenticQA(body) {
+    return request('/agentic-qa/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+  getAgenticQAStatus(id) {
+    return request(`/agentic-qa/status/${encodeURIComponent(id)}`);
+  },
 };

@@ -310,6 +310,25 @@ def init_db():
                 FOREIGN KEY(monitor_id) REFERENCES feature_monitors(monitor_id)
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS agentic_qa_reports (
+                audit_id        TEXT PRIMARY KEY,
+                client_name     TEXT,
+                url             TEXT,
+                tier            TEXT,
+                status          TEXT NOT NULL DEFAULT 'queued',
+                score           INTEGER,
+                confidence      INTEGER,
+                findings_json   TEXT,
+                summary         TEXT,
+                bundled_fix     TEXT,
+                video_path      TEXT,
+                desktop_ss_b64  TEXT,
+                mobile_ss_b64   TEXT,
+                created_at      TEXT NOT NULL,
+                updated_at      TEXT NOT NULL
+            )
+        """)
 
         # ── Indexes ───────────────────────────────────────────────────────────
         cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_logs_client_name ON usage_logs(client_name)")
@@ -1655,3 +1674,98 @@ def mark_lead_contacted(lead_id: int) -> bool:
             (lead_id,),
         )
         return (cur.rowcount or 0) > 0
+
+
+# ── Agentic QA reports ────────────────────────────────────────────────────────
+
+def insert_agentic_qa_report(
+    *,
+    audit_id: str,
+    client_name: str | None,
+    url: str,
+    tier: str,
+    status: str = "queued",
+) -> None:
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            INSERT INTO agentic_qa_reports(
+                audit_id, client_name, url, tier, status, created_at, updated_at
+            ) VALUES ({_ph(7)})
+            """,
+            (audit_id, client_name, url, tier, status, now, now),
+        )
+
+
+def update_agentic_qa_status(audit_id: str, status: str) -> None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE agentic_qa_reports
+               SET status={_P}, updated_at={_P}
+             WHERE audit_id={_P}
+            """,
+            (status, _utc_now(), audit_id),
+        )
+
+
+def finalize_agentic_qa_success(
+    *,
+    audit_id: str,
+    score: int | None,
+    confidence: int | None,
+    findings_json: str | None,
+    summary: str | None,
+    bundled_fix: str | None,
+    video_path: str | None,
+    desktop_ss_b64: str | None,
+    mobile_ss_b64: str | None,
+) -> None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE agentic_qa_reports
+               SET status={_P},
+                   score={_P},
+                   confidence={_P},
+                   findings_json={_P},
+                   summary={_P},
+                   bundled_fix={_P},
+                   video_path={_P},
+                   desktop_ss_b64={_P},
+                   mobile_ss_b64={_P},
+                   updated_at={_P}
+             WHERE audit_id={_P}
+            """,
+            ("done", score, confidence, findings_json, summary,
+             bundled_fix, video_path, desktop_ss_b64, mobile_ss_b64,
+             _utc_now(), audit_id),
+        )
+
+
+def finalize_agentic_qa_failure(audit_id: str) -> None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE agentic_qa_reports
+               SET status={_P},
+                   updated_at={_P}
+             WHERE audit_id={_P}
+            """,
+            ("failed", _utc_now(), audit_id),
+        )
+
+
+def get_agentic_qa_row(audit_id: str) -> dict | None:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT * FROM agentic_qa_reports WHERE audit_id={_P}",
+            (audit_id,),
+        )
+        return _row_to_dict(cur.fetchone())

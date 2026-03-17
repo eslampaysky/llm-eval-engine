@@ -231,7 +231,7 @@ export default function WorkspacePage() {
               style={{ ...S.input, fontFamily: "'Space Grotesk', sans-serif", fontSize: 13 }}
               value={apiBase}
               onChange={e => setApiBase(e.target.value)}
-              placeholder="https://llm-eval-engine-production.up.railway.app"
+              placeholder="https://ai-breaker-labs.vercel.app"
               onFocus={e => e.target.style.borderColor = 'var(--neon-blue, #3bb4ff)'}
               onBlur={e => e.target.style.borderColor = 'rgba(33,57,90,0.9)'}
             />

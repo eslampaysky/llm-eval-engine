@@ -216,3 +216,42 @@ class FeatureMonitorConfig(BaseModel):
 class MonitorCheckRequest(BaseModel):
     monitor_id: str
     force: bool = False
+
+
+# ── Agentic QA (pivot) ───────────────────────────────────────────────────────
+
+class AgenticQAStartRequest(BaseModel):
+    url: str = Field(..., description="Full URL to audit, e.g. https://myapp.com")
+    tier: Literal["vibe", "deep", "fix"] = Field(
+        default="vibe",
+        description="vibe = quick visual scan, deep = full journey + video, fix = deep + code analysis",
+    )
+    journeys: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Optional user journey steps for deep/fix tiers",
+    )
+
+
+class AgenticQAFinding(BaseModel):
+    severity: str
+    category: str
+    title: str
+    description: str
+    fix_prompt: str
+    confidence: int | None = None
+
+
+class AgenticQAResult(BaseModel):
+    audit_id: str
+    status: str  # queued | processing | done | failed
+    url: str
+    tier: str
+    score: int | None = None
+    confidence: int | None = None
+    findings: list[AgenticQAFinding] | None = None
+    summary: str | None = None
+    bundled_fix_prompt: str | None = None
+    video_url: str | None = None
+    desktop_screenshot_url: str | None = None
+    mobile_screenshot_url: str | None = None
+    created_at: str

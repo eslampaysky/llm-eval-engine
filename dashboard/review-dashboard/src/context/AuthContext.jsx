@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL ||
-  'https://llm-eval-engine-production.up.railway.app';
+  'https://ai-breaker-labs.vercel.app';
 
 let token = localStorage.getItem('auth_token');
 

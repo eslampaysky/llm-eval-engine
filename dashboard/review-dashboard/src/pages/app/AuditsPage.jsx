@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, ArrowRight, Zap, Filter } from 'lucide-react';
@@ -127,4 +128,13 @@ export default function AuditsPage() {
       )}
     </div>
   );
+=======
+import { useNavigate } from 'react-router-dom';
+import { HistoryPage as AuditsHistoryPage } from '../../App.jsx';
+
+export default function AuditsPage() {
+  const navigate = useNavigate();
+
+  return <AuditsHistoryPage onLoadReport={(row) => navigate(`/app/audits/${row.report_id}`)} />;
+>>>>>>> 952b221998466c82308faa3bf4986c92c664747d
 }

@@ -7,13 +7,13 @@ execution to the Clean Architecture pipeline.
 import os
 
 try:
-    from src.llm_eval_engine.application.pipeline import EvaluationPipeline
-    from src.llm_eval_engine.infrastructure.config_loader import load_project_config
-    from src.llm_eval_engine.infrastructure.evaluator_factories import build_default_evaluator_registry
+    from src.core_engine.application.pipeline import EvaluationPipeline
+    from src.core_engine.infrastructure.config_loader import load_project_config
+    from src.core_engine.infrastructure.evaluator_factories import build_default_evaluator_registry
 except ImportError:
-    from llm_eval_engine.application.pipeline import EvaluationPipeline
-    from llm_eval_engine.infrastructure.config_loader import load_project_config
-    from llm_eval_engine.infrastructure.evaluator_factories import build_default_evaluator_registry
+    from core_engine.application.pipeline import EvaluationPipeline
+    from core_engine.infrastructure.config_loader import load_project_config
+    from core_engine.infrastructure.evaluator_factories import build_default_evaluator_registry
 
 MAX_WORKERS = int(os.getenv("MAX_WORKERS", "4"))
 

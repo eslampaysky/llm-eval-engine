@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from src.llm_eval_engine.application.registry import EvaluatorDefinition, EvaluatorRegistry
+from src.core_engine.application.registry import EvaluatorDefinition, EvaluatorRegistry
 from src.metrics import compute_metrics
-from src.llm_eval_engine.application.pipeline import EvaluationPipeline
+from src.core_engine.application.pipeline import EvaluationPipeline
 
 
 class _FakeEvaluator:
@@ -37,7 +37,7 @@ def test_pipeline_and_metrics() -> None:
 
     config = {"target_model": {"type": "openai", "base_url": "http://example.com", "model_name": "x"}}
 
-    with patch("src.llm_eval_engine.application.pipeline.AdapterFactory.from_config", return_value=_FakeAdapter()):
+    with patch("src.core_engine.application.pipeline.AdapterFactory.from_config", return_value=_FakeAdapter()):
         pipeline = EvaluationPipeline(config=config, evaluator_registry=registry, max_workers=1)
         rows = pipeline.run(
             samples=[
