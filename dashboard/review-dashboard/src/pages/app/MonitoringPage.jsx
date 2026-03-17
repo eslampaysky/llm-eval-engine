@@ -1,174 +1,46 @@
-<<<<<<< HEAD
-import { useState } from 'react';
-import { Plus, X, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, X, Loader } from 'lucide-react';
+import { api } from '../../services/api';
+import CopyButton from '../../components/CopyButton.jsx';
 import ScoreRing from '../../components/ScoreRing.jsx';
 import AuditStatusBadge from '../../components/AuditStatusBadge.jsx';
 
-const MOCK_SITES = [
-  { url: 'myapp.vercel.app', score: 83, trend: 'up', lastChecked: '2 hours ago', status: 'healthy' },
-  { url: 'shop.example.com', score: 67, trend: 'down', lastChecked: '4 hours ago', status: 'degraded' },
-  { url: 'dashboard.io', score: 91, trend: 'up', lastChecked: '1 hour ago', status: 'healthy' },
-];
+const STATUS_MAP = {
+  pending: 'degraded',
+  ready: 'healthy',
+  regression: 'critical',
+  ok: 'healthy',
+  failed: 'critical',
+};
 
-export default function MonitoringPage() {
-  const [showModal, setShowModal] = useState(false);
-  const [newUrl, setNewUrl] = useState('');
-  const [frequency, setFrequency] = useState('daily');
-
-  return (
-    <div className="page-container fade-in">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
-        <div>
-          <div className="page-eyebrow">Monitoring</div>
-          <h1 className="page-title">Monitored Sites</h1>
-          <p className="page-subtitle">Get alerted when reliability drops.</p>
-        </div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={16} /> Add Site
-        </button>
-      </div>
-
-      {MOCK_SITES.length > 0 ? (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-          gap: 16,
-        }}>
-          {MOCK_SITES.map((site) => (
-            <div key={site.url} className="card" style={{
-              display: 'flex', flexDirection: 'column', gap: 16,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)',
-                  display: 'flex', alignItems: 'center', gap: 6,
-                }}>
-                  {site.url} <ExternalLink size={12} style={{ color: 'var(--text-dim)' }} />
-                </div>
-                <AuditStatusBadge status={site.status} />
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <ScoreRing score={site.score} size={56} strokeWidth={4} />
-                <div style={{ flex: 1 }}>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    fontFamily: 'var(--font-mono)', fontSize: 13,
-                    color: site.trend === 'up' ? 'var(--green)' : 'var(--coral)',
-                  }}>
-                    {site.trend === 'up' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                    {site.trend === 'up' ? '+3 pts' : '-5 pts'}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Last checked {site.lastChecked}
-                  </div>
-                </div>
-              </div>
-
-              <a href="#" style={{
-                fontSize: 13, color: 'var(--accent)', fontWeight: 500,
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-              }}>
-                View Last Report →
-              </a>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="card" style={{ textAlign: 'center', padding: '60px 24px' }}>
-          <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>📡</div>
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-            No sites monitored yet
-          </h3>
-          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
-            Add your first site to get alerted when reliability drops.
-          </p>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <Plus size={16} /> Add Site
-          </button>
-        </div>
-      )}
-
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
-                Add Monitored Site
-              </h3>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label className="form-label">URL</label>
-              <input className="form-input" type="url" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} placeholder="https://your-app.vercel.app" />
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label className="form-label">Check Frequency</label>
-              <select className="form-select" value={frequency} onChange={(e) => setFrequency(e.target.value)}>
-                <option value="deploy">On every deploy</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-              </select>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label className="form-label">Slack Webhook (optional)</label>
-              <input className="form-input" placeholder="https://hooks.slack.com/..." />
-            </div>
-
-            <div style={{ marginBottom: 20 }}>
-              <label className="form-label">Email (optional)</label>
-              <input className="form-input" type="email" placeholder="alerts@company.com" />
-            </div>
-
-            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setShowModal(false)}>
-              Add Site
-            </button>
-          </div>
-        </div>
-      )}
-=======
-import { useEffect, useMemo, useState } from 'react';
-import { api } from '../../services/api';
-import CopyButton from '../../components/CopyButton';
-import ConfidenceBar from '../../components/ConfidenceBar';
-
-const STATUS_MSGS = {
+const STATUS_LABELS = {
   pending: 'Pending',
   ready: 'Ready',
-  regression: 'Regression detected',
+  regression: 'Regression',
   ok: 'OK',
   failed: 'Failed',
 };
 
 export default function MonitoringPage() {
-  const [target, setTarget] = useState({
-    type: 'webhook',
-    base_url: '',
-    api_key: '',
-    model_name: '',
-    repo_id: '',
-    api_token: '',
-    endpoint_url: '',
-    headers: '',
-    payload_template: '',
-    chain_import_path: '',
-    invoke_key: '',
-  });
+  const [monitors, setMonitors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
+  const [actionMsg, setActionMsg] = useState('');
+
+  // Form state
   const [featureName, setFeatureName] = useState('');
   const [description, setDescription] = useState('');
   const [schedule, setSchedule] = useState('daily');
   const [alertWebhook, setAlertWebhook] = useState('');
   const [testInputs, setTestInputs] = useState('');
-  const [monitors, setMonitors] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState('');
-  const [actionMsg, setActionMsg] = useState('');
+  const [target, setTarget] = useState({
+    type: 'webhook', endpoint_url: '', headers: '',
+    base_url: '', api_key: '', model_name: '',
+    repo_id: '', api_token: '',
+    chain_import_path: '', invoke_key: '',
+  });
 
   async function loadMonitors() {
     setLoading(true);
@@ -183,60 +55,42 @@ export default function MonitoringPage() {
     }
   }
 
-  useEffect(() => {
-    loadMonitors();
-  }, []);
+  useEffect(() => { loadMonitors(); }, []);
 
   async function createMonitor() {
     if (!featureName.trim() || !description.trim()) return;
-
-    const inputs = testInputs
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    if (inputs.length < 3) {
-      setError('Provide at least 3 test inputs.');
-      return;
-    }
+    const inputs = testInputs.split('\n').map(l => l.trim()).filter(Boolean);
+    if (inputs.length < 3) { setError('Provide at least 3 test inputs.'); return; }
 
     let headers = null;
     if (target.headers.trim()) {
-      try {
-        headers = JSON.parse(target.headers);
-      } catch {
-        setError('Headers must be valid JSON.');
-        return;
-      }
+      try { headers = JSON.parse(target.headers); }
+      catch { setError('Headers must be valid JSON.'); return; }
     }
 
-    const payload = {
-      feature_name: featureName.trim(),
-      description: description.trim(),
-      target: {
-        type: target.type,
-        base_url: target.base_url || undefined,
-        api_key: target.api_key || undefined,
-        model_name: target.model_name || undefined,
-        repo_id: target.repo_id || undefined,
-        api_token: target.api_token || undefined,
-        endpoint_url: target.endpoint_url || undefined,
-        headers: headers || undefined,
-        payload_template: target.payload_template || undefined,
-        chain_import_path: target.chain_import_path || undefined,
-        invoke_key: target.invoke_key || undefined,
-      },
-      test_inputs: inputs,
-      schedule,
-      alert_webhook: alertWebhook.trim() || null,
-    };
-
-    setCreating(true);
-    setActionMsg('');
-    setError('');
+    setCreating(true); setActionMsg(''); setError('');
     try {
-      await api.createMonitor(payload);
+      await api.createMonitor({
+        feature_name: featureName.trim(),
+        description: description.trim(),
+        target: {
+          type: target.type,
+          base_url: target.base_url || undefined,
+          api_key: target.api_key || undefined,
+          model_name: target.model_name || undefined,
+          repo_id: target.repo_id || undefined,
+          api_token: target.api_token || undefined,
+          endpoint_url: target.endpoint_url || undefined,
+          headers: headers || undefined,
+          chain_import_path: target.chain_import_path || undefined,
+          invoke_key: target.invoke_key || undefined,
+        },
+        test_inputs: inputs,
+        schedule,
+        alert_webhook: alertWebhook.trim() || null,
+      });
       setActionMsg('Monitor created. Capturing baseline...');
+      setShowModal(false);
       await loadMonitors();
     } catch (err) {
       setError(err.message || 'Failed to create monitor');
@@ -247,8 +101,7 @@ export default function MonitoringPage() {
   }
 
   async function runCheck(monitorId) {
-    setActionMsg('');
-    setError('');
+    setActionMsg(''); setError('');
     try {
       await api.runMonitorCheck(monitorId);
       setActionMsg('Regression check started.');
@@ -260,8 +113,7 @@ export default function MonitoringPage() {
   }
 
   const canCreate = useMemo(() => {
-    if (!featureName.trim() || !description.trim()) return false;
-    if (creating) return false;
+    if (!featureName.trim() || !description.trim() || creating) return false;
     if (target.type === 'openai') return !!target.base_url.trim() && !!target.model_name.trim();
     if (target.type === 'huggingface') return !!target.repo_id.trim();
     if (target.type === 'langchain') return !!target.chain_import_path.trim();
@@ -269,166 +121,175 @@ export default function MonitoringPage() {
     return false;
   }, [featureName, description, creating, target]);
 
+  if (loading) {
+    return (
+      <div className="page-container fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+        <Loader size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent)' }} />
+      </div>
+    );
+  }
+
   return (
-    <div className="page fade-in">
-      <div className="page-header">
-        <div className="page-eyebrow">// app — monitoring</div>
-        <div className="page-title">Continuous Monitoring</div>
-        <div className="page-desc">
-          Automatically re-tests your app every time you deploy.
+    <div className="page-container fade-in">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <div className="page-eyebrow">Monitoring</div>
+          <h1 className="page-title">Continuous Monitoring</h1>
+          <p className="page-subtitle">Automatically re-tests your app on every deploy or schedule.</p>
         </div>
-      </div>
-
-      {error && <div className="err-box">! {error}</div>}
-      {actionMsg && <div className="card" style={{ marginBottom: 16 }}>{actionMsg}</div>}
-
-      <div className="card">
-        <div className="card-label">Create monitor</div>
-        <div className="field">
-          <label className="label">Feature name</label>
-          <input
-            className="input"
-            placeholder="Checkout assistant"
-            value={featureName}
-            onChange={(e) => setFeatureName(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label className="label">Description</label>
-          <textarea
-            className="textarea"
-            rows={3}
-            placeholder="What this feature should do and how success looks."
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-        <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-          <div>
-            <label className="label">Schedule</label>
-            <select className="select" value={schedule} onChange={(e) => setSchedule(e.target.value)}>
-              <option value="daily">Daily</option>
-              <option value="hourly">Hourly</option>
-              <option value="on_deploy">On deploy</option>
-            </select>
-          </div>
-          <div>
-            <label className="label">Alert webhook (optional)</label>
-            <input
-              className="input"
-              placeholder="https://hooks.slack.com/services/..."
-              value={alertWebhook}
-              onChange={(e) => setAlertWebhook(e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="field" style={{ marginTop: 10 }}>
-          <label className="label">Test inputs (one per line)</label>
-          <textarea
-            className="textarea"
-            rows={4}
-            placeholder="What is your refund policy?"
-            value={testInputs}
-            onChange={(e) => setTestInputs(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="card-label">Target config</div>
-        <div className="field">
-          <label className="label">Target type</label>
-          <select
-            className="select"
-            value={target.type}
-            onChange={(e) => setTarget((prev) => ({ ...prev, type: e.target.value }))}
-          >
-            <option value="webhook">Webhook / REST API</option>
-            <option value="openai">OpenAI-compatible</option>
-            <option value="huggingface">HuggingFace</option>
-            <option value="langchain">LangChain</option>
-          </select>
-        </div>
-
-        {target.type === 'openai' && (
-          <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-            <div><label className="label">Base URL</label><input className="input" placeholder="https://api.openai.com/v1" value={target.base_url} onChange={(e) => setTarget((prev) => ({ ...prev, base_url: e.target.value }))} /></div>
-            <div><label className="label">API key</label><input className="input" placeholder="sk-..." value={target.api_key} onChange={(e) => setTarget((prev) => ({ ...prev, api_key: e.target.value }))} /></div>
-            <div><label className="label">Model name</label><input className="input" placeholder="gpt-4o-mini" value={target.model_name} onChange={(e) => setTarget((prev) => ({ ...prev, model_name: e.target.value }))} /></div>
-          </div>
-        )}
-
-        {target.type === 'huggingface' && (
-          <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            <div><label className="label">Repo ID</label><input className="input" placeholder="meta-llama/Llama-3-8B-Instruct" value={target.repo_id} onChange={(e) => setTarget((prev) => ({ ...prev, repo_id: e.target.value }))} /></div>
-            <div><label className="label">API token</label><input className="input" placeholder="hf_..." value={target.api_token} onChange={(e) => setTarget((prev) => ({ ...prev, api_token: e.target.value }))} /></div>
-          </div>
-        )}
-
-        {target.type === 'langchain' && (
-          <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            <div><label className="label">Chain import path</label><input className="input" placeholder="my_module.my_chain" value={target.chain_import_path} onChange={(e) => setTarget((prev) => ({ ...prev, chain_import_path: e.target.value }))} /></div>
-            <div><label className="label">Invoke key</label><input className="input" placeholder="question" value={target.invoke_key} onChange={(e) => setTarget((prev) => ({ ...prev, invoke_key: e.target.value }))} /></div>
-          </div>
-        )}
-
-        {target.type === 'webhook' && (
-          <div className="input-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            <div><label className="label">Endpoint URL</label><input className="input" placeholder="https://your-api.com/feature" value={target.endpoint_url} onChange={(e) => setTarget((prev) => ({ ...prev, endpoint_url: e.target.value }))} /></div>
-            <div><label className="label">Headers (JSON)</label><textarea className="textarea" rows={3} placeholder='{"Authorization": "Bearer ..."}' value={target.headers} onChange={(e) => setTarget((prev) => ({ ...prev, headers: e.target.value }))} /></div>
-          </div>
-        )}
-        <button type="button" className="btn btn-primary" style={{ marginTop: 12 }} onClick={createMonitor} disabled={!canCreate}>
-          {creating ? 'Creating...' : 'Create Monitor ->'}
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+          <Plus size={16} /> Create Monitor
         </button>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="card-label">Existing monitors</div>
-        {loading && <div style={{ color: 'var(--mid)' }}>Loading...</div>}
-        {!loading && monitors.length === 0 && (
-          <div style={{ color: 'var(--mid)' }}>No monitors yet.</div>
-        )}
-        {monitors.map((m) => {
-          let baseline = null;
-          if (m.baseline_json) {
-            try { baseline = JSON.parse(m.baseline_json); } catch { baseline = null; }
-          }
-          const changedSamples = Array.isArray(m.changed_samples) ? m.changed_samples : [];
-          return (
-            <div key={m.monitor_id} className="card" style={{ marginTop: 10, border: '1px solid var(--line2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
-                <div style={{ fontWeight: 600 }}>{m.feature_name}</div>
-                <div style={{ fontSize: 11, color: 'var(--mid)' }}>
-                  {STATUS_MSGS[m.last_status] || m.last_status || 'pending'}
+      {error && (
+        <div className="card" style={{
+          padding: '12px 16px', marginBottom: 16,
+          background: 'rgba(232, 89, 60, 0.08)', border: '1px solid rgba(232, 89, 60, 0.3)',
+          color: 'var(--coral)', fontSize: 13, borderRadius: 'var(--radius-md)',
+        }}>
+          ⚠ {error}
+        </div>
+      )}
+      {actionMsg && (
+        <div className="card" style={{ padding: '12px 16px', marginBottom: 16, fontSize: 13, color: 'var(--green)' }}>
+          ✓ {actionMsg}
+        </div>
+      )}
+
+      {/* Monitors list */}
+      {monitors.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '60px 24px' }}>
+          <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>📡</div>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+            No monitors yet
+          </h3>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
+            Create your first monitor to get continuous regression checks.
+          </p>
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={16} /> Create Monitor
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {monitors.map((m) => {
+            let baseline = null;
+            if (m.baseline_json) try { baseline = JSON.parse(m.baseline_json); } catch {}
+            const changedSamples = Array.isArray(m.changed_samples) ? m.changed_samples : [];
+            const statusKey = m.last_status || 'pending';
+
+            return (
+              <div key={m.monitor_id} className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16, color: 'var(--text-primary)' }}>
+                    {m.feature_name}
+                  </div>
+                  <AuditStatusBadge status={STATUS_MAP[statusKey] || 'degraded'} label={STATUS_LABELS[statusKey] || statusKey} />
+                </div>
+
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>{m.description}</p>
+
+                {baseline && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>
+                    Baseline: {baseline.captured_at || 'unknown'} · {baseline.samples?.length || 0} samples
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button className="btn btn-ghost" onClick={() => runCheck(m.monitor_id)} style={{ fontSize: 12 }}>
+                    Run Regression Check
+                  </button>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+                    ID: {m.monitor_id}
+                  </span>
+                </div>
+
+                {changedSamples.length > 0 && (
+                  <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+                    {changedSamples.map((sample, idx) => (
+                      <div key={idx} style={{ marginBottom: 8 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>{sample.change}</div>
+                        {sample.fix && <CopyButton text={sample.fix} label="Copy Regression Fix" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create modal */}
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560, maxHeight: '80vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
+                Create Monitor
+              </h3>
+              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: 14 }}>
+              <div>
+                <label className="form-label">Feature Name</label>
+                <input className="form-input" placeholder="Checkout assistant" value={featureName} onChange={(e) => setFeatureName(e.target.value)} />
+              </div>
+              <div>
+                <label className="form-label">Description</label>
+                <textarea className="form-textarea" rows={3} placeholder="What this feature should do..." value={description} onChange={(e) => setDescription(e.target.value)} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label className="form-label">Schedule</label>
+                  <select className="form-select" value={schedule} onChange={(e) => setSchedule(e.target.value)}>
+                    <option value="daily">Daily</option>
+                    <option value="hourly">Hourly</option>
+                    <option value="on_deploy">On deploy</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Alert Webhook</label>
+                  <input className="form-input" placeholder="https://hooks.slack.com/..." value={alertWebhook} onChange={(e) => setAlertWebhook(e.target.value)} />
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--mid)', marginBottom: 8 }}>{m.description}</div>
-              {baseline && (
-                <div style={{ fontSize: 11, color: 'var(--mid)', marginBottom: 8 }}>
-                  Baseline: {baseline.captured_at || 'unknown'} - Samples: {baseline.samples?.length || 0}
+              <div>
+                <label className="form-label">Target Type</label>
+                <select className="form-select" value={target.type} onChange={(e) => setTarget(p => ({ ...p, type: e.target.value }))}>
+                  <option value="webhook">Webhook / REST API</option>
+                  <option value="openai">OpenAI-compatible</option>
+                  <option value="huggingface">HuggingFace</option>
+                  <option value="langchain">LangChain</option>
+                </select>
+              </div>
+              {target.type === 'webhook' && (
+                <>
+                  <div><label className="form-label">Endpoint URL</label><input className="form-input" placeholder="https://your-api.com/feature" value={target.endpoint_url} onChange={(e) => setTarget(p => ({ ...p, endpoint_url: e.target.value }))} /></div>
+                  <div><label className="form-label">Headers (JSON)</label><textarea className="form-textarea" rows={2} placeholder='{"Authorization": "Bearer ..."}' value={target.headers} onChange={(e) => setTarget(p => ({ ...p, headers: e.target.value }))} /></div>
+                </>
+              )}
+              {target.type === 'openai' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div><label className="form-label">Base URL</label><input className="form-input" placeholder="https://api.openai.com/v1" value={target.base_url} onChange={(e) => setTarget(p => ({ ...p, base_url: e.target.value }))} /></div>
+                  <div><label className="form-label">Model</label><input className="form-input" placeholder="gpt-4o-mini" value={target.model_name} onChange={(e) => setTarget(p => ({ ...p, model_name: e.target.value }))} /></div>
                 </div>
               )}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn-ghost" onClick={() => runCheck(m.monitor_id)}>
-                  Run Regression Check
-                </button>
-                <div style={{ fontSize: 11, color: 'var(--mid)' }}>Monitor ID: {m.monitor_id}</div>
+              <div>
+                <label className="form-label">Test Inputs (one per line, min 3)</label>
+                <textarea className="form-textarea" rows={4} placeholder="What is your refund policy?" value={testInputs} onChange={(e) => setTestInputs(e.target.value)} />
               </div>
-              {changedSamples.map((sample, idx) => (
-                <div key={idx} style={{ marginTop: 8, fontSize: 12, color: 'var(--mid)' }}>
-                  <div style={{ marginBottom: 6 }}>{sample.change}</div>
-                  {typeof sample.confidence === 'number' && (
-                    <ConfidenceBar score={sample.confidence} subject="this feature" />
-                  )}
-                  <CopyButton text={sample.fix} label="Copy Regression Fix" />
-                </div>
-              ))}
             </div>
-          );
-        })}
-      </div>
->>>>>>> 952b221998466c82308faa3bf4986c92c664747d
+
+            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 16 }} onClick={createMonitor} disabled={!canCreate}>
+              {creating ? 'Creating...' : 'Create Monitor'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

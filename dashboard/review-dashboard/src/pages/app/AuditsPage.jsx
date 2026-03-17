@@ -1,26 +1,41 @@
-<<<<<<< HEAD
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, ArrowRight, Zap, Filter } from 'lucide-react';
+import { Search, ArrowRight, Zap, Filter, Loader } from 'lucide-react';
+import { apiFetch } from '../../App.jsx';
 import ScoreRing from '../../components/ScoreRing.jsx';
-
-const MOCK_AUDITS = [
-  { id: '1', url: 'myapp.vercel.app', tier: 'vibe', score: 83, date: 'Mar 18, 2026', findings: 3 },
-  { id: '2', url: 'shop.example.com', tier: 'deep', score: 67, date: 'Mar 17, 2026', findings: 6 },
-  { id: '3', url: 'dashboard.io', tier: 'fix', score: 91, date: 'Mar 15, 2026', findings: 1 },
-  { id: '4', url: 'landing-page.dev', tier: 'vibe', score: 45, date: 'Mar 14, 2026', findings: 8 },
-  { id: '5', url: 'api-docs.example.com', tier: 'deep', score: 78, date: 'Mar 12, 2026', findings: 4 },
-];
 
 const TIER_LABELS = { vibe: 'Vibe', deep: 'Deep', fix: 'Fix' };
 const TIER_COLORS = { vibe: 'badge-blue', deep: 'badge-amber', fix: 'badge-green' };
 
 export default function AuditsPage() {
+  const [audits, setAudits] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filtered = MOCK_AUDITS.filter((a) =>
-    a.url.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await apiFetch('/agentic-qa/history');
+        setAudits(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Failed to load audits:', err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const filtered = audits.filter((a) =>
+    (a.url || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="page-container fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+        <Loader size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent)' }} />
+      </div>
+    );
+  }
 
   return (
     <div className="page-container fade-in">
@@ -31,12 +46,8 @@ export default function AuditsPage() {
       </div>
 
       {/* Search */}
-      <div style={{
-        display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap',
-      }}>
-        <div style={{
-          flex: 1, minWidth: 200, position: 'relative',
-        }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
           <Search size={16} style={{
             position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
             color: 'var(--text-dim)',
@@ -45,9 +56,6 @@ export default function AuditsPage() {
             value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
             style={{ paddingLeft: 36 }} />
         </div>
-        <button className="btn btn-ghost">
-          <Filter size={14} /> Filters
-        </button>
       </div>
 
       {/* Table */}
@@ -65,48 +73,51 @@ export default function AuditsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((audit) => (
-                <tr key={audit.id} style={{ cursor: 'pointer' }}>
-                  <td>
-                    <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 13,
-                      color: 'var(--text-primary)',
-                      maxWidth: 200, display: 'inline-block',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }} title={audit.url}>
-                      {audit.url}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`badge ${TIER_COLORS[audit.tier]}`}>
-                      {TIER_LABELS[audit.tier]}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <ScoreRing score={audit.score} size={28} strokeWidth={3} showScore={false} />
+              {filtered.map((audit) => {
+                const score = audit.score ?? 0;
+                const tier = audit.tier || 'vibe';
+                const findingsCount = audit.findings_count ?? (audit.findings ? audit.findings.length : 0);
+                const id = audit.audit_id || audit.report_id;
+                return (
+                  <tr key={id} style={{ cursor: 'pointer' }}>
+                    <td>
                       <span style={{
                         fontFamily: 'var(--font-mono)', fontSize: 13,
-                        color: audit.score >= 80 ? 'var(--green)' : audit.score >= 50 ? 'var(--amber)' : 'var(--red)',
-                      }}>
-                        {audit.score}
+                        color: 'var(--text-primary)',
+                        maxWidth: 200, display: 'inline-block',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }} title={audit.url}>
+                        {audit.url || 'Unknown'}
                       </span>
-                    </div>
-                  </td>
-                  <td>{audit.date}</td>
-                  <td>{audit.findings}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <Link to={`/app/audits/${audit.id}`} className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }}>
+                    </td>
+                    <td>
+                      <span className={`badge ${TIER_COLORS[tier] || 'badge-blue'}`}>
+                        {TIER_LABELS[tier] || tier}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <ScoreRing score={score} size={28} strokeWidth={3} showScore={false} />
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 13,
+                          color: score >= 80 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)',
+                        }}>
+                          {score}
+                        </span>
+                      </div>
+                    </td>
+                    <td style={{ fontSize: 12 }}>
+                      {audit.created_at ? new Date(audit.created_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td>{findingsCount}</td>
+                    <td>
+                      <Link to={`/app/audits/${id}`} className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }}>
                         View
                       </Link>
-                      <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }}>
-                        Re-run
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -128,13 +139,4 @@ export default function AuditsPage() {
       )}
     </div>
   );
-=======
-import { useNavigate } from 'react-router-dom';
-import { HistoryPage as AuditsHistoryPage } from '../../App.jsx';
-
-export default function AuditsPage() {
-  const navigate = useNavigate();
-
-  return <AuditsHistoryPage onLoadReport={(row) => navigate(`/app/audits/${row.report_id}`)} />;
->>>>>>> 952b221998466c82308faa3bf4986c92c664747d
 }
