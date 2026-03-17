@@ -102,7 +102,7 @@ export default function PublicWebAuditPage() {
           </div>
         </div>
         <a className="btn btn-primary" href="/auth/signup">
-          Get your free AI site audit ->
+          Get your free AI site audit &rarr;
         </a>
       </div>
     </div>

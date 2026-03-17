@@ -6,17 +6,8 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 const NAV_ITEMS = [
   { to: '/app/vibe-check', label: 'Vibe Check', icon: '🚀' },
-  { to: '/app/dashboard', label: 'Dashboard', icon: '◆' },
-  { to: '/app/targets', label: 'Targets', icon: '◈' },
-  { to: '/app/runs', label: 'Runs', icon: '◷' },
-  { to: '/app/audit-history', label: 'Audit History', icon: '+' },
-  { to: '/app/audit', label: 'Audit Report', icon: '📋' },
-  { to: '/app/hitl', label: 'HITL Review', icon: '✎' },
-  { to: '/app/playground', label: 'Playground', icon: '⚡' },
-  { to: '/app/agentic', label: 'Agentic', icon: '*' },
-  { to: '/app/compare', label: 'Compare', icon: '⇌' },
-  { to: '/app/api-keys', label: 'API Keys', icon: '⌘' },
-  { to: '/app/config-builder', label: 'Config Builder', icon: '⚙' },
+  { to: '/app/web-audit', label: 'Deep Dive', icon: '🔍' },
+  { to: '/app/agent-audit', label: 'Fix & Verify', icon: '🔧' },
   { to: '/app/settings', label: 'Settings', icon: '⚙' },
 ];
 
@@ -49,7 +40,7 @@ function AppLayoutFrame() {
               <div className="logo-dot" />
               AI BREAKER LABS
             </div>
-            <div className="logo-sub">AI model stress-tester</div>
+            <div className="logo-sub">Reliability layer for AI-built apps</div>
           </div>
 
           <nav className="nav">

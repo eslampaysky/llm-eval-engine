@@ -1,309 +1,273 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { apiFetch } from '../../App.jsx';
-
-const PLANS = [
+const TIERS = [
   {
-    key: 'free',
-    name: 'Free',
+    key: 'vibe',
+    name: 'Vibe Check',
     price: '$0',
-    period: '/month',
-    desc: 'For solo builders shipping AI-built web apps.',
-    current: true,
+    period: 'Free forever',
+    desc: 'For solo builders who want a quick sanity check.',
+    highlight: false,
     features: [
-      '3 web audits / month',
-      '20 tests per run',
-      'Video replays',
-      'AI fix prompts',
+      'Desktop + mobile screenshots',
+      'Top 3 bugs by severity',
+      'Fix prompts you can paste',
+      '3 audits per month',
       'Community support',
     ],
-    cta: 'Get Started',
+    cta: 'Get Started Free',
     ctaTo: '/auth/signup',
-    highlight: false,
   },
   {
-    key: 'pro',
-    name: 'Pro',
-    price: '$99',
+    key: 'deep',
+    name: 'Deep Dive',
+    price: '$29',
     period: '/month',
-    desc: 'For teams shipping AI-powered web apps.',
-    current: false,
-    features: [
-      '200 web audits / month',
-      '75 tests per run',
-      'PR comment bot',
-      'Team sharing + share links',
-      'Audit exports',
-      'Priority support',
-    ],
-    cta: 'Upgrade to Pro',
-    ctaTo: '/auth/signup',
+    desc: 'For teams that need full visibility before launch.',
     highlight: true,
+    badge: 'MOST POPULAR',
+    features: [
+      'Everything in Vibe Check',
+      'Full Playwright crawl',
+      'User journey testing',
+      'Video replay of every session',
+      'All findings (not just top 3)',
+      '50 audits per month',
+      'Share links for stakeholders',
+    ],
+    cta: 'Start 7-Day Free Trial',
+    ctaTo: '/auth/signup',
   },
   {
-    key: 'enterprise',
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    desc: 'For orgs with compliance, security, and scale.',
-    current: false,
-    features: [
-      'Unlimited audits',
-      'Custom test suites',
-      'SSO / SAML',
-      'Audit logs + exports',
-      'Dedicated support',
-      'SLA guarantee',
-    ],
-    cta: 'Contact Sales',
-    ctaTo: '',
+    key: 'fix',
+    name: 'Fix & Verify',
+    price: '$99',
+    period: '/month or $1/resolution',
+    desc: 'For teams that want bugs fixed, not just found.',
     highlight: false,
+    features: [
+      'Everything in Deep Dive',
+      'AI code-level analysis',
+      'Bundled fix prompt (all issues)',
+      'Re-verification after fix',
+      'Unlimited audits',
+      'Priority support',
+      'API access',
+    ],
+    cta: 'Start Free Trial',
+    ctaTo: '/auth/signup',
+  },
+];
+
+const FAQ = [
+  {
+    q: 'How does AiBreaker find bugs?',
+    a: 'We launch a real Chromium browser via Playwright, crawl your app like a user would, capture desktop and mobile screenshots, log console errors and failed network requests, then send everything to Gemini AI for visual bug detection. The whole process takes 30–90 seconds.',
+  },
+  {
+    q: 'Do I need to give you access to my codebase?',
+    a: 'No. AiBreaker only needs a publicly accessible URL. We test from the outside, exactly like your users do. No code access, no SDKs, no integration required.',
+  },
+  {
+    q: 'What does a "fix prompt" look like?',
+    a: 'It\'s a plain-English instruction you can paste directly into Lovable, Bolt.new, Replit Agent, or Cursor. For example: "The sign-up button on mobile (390px viewport) is hidden behind the footer. Move the CTA above the fold and add 16px bottom margin."',
+  },
+  {
+    q: 'Can I test apps behind a login?',
+    a: 'Not yet in the self-serve product. The Deep Dive and Fix & Verify tiers support user journey steps (click, fill, submit) that can navigate through login flows. Contact us for early access to authenticated testing.',
+  },
+  {
+    q: 'What\'s the refund policy?',
+    a: 'If AiBreaker doesn\'t find a single real bug in your app, we\'ll refund your first month — no questions asked. We\'re confident because 67% of AI-built apps have issues we catch.',
   },
 ];
 
 export default function PricingPage() {
-  const [planLoading, setPlanLoading] = useState({});
-  const [planError, setPlanError] = useState({});
-  const [contactOpen, setContactOpen] = useState(false);
-  const [contactSubmitting, setContactSubmitting] = useState(false);
-  const [contactSuccess, setContactSuccess] = useState(false);
-  const [contactError, setContactError] = useState('');
-  const [contactForm, setContactForm] = useState({ name: '', email: '', company: '', use_case: '' });
-
-  async function startPlanCheckout(planKey) {
-    if (planLoading[planKey]) return;
-    setPlanLoading((prev) => ({ ...prev, [planKey]: true }));
-    setPlanError((prev) => ({ ...prev, [planKey]: '' }));
-    try {
-      const data = await apiFetch('/billing/checkout', {
-        method: 'POST',
-        body: JSON.stringify({ plan: planKey }),
-      });
-      if (!data?.checkout_url) throw new Error('Missing checkout URL');
-      window.location.href = data.checkout_url;
-    } catch (e) {
-      setPlanError((prev) => ({ ...prev, [planKey]: e?.message || 'Failed to start checkout' }));
-    } finally {
-      setPlanLoading((prev) => ({ ...prev, [planKey]: false }));
-    }
-  }
-
-  async function submitContactSales(e) {
-    e.preventDefault();
-    if (contactSubmitting) return;
-    setContactSubmitting(true);
-    setContactError('');
-    try {
-      const res = await fetch(`${API_BASE}/contact-sales`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(contactForm),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.detail || `Request failed (${res.status})`);
-      setContactSuccess(true);
-    } catch (err) {
-      setContactError(err?.message || 'Failed to submit.');
-    } finally {
-      setContactSubmitting(false);
-    }
-  }
+  const [openFaq, setOpenFaq] = useState(null);
 
   return (
-    <section className="page fade-in" style={{ maxWidth: 980, margin: '0 auto' }}>
-      <div className="page-header">
-        <div className="page-eyebrow">// public · pricing</div>
-        <div className="page-title">Simple, transparent pricing</div>
-        <div className="page-desc">Start free. Upgrade when you need more runs, longer test suites, or team features.</div>
+    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '56px 20px 80px' }}>
+
+      {/* ═══ Header ═══ */}
+      <div style={{ textAlign: 'center', marginBottom: 44 }}>
+        <div style={{
+          fontFamily: "'JetBrains Mono', monospace", fontSize: '.72rem', color: '#3bb4ff',
+          letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 10,
+        }}>
+          // pricing
+        </div>
+        <h1 style={{
+          fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 800, margin: '0 0 14px',
+          lineHeight: 1.1,
+        }}>
+          Simple pricing. No surprises.
+        </h1>
+        <p style={{ color: '#8ea8c7', fontSize: '1rem', margin: 0, maxWidth: 500, marginInline: 'auto' }}>
+          Start free. Upgrade when you need deeper analysis, video replay, or code-level fix prompts.
+        </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
-        {PLANS.map((plan) => (
-          <div
-            key={plan.key}
-            className="card"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
-              border: plan.highlight ? '1px solid var(--accent, #3bb4ff)' : undefined,
-              position: 'relative',
-            }}
-          >
-            {plan.highlight && (
+      {/* ═══ Pricing Cards ═══ */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: 18, marginBottom: 56,
+      }}>
+        {TIERS.map((t) => (
+          <div key={t.key} style={{
+            background: 'linear-gradient(165deg, var(--panel), var(--panel-2))',
+            border: t.highlight ? '1px solid rgba(59,180,255,.5)' : '1px solid var(--line)',
+            borderRadius: 16, padding: '32px 24px',
+            display: 'flex', flexDirection: 'column', gap: 18,
+            position: 'relative', overflow: 'hidden',
+            boxShadow: t.highlight ? '0 0 2rem rgba(59,180,255,.08)' : 'none',
+          }}>
+            {/* Badge */}
+            {t.badge && (
               <div style={{
-                position: 'absolute', top: -1, left: '50%', transform: 'translateX(-50%)',
-                background: 'var(--accent, #3bb4ff)', color: '#000',
-                fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-                padding: '3px 12px', borderRadius: '0 0 6px 6px',
+                position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+                background: 'linear-gradient(120deg, var(--accent), var(--accent2))',
+                color: '#020810', fontSize: '.66rem', fontWeight: 800,
+                letterSpacing: '.08em', padding: '4px 16px',
+                borderRadius: '0 0 8px 8px',
+                fontFamily: "'JetBrains Mono', monospace",
               }}>
-                MOST POPULAR
+                {t.badge}
               </div>
             )}
 
+            {/* Plan info */}
             <div>
-              <div className="card-label">{plan.name}</div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, margin: '8px 0 4px' }}>
-                <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--hi)' }}>{plan.price}</span>
-                <span style={{ fontSize: 13, color: 'var(--mid)' }}>{plan.period}</span>
+              <h3 style={{ margin: '0 0 4px', fontSize: '1.15rem', fontWeight: 700 }}>{t.name}</h3>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, margin: '10px 0 6px' }}>
+                <span style={{
+                  fontSize: '2.4rem', fontWeight: 800,
+                  background: 'linear-gradient(135deg, var(--text), var(--accent))',
+                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                }}>{t.price}</span>
+                <span style={{
+                  fontSize: '.82rem', color: '#8ea8c7',
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}>{t.period}</span>
               </div>
-              <div style={{ fontSize: 13, color: 'var(--mid)' }}>{plan.desc}</div>
+              <p style={{ margin: 0, fontSize: '.85rem', color: '#8ea8c7' }}>{t.desc}</p>
             </div>
 
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {plan.features.map((f) => (
-                <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--mid)' }}>
-                  <span style={{ color: 'var(--accent, #3bb4ff)', flexShrink: 0 }}>✓</span>
+            {/* Features */}
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {t.features.map((f) => (
+                <li key={f} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                  fontSize: '.85rem', color: '#8ea8c7',
+                }}>
+                  <span style={{ color: '#26f0b9', flexShrink: 0, marginTop: 1 }}>✓</span>
                   {f}
                 </li>
               ))}
             </ul>
 
-            {plan.key === 'pro' ? (
-              <button
-                type="button"
-                className={`btn ${plan.highlight ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => startPlanCheckout(plan.key)}
-                disabled={!!planLoading[plan.key]}
-                style={{ marginTop: 'auto', textAlign: 'center' }}
-              >
-                {planLoading[plan.key] ? 'Redirecting to checkout...' : plan.cta}
-              </button>
-            ) : plan.key === 'enterprise' ? (
-              <button
-                type="button"
-                className={`btn ${plan.highlight ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => {
-                  setContactOpen(true);
-                  setContactSuccess(false);
-                  setContactError('');
-                }}
-                style={{ marginTop: 'auto', textAlign: 'center' }}
-              >
-                {plan.cta}
-              </button>
-            ) : (
-              <Link
-                className={`btn ${plan.highlight ? 'btn-primary' : 'btn-ghost'}`}
-                to={plan.ctaTo}
-                style={{ marginTop: 'auto', textAlign: 'center' }}
-              >
-                {plan.cta}
-              </Link>
-            )}
-            {plan.key === 'pro' && planError[plan.key] && (
-              <div style={{ marginTop: 8, fontSize: 12, color: '#ff7b91' }}>
-                {planError[plan.key]}
-              </div>
-            )}
+            {/* CTA */}
+            <Link to={t.ctaTo} style={{
+              display: 'block', textAlign: 'center', textDecoration: 'none',
+              marginTop: 'auto', borderRadius: 12, padding: '13px 20px',
+              fontWeight: 700, fontSize: '.85rem',
+              fontFamily: "'JetBrains Mono', monospace",
+              transition: 'transform .15s, box-shadow .2s',
+              ...(t.highlight
+                ? {
+                    background: 'linear-gradient(120deg, var(--accent), var(--accent2))',
+                    color: '#020810',
+                    boxShadow: 'var(--glow-blue), var(--glow-green)',
+                  }
+                : {
+                    background: 'transparent',
+                    border: '1px solid #25537a',
+                    color: '#9fd5ff',
+                  }),
+            }}
+            onMouseEnter={(e) => { e.target.style.transform = 'scale(1.03)'; }}
+            onMouseLeave={(e) => { e.target.style.transform = 'scale(1)'; }}
+            >
+              {t.cta}
+            </Link>
           </div>
         ))}
       </div>
 
-      {contactOpen && (
-        <div
-          className="card"
-          style={{
-            marginTop: 16,
-            minHeight: 400,
-            padding: 18,
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid var(--line)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
-            <div>
-              <div className="card-label">Contact Sales</div>
-              <div style={{ fontSize: 13, color: 'var(--mid)' }}>Tell us what you’re building and we’ll follow up.</div>
-            </div>
-            <button type="button" className="btn btn-ghost" onClick={() => setContactOpen(false)} style={{ whiteSpace: 'nowrap' }}>
-              Close
-            </button>
-          </div>
+      {/* ═══ FAQ ═══ */}
+      <div style={{ maxWidth: 680, margin: '0 auto' }}>
+        <div style={{
+          fontFamily: "'JetBrains Mono', monospace", fontSize: '.72rem', color: '#26f0b9',
+          letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 10, textAlign: 'center',
+        }}>
+          FAQ
+        </div>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 28px', textAlign: 'center' }}>
+          Frequently asked questions
+        </h2>
 
-          {contactSuccess ? (
-            <div style={{ padding: '14px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r)', background: 'var(--bg2)' }}>
-              <div style={{ fontWeight: 800, color: 'var(--hi)', marginBottom: 6 }}>Received</div>
-              <div style={{ fontSize: 13, color: 'var(--mid)' }}>We'll reach out within 1 business day.</div>
-            </div>
-          ) : (
-            <form onSubmit={submitContactSales} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginTop: 10 }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Name</span>
-                <input
-                  value={contactForm.name}
-                  onChange={(e) => setContactForm((s) => ({ ...s, name: e.target.value }))}
-                  required
-                  style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)', color: 'var(--hi)' }}
-                />
-              </label>
-
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Work email</span>
-                <input
-                  type="email"
-                  value={contactForm.email}
-                  onChange={(e) => setContactForm((s) => ({ ...s, email: e.target.value }))}
-                  required
-                  style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)', color: 'var(--hi)' }}
-                />
-              </label>
-
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Company</span>
-                <input
-                  value={contactForm.company}
-                  onChange={(e) => setContactForm((s) => ({ ...s, company: e.target.value }))}
-                  required
-                  style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)', color: 'var(--hi)' }}
-                />
-              </label>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Plan</span>
-                <div style={{ fontSize: 13, color: 'var(--hi)', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)' }}>
-                  Enterprise
-                </div>
-              </div>
-
-              <label style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--mid)' }}>Tell us about your use case</span>
-                <textarea
-                  value={contactForm.use_case}
-                  onChange={(e) => setContactForm((s) => ({ ...s, use_case: e.target.value }))}
-                  required
-                  rows={6}
-                  style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg2)', color: 'var(--hi)', resize: 'vertical' }}
-                />
-              </label>
-
-              {contactError && (
-                <div style={{ gridColumn: '1 / -1', fontSize: 13, color: '#ff7b91' }}>
-                  {contactError}
+        <div style={{ display: 'grid', gap: 8 }}>
+          {FAQ.map((item, i) => (
+            <div key={i} style={{
+              background: 'linear-gradient(165deg, var(--panel), var(--panel-2))',
+              border: '1px solid var(--line)', borderRadius: 12,
+              overflow: 'hidden', transition: 'border-color .2s',
+              borderColor: openFaq === i ? 'rgba(59,180,255,.35)' : undefined,
+            }}>
+              <button onClick={() => setOpenFaq(openFaq === i ? null : i)} style={{
+                width: '100%', padding: '16px 18px',
+                background: 'none', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                color: 'var(--text)', fontSize: '.92rem', fontWeight: 600, textAlign: 'left',
+                fontFamily: 'inherit',
+              }}>
+                {item.q}
+                <span style={{
+                  color: '#8ea8c7', transition: 'transform .2s',
+                  transform: openFaq === i ? 'rotate(180deg)' : 'rotate(0)',
+                }}>▼</span>
+              </button>
+              {openFaq === i && (
+                <div style={{
+                  padding: '0 18px 16px', fontSize: '.88rem',
+                  color: '#8ea8c7', lineHeight: 1.6,
+                }}>
+                  {item.a}
                 </div>
               )}
-
-              <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setContactOpen(false)} disabled={contactSubmitting}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={contactSubmitting}>
-                  {contactSubmitting ? 'Sending…' : 'Send'}
-                </button>
-              </div>
-            </form>
-          )}
+            </div>
+          ))}
         </div>
-      )}
-
-      <div style={{ marginTop: 32, padding: '20px 24px', border: '1px solid var(--line)', borderRadius: 'var(--r)', background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div style={{ fontWeight: 700, color: 'var(--hi)', marginBottom: 4 }}>Not sure which plan fits?</div>
-          <div style={{ fontSize: 13, color: 'var(--mid)' }}>Try the live demo — no account needed.</div>
-        </div>
-        <Link className="btn btn-ghost" to="/demo">Try Live Demo →</Link>
       </div>
-    </section>
+
+      {/* ═══ Bottom CTA ═══ */}
+      <div style={{
+        marginTop: 48, padding: '28px 24px', textAlign: 'center',
+        background: 'linear-gradient(165deg, var(--panel), var(--panel-2))',
+        border: '1px solid var(--line)', borderRadius: 14,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexWrap: 'wrap', gap: 16,
+      }}>
+        <div>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Not sure which tier fits?</div>
+          <div style={{ fontSize: '.85rem', color: '#8ea8c7' }}>Start with a free Vibe Check — upgrade anytime.</div>
+        </div>
+        <Link to="/auth/signup" style={{
+          textDecoration: 'none',
+          background: 'linear-gradient(120deg, var(--accent), var(--accent2))',
+          color: '#020810', borderRadius: 10, padding: '12px 28px',
+          fontWeight: 700, fontSize: '.85rem',
+          fontFamily: "'JetBrains Mono', monospace",
+          boxShadow: 'var(--glow-blue)',
+          transition: 'transform .15s',
+        }}
+        onMouseEnter={(e) => { e.target.style.transform = 'scale(1.03)'; }}
+        onMouseLeave={(e) => { e.target.style.transform = 'scale(1)'; }}
+        >
+          Start Free →
+        </Link>
+      </div>
+    </div>
   );
 }
