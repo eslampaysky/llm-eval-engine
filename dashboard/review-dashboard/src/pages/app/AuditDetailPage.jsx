@@ -205,11 +205,46 @@ export default function AuditDetailPage() {
       )}
 
       {/* Bundled fix prompt */}
-      {report.bundled_fix_prompt && (
+      {report.bundled_fix_prompt && findings.length === 0 ? (
+        <div className="slide-up" style={{ marginBottom: 32 }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(59, 180, 255, 0.08), rgba(52, 211, 153, 0.05))',
+            border: '2px solid rgba(59, 180, 255, 0.2)',
+            borderRadius: 'var(--radius-lg)',
+            padding: 24,
+            marginBottom: 16,
+          }}>
+            <div className="card-label" style={{ color: 'var(--accent)', marginBottom: 16 }}>AI-Generated Fix Plan</div>
+            <pre style={{
+              fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)',
+              lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: 20,
+              background: 'var(--bg-deepest)', padding: 16, borderRadius: 'var(--radius-md)'
+            }}>
+              {report.bundled_fix_prompt}
+            </pre>
+            <CopyButton text={report.bundled_fix_prompt} label="Copy AI Fix Plan" size="lg" />
+          </div>
+          
+          <div style={{
+            background: 'rgba(52, 211, 153, 0.1)',
+            border: '1px solid rgba(52, 211, 153, 0.3)',
+            borderRadius: 'var(--radius-md)',
+            padding: '16px 20px',
+            color: 'var(--green)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            fontWeight: 500
+          }}>
+            <Check size={20} />
+            No critical bugs detected — but here are AI-recommended improvements to make your app more robust
+          </div>
+        </div>
+      ) : report.bundled_fix_prompt ? (
         <div style={{ marginBottom: 24 }}>
           <CopyButton text={report.bundled_fix_prompt} label="Copy All Fix Prompts" size="lg" />
         </div>
-      )}
+      ) : null}
 
       {/* Findings */}
       {findings.length > 0 && (

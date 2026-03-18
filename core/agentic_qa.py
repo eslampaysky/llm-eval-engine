@@ -339,6 +339,14 @@ def run_agentic_qa(
         code_fix = _run_code_analysis(findings, crawl)
         if code_fix:
             bundled = code_fix  # Replace basic bundle with enhanced HTML-aware version
+            if not findings:
+                findings.append(Finding(
+                    severity="info",
+                    category="code",
+                    title="AI Code Analysis Complete",
+                    description="Groq analyzed your page HTML and generated improvement recommendations. See the fix plan below.",
+                    fix_prompt=""
+                ))
 
     _progress(total_steps, total_steps, "Done!")
 
