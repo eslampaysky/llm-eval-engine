@@ -1,0 +1,18 @@
+{
+  "include": ["api", "core", "src", "tests", "evaluators", "validators", "reports", "scripts"],
+  "exclude": ["**/node_modules", "**/__pycache__", "dashboard", "data", "_incoming"],
+  "extraPaths": ["."],
+  "pythonVersion": "3.13",
+  "pythonPlatform": "Windows",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingModuleSource": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportGeneralTypeIssues": "none",
+  "reportOptionalSubscript": "none",
+  "reportOptionalCall": "none",
+  "reportOptionalIterable": "none",
+  "reportOptionalOperand": "none",
+  "reportUnnecessaryTypeIgnoreComment": "none",
+  "reportUnusedImport": "warning"
+}
