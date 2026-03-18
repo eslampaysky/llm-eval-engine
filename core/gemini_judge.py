@@ -227,6 +227,7 @@ def _try_groq_vision(prompt_text: str, desktop_b64: str | None) -> dict | None:
         client = OpenAI(
             base_url="https://api.groq.com/openai/v1",
             api_key=groq_key,
+            timeout=120.0,
         )
 
         messages_content: list[dict] = [{"type": "text", "text": prompt_text}]
