@@ -7,6 +7,7 @@ import LoadingSteps from '../../components/LoadingSteps.jsx';
 import ScoreRing from '../../components/ScoreRing.jsx';
 import FindingCard from '../../components/FindingCard.jsx';
 import CopyButton from '../../components/CopyButton.jsx';
+import { api } from '../../services/api';
 
 const AUDIT_STEPS = [
   { label: 'Launching browser...' },
