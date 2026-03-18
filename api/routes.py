@@ -94,6 +94,7 @@ from api.database import (
     finalize_agentic_qa_success,
     finalize_agentic_qa_failure,
     get_agentic_qa_row,
+    get_user_gemini_key,
 )
 from api.job_queue import enqueue_job
 from api.models import (
@@ -3258,6 +3259,7 @@ async def start_agentic_qa(
     request: Request,
     payload: AgenticQAStartRequest,
     auth_ctx: dict[str, Any] = Depends(validate_api_key),
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
 ) -> dict:
     """Start an agentic QA audit. Poll GET /agentic-qa/status/{id}."""
     audit_id = str(uuid.uuid4())
@@ -3270,6 +3272,18 @@ async def start_agentic_qa(
         tier=payload.tier,
         status="queued",
     )
+
+    # Try to extract user's Gemini API key from Bearer token (if logged in)
+    user_api_key = None
+    if credentials:
+        try:
+            token_payload = decode_access_token(credentials.credentials)
+            user_id = token_payload.get("sub")
+            if user_id:
+                user_api_key = get_user_gemini_key(user_id)
+        except Exception:
+            pass  # No user key available — will use shared pool
+
     await enqueue_job(
         _run_agentic_qa_job,
         audit_id,
@@ -3277,6 +3291,7 @@ async def start_agentic_qa(
         payload.tier,
         payload.journeys,
         auth_ctx.get("client_name"),
+        user_api_key,
         job_id=audit_id,
     )
     return {
@@ -3305,6 +3320,9 @@ def get_agentic_qa_status(
         except json.JSONDecodeError:
             findings = None
 
+    # Detect analysis limitation from the stored result
+    analysis_limited = row.get("confidence") is None and row.get("status") == "done"
+
     return {
         "audit_id": audit_id,
         "status": row.get("status"),
@@ -3315,6 +3333,7 @@ def get_agentic_qa_status(
         "findings": findings,
         "summary": row.get("summary"),
         "bundled_fix_prompt": row.get("bundled_fix"),
+        "analysis_limited": analysis_limited,
         "video_url": f"/agentic-qa/{audit_id}/video" if row.get("video_path") else None,
         "desktop_screenshot_url": f"/agentic-qa/{audit_id}/screenshot/desktop" if row.get("desktop_ss_b64") else None,
         "mobile_screenshot_url": f"/agentic-qa/{audit_id}/screenshot/mobile" if row.get("mobile_ss_b64") else None,
@@ -3322,7 +3341,7 @@ def get_agentic_qa_status(
     }
 
 
-def _run_agentic_qa_job(audit_id, url, tier, journeys, client_name):
+def _run_agentic_qa_job(audit_id, url, tier, journeys, client_name, user_api_key=None):
     """Background job: run the agentic QA orchestrator."""
     from core.agentic_qa import run_agentic_qa, result_to_dict
     from dataclasses import asdict
@@ -3338,6 +3357,7 @@ def _run_agentic_qa_job(audit_id, url, tier, journeys, client_name):
             tier=tier,
             journeys=journeys,
             on_progress=_on_progress,
+            user_api_key=user_api_key,
         )
 
         findings_dicts = [

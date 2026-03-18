@@ -40,8 +40,8 @@ class Finding:
 class AgenticQAResult:
     url: str
     tier: str
-    score: int              # 0-100
-    confidence: int         # 0-100
+    score: int | None           # 0-100, None when no AI analysis available
+    confidence: int | None      # 0-100, None when using fallback only
     findings: list[Finding] = field(default_factory=list)
     summary: str = ""
     bundled_fix_prompt: str | None = None
@@ -50,6 +50,8 @@ class AgenticQAResult:
     mobile_screenshot_b64: str | None = None
     journey_results: list[dict] | None = None
     error: str | None = None
+    analysis_limited: bool = False      # True when AI analysis was unavailable
+    user_key_exhausted: bool = False     # True when user's own API key hit quota
 
 
 # ── Score computation ─────────────────────────────────────────────────────────
@@ -173,6 +175,7 @@ def run_agentic_qa(
     journeys: list[dict] | None = None,
     *,
     on_progress: callable | None = None,
+    user_api_key: str | None = None,
 ) -> AgenticQAResult:
     """
     Run an agentic QA audit against a URL.
@@ -182,6 +185,7 @@ def run_agentic_qa(
         tier: "vibe", "deep", or "fix".
         journeys: Optional list of user journey steps (for deep/fix tiers).
         on_progress: Optional callback(step, total, message) for progress updates.
+        user_api_key: Optional per-user Gemini API key.
 
     Returns:
         AgenticQAResult with score, findings, screenshots, etc.
@@ -220,8 +224,8 @@ def run_agentic_qa(
             tier=tier,
             score=0,
             confidence=0,
-            summary=f"Could not load the site: {str(exc)[:200]}",
-            error=str(exc)[:500],
+            summary="Could not load the site. Please check the URL and try again.",
+            error="Site could not be loaded",
         )
 
     if crawl.get("error") and not crawl.get("desktop_screenshot_b64"):
@@ -230,23 +234,29 @@ def run_agentic_qa(
             tier=tier,
             score=0,
             confidence=0,
-            summary=f"Could not load the site: {crawl['error'][:200]}",
-            error=crawl["error"][:500],
+            summary="Could not load the site. Please check the URL and try again.",
+            error="Site could not be loaded",
         )
 
-    # Step 2: Visual analysis via Gemini
+    # Step 2: Visual analysis via Gemini (with full fallback chain)
     _progress(2, total_steps, "Running AI visual analysis...")
 
     try:
-        verdict = judge_visual(crawl)
+        verdict = judge_visual(crawl, user_api_key=user_api_key)
     except Exception as exc:
         _log.error("[AgenticQA] Gemini judge failed: %s", exc, exc_info=True)
+        # Never expose raw error messages — use Playwright fallback data
         verdict = {
-            "score": 50,
-            "confidence": 30,
+            "score": None,
+            "confidence": None,
             "findings": [],
-            "summary": "Visual analysis encountered an error.",
+            "summary": "AI visual analysis was unavailable. Showing basic technical audit.",
+            "analysis_limited": True,
         }
+
+    # Detect if analysis was limited (fallback mode)
+    analysis_limited = verdict.get("analysis_limited", False)
+    user_key_exhausted = verdict.get("user_key_exhausted", False)
 
     # Build findings
     findings = [
@@ -267,9 +277,15 @@ def run_agentic_qa(
         findings.sort(key=lambda f: severity_order.get(f.severity, 99))
         findings = findings[:3]
 
-    # Compute score from findings (override Gemini's score with our own)
-    score = compute_score(findings)
-    confidence = verdict.get("confidence", 50)
+    # Compute score and confidence
+    if analysis_limited:
+        # In fallback mode: compute score from findings if we have any, else None
+        score = compute_score(findings) if findings else None
+        confidence = None
+    else:
+        # Normal AI mode: compute from findings
+        score = compute_score(findings)
+        confidence = verdict.get("confidence", 50)
 
     # Step 3: Build fix prompt bundle
     _progress(3, total_steps, "Generating fix prompts...")
@@ -296,6 +312,8 @@ def run_agentic_qa(
         desktop_screenshot_b64=crawl.get("desktop_screenshot_b64"),
         mobile_screenshot_b64=crawl.get("mobile_screenshot_b64"),
         journey_results=crawl.get("journey_results"),
+        analysis_limited=analysis_limited,
+        user_key_exhausted=user_key_exhausted,
     )
 
 

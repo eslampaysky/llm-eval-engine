@@ -385,6 +385,8 @@ def init_db():
             cur.execute("ALTER TABLE users ADD COLUMN paddle_customer_id TEXT")
         if "paddle_subscription_id" not in existing_users:
             cur.execute("ALTER TABLE users ADD COLUMN paddle_subscription_id TEXT")
+        if "gemini_api_key_enc" not in existing_users:
+            cur.execute("ALTER TABLE users ADD COLUMN gemini_api_key_enc TEXT")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1579,6 +1581,78 @@ def deactivate_user(user_id: str) -> bool:
         cur = conn.cursor()
         cur.execute(
             "UPDATE users SET is_active=FALSE, updated_at=%s WHERE user_id=%s",
+            (now, user_id),
+        )
+        return (cur.rowcount or 0) > 0
+
+
+# ── Per-user Gemini API key (encrypted) ───────────────────────────────────────
+
+def _get_fernet():
+    """Create a Fernet cipher using AUTH_SECRET as the key base."""
+    from cryptography.fernet import Fernet
+    secret = os.getenv("AUTH_SECRET", "").strip()
+    if not secret:
+        raise RuntimeError("AUTH_SECRET is required for key encryption")
+    # Derive a 32-byte Fernet key from AUTH_SECRET
+    key_bytes = hashlib.sha256(secret.encode()).digest()
+    import base64
+    fernet_key = base64.urlsafe_b64encode(key_bytes)
+    return Fernet(fernet_key)
+
+
+def set_user_gemini_key(user_id: str, api_key: str) -> bool:
+    """Encrypt and store a user's Gemini API key. Returns True on success."""
+    f = _get_fernet()
+    encrypted = f.encrypt(api_key.encode()).decode()
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE users SET gemini_api_key_enc=%s, updated_at=%s WHERE user_id=%s",
+            (encrypted, now, user_id),
+        )
+        return (cur.rowcount or 0) > 0
+
+
+def get_user_gemini_key(user_id: str) -> str | None:
+    """Decrypt and return the user's Gemini API key, or None if not set."""
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT gemini_api_key_enc FROM users WHERE user_id = {_P}",
+            (user_id,),
+        )
+        row = _row_to_dict(cur.fetchone())
+    if not row or not row.get("gemini_api_key_enc"):
+        return None
+    try:
+        f = _get_fernet()
+        return f.decrypt(row["gemini_api_key_enc"].encode()).decode()
+    except Exception as exc:
+        _log.error("[DB] Failed to decrypt Gemini key for user %s: %s", user_id, exc)
+        return None
+
+
+def has_user_gemini_key(user_id: str) -> bool:
+    """Check if a user has a Gemini API key stored (without decrypting)."""
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT gemini_api_key_enc FROM users WHERE user_id = {_P}",
+            (user_id,),
+        )
+        row = _row_to_dict(cur.fetchone())
+    return bool(row and row.get("gemini_api_key_enc"))
+
+
+def delete_user_gemini_key(user_id: str) -> bool:
+    """Remove a user's stored Gemini API key."""
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE users SET gemini_api_key_enc=NULL, updated_at=%s WHERE user_id=%s",
             (now, user_id),
         )
         return (cur.rowcount or 0) > 0

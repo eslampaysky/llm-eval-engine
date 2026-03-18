@@ -5,10 +5,18 @@ Sends desktop + mobile screenshots to Gemini and asks it to identify
 visual bugs, layout issues, accessibility problems, and broken flows.
 Returns structured findings with severity, category, and fix prompts.
 
-Free-tier resilience:
+Resilience layers (in order):
+  1. Per-user API key — if the user stored their own key, use it exclusively.
+  2. Shared key rotation — up to 4 GEMINI_API_KEY_N env vars, round-robin.
+  3. Groq vision fallback — meta-llama/llama-4-scout-17b-16e-instruct.
+  4. Playwright-only analysis — programmatic checks, no AI at all.
+
+Additional safeguards:
   • Exponential backoff (1s → 2s → 4s) on 429 rate-limit errors.
   • Rate limiter — minimum 5 s between Gemini calls (≤12 RPM).
   • 24-hour file-based cache — same URL re-audited in one day costs 0 calls.
+  • PII masking — strip emails, phones, card numbers before sending to any API.
+  • No raw error messages are ever returned to the caller.
 """
 
 from __future__ import annotations
@@ -31,15 +39,52 @@ _log = logging.getLogger(__name__)
 _MODEL_NAME = "gemini-2.0-flash"
 
 
-def _get_gemini_model():
-    """Lazily create the Gemini GenerativeModel."""
-    import google.generativeai as genai
+# ── Multi-key pool (Part 2) ──────────────────────────────────────────────────
 
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError(
-            "GEMINI_API_KEY is not set. Get a free key from https://aistudio.google.com"
-        )
+def _load_key_pool() -> list[str]:
+    """
+    Build the Gemini API key pool from environment variables.
+    Checks GEMINI_API_KEY_1 through _4, then falls back to GEMINI_API_KEY.
+    """
+    keys: list[str] = []
+    for i in range(1, 5):
+        k = os.getenv(f"GEMINI_API_KEY_{i}", "").strip()
+        if k:
+            keys.append(k)
+    if not keys:
+        fallback = os.getenv("GEMINI_API_KEY", "").strip()
+        if fallback:
+            keys.append(fallback)
+    return keys
+
+
+def _mask_key(key: str) -> str:
+    """Show only the last 4 characters for logging."""
+    if len(key) <= 4:
+        return "****"
+    return f"***{key[-4:]}"
+
+
+_key_pool: list[str] = _load_key_pool()
+_key_index: int = 0
+_key_lock = threading.Lock()
+
+
+def _get_next_key() -> tuple[str, int]:
+    """Thread-safe round-robin key selection. Returns (key, index)."""
+    global _key_index
+    with _key_lock:
+        if not _key_pool:
+            return "", -1
+        idx = _key_index % len(_key_pool)
+        key = _key_pool[idx]
+        _key_index = (idx + 1) % len(_key_pool)
+        return key, idx
+
+
+def _get_gemini_model(api_key: str):
+    """Create a Gemini GenerativeModel with the given api_key."""
+    import google.generativeai as genai
     genai.configure(api_key=api_key)
     return genai.GenerativeModel(_MODEL_NAME)
 
@@ -63,35 +108,305 @@ def _rate_limit():
         _last_call_time = time.monotonic()
 
 
-# ── Exponential backoff for 429s ──────────────────────────────────────────────
+# ── Exponential backoff with key rotation ─────────────────────────────────────
 
-_MAX_RETRIES = 3
-_BACKOFF_BASE = 1  # seconds: 1, 2, 4
+_MAX_RETRIES_PER_KEY = 2
+_BACKOFF_BASE = 1  # seconds: 1, 2
 
 
-def _call_gemini_with_backoff(model, parts: list) -> str:
+def _is_429(exc: Exception) -> bool:
+    """Check if an exception is a 429 / ResourceExhausted error."""
+    exc_str = str(exc)
+    return "429" in exc_str or "ResourceExhausted" in type(exc).__name__
+
+
+def _call_gemini_with_rotation(parts: list, user_api_key: str | None = None) -> str:
     """
-    Call model.generate_content with exponential backoff on 429.
-    Returns raw response text, or raises on non-retryable errors.
+    Try Gemini with key rotation.
+
+    If user_api_key is provided, use ONLY that key (no pool).
+    Otherwise rotate through the shared pool.
+
+    Returns raw response text on success.
+    Raises _AllKeysExhausted if all keys return 429.
+    Raises other exceptions for non-429 errors.
     """
-    for attempt in range(_MAX_RETRIES + 1):
+    if user_api_key:
+        # User's own key — try it with backoff, no rotation
+        return _try_single_key(user_api_key, parts, label="user-key")
+
+    if not _key_pool:
+        raise _AllKeysExhausted("No Gemini API keys configured")
+
+    keys_tried = set()
+    total_keys = len(_key_pool)
+
+    while len(keys_tried) < total_keys:
+        key, idx = _get_next_key()
+        if not key or idx in keys_tried:
+            # Already tried this key
+            if idx in keys_tried:
+                # Force next
+                continue
+            break
+        keys_tried.add(idx)
+
+        masked = _mask_key(key)
+        _log.info("[KeyRotation] Trying key #%d (%s)", idx + 1, masked)
+
+        try:
+            return _try_single_key(key, parts, label=f"pool-key-{idx + 1}")
+        except _SingleKey429:
+            _log.warning(
+                "[KeyRotation] Key #%d (%s) exhausted (429) — rotating",
+                idx + 1, masked,
+            )
+            continue
+        # Non-429 exceptions propagate up
+
+    raise _AllKeysExhausted(
+        f"All {total_keys} Gemini API keys returned 429"
+    )
+
+
+def _try_single_key(api_key: str, parts: list, label: str = "") -> str:
+    """
+    Try a single key with exponential backoff on 429.
+    Raises _SingleKey429 if retries exhausted.
+    """
+    model = _get_gemini_model(api_key)
+    masked = _mask_key(api_key)
+
+    for attempt in range(_MAX_RETRIES_PER_KEY + 1):
         _rate_limit()
         try:
+            _log.info("[Gemini] Calling with key %s (%s) attempt %d",
+                      masked, label, attempt + 1)
             response = model.generate_content(parts)
             return response.text or ""
         except Exception as exc:
-            exc_str = str(exc)
-            is_429 = "429" in exc_str or "ResourceExhausted" in type(exc).__name__
-            if is_429 and attempt < _MAX_RETRIES:
+            if _is_429(exc) and attempt < _MAX_RETRIES_PER_KEY:
                 delay = _BACKOFF_BASE * (2 ** attempt)
                 _log.warning(
-                    "[Backoff] 429 on attempt %d/%d — retrying in %ds",
-                    attempt + 1, _MAX_RETRIES, delay,
+                    "[Backoff] 429 on %s attempt %d/%d — retrying in %ds",
+                    masked, attempt + 1, _MAX_RETRIES_PER_KEY, delay,
                 )
                 time.sleep(delay)
                 continue
-            raise  # non-429 or final attempt — let caller handle
-    return ""  # unreachable
+            if _is_429(exc):
+                raise _SingleKey429(f"Key {masked} exhausted") from exc
+            raise  # non-429 — let caller handle
+
+
+class _SingleKey429(Exception):
+    """A single key is exhausted."""
+
+
+class _AllKeysExhausted(Exception):
+    """All Gemini keys in the pool returned 429."""
+
+
+# ── Groq Vision Fallback (Part 3) ────────────────────────────────────────────
+
+_GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
+
+def _try_groq_vision(prompt_text: str, desktop_b64: str | None) -> dict | None:
+    """
+    Attempt visual analysis via Groq vision API.
+    Returns parsed verdict dict or None on failure.
+    """
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    if not groq_key:
+        _log.info("[GroqFallback] GROQ_API_KEY not set — skipping")
+        return None
+
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(
+            base_url="https://api.groq.com/openai/v1",
+            api_key=groq_key,
+        )
+
+        messages_content: list[dict] = [{"type": "text", "text": prompt_text}]
+        if desktop_b64:
+            messages_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/png;base64,{desktop_b64}",
+                },
+            })
+
+        _log.info("[GroqFallback] Calling %s for visual analysis", _GROQ_VISION_MODEL)
+        response = client.chat.completions.create(
+            model=_GROQ_VISION_MODEL,
+            messages=[{
+                "role": "user",
+                "content": messages_content,
+            }],
+            max_tokens=2000,
+            temperature=0.3,
+        )
+        raw_text = response.choices[0].message.content.strip()
+        verdict = _parse_json_response(raw_text)
+        if verdict and "findings" in verdict:
+            _log.info("[GroqFallback] Successfully got %d findings", len(verdict.get("findings", [])))
+            return verdict
+        _log.warning("[GroqFallback] Response parsed but missing findings")
+        return verdict if verdict else None
+
+    except Exception as exc:
+        _log.error("[GroqFallback] Groq vision call failed: %s", exc)
+        return None
+
+
+# ── Playwright-only fallback analysis (Part 1) ───────────────────────────────
+
+def _playwright_fallback_analysis(crawl: dict) -> dict:
+    """
+    Perform basic programmatic checks using only the crawl data.
+    No AI involved — pure rule-based analysis.
+
+    Checks:
+      - Console errors
+      - Failed network requests
+      - Missing viewport meta tag
+      - Missing page title
+      - Images without alt text
+      - Buttons with no text
+      - Forms with no labels
+    """
+    findings: list[dict] = []
+
+    # Console errors
+    console_errors = crawl.get("console_errors") or []
+    if console_errors:
+        findings.append({
+            "severity": "high",
+            "category": "functionality",
+            "title": f"{len(console_errors)} JavaScript console error(s) detected",
+            "description": (
+                f"The browser console reported {len(console_errors)} error(s). "
+                f"First error: {str(console_errors[0])[:150]}"
+            ),
+            "fix_prompt": (
+                "Open your browser DevTools console and fix all JavaScript errors. "
+                f"There are {len(console_errors)} errors to resolve."
+            ),
+        })
+
+    # Failed network requests
+    failed_requests = crawl.get("failed_requests") or []
+    if failed_requests:
+        findings.append({
+            "severity": "high",
+            "category": "functionality",
+            "title": f"{len(failed_requests)} failed network request(s)",
+            "description": (
+                f"{len(failed_requests)} network request(s) failed to load. "
+                f"First failure: {str(failed_requests[0])[:150]}"
+            ),
+            "fix_prompt": (
+                "Check that all API endpoints, images, and external resources load correctly. "
+                f"There are {len(failed_requests)} failing requests to fix."
+            ),
+        })
+
+    # Missing page title
+    title = crawl.get("title", "").strip()
+    if not title:
+        findings.append({
+            "severity": "medium",
+            "category": "accessibility",
+            "title": "Page has no title",
+            "description": (
+                "The page is missing a <title> tag. This hurts SEO and accessibility — "
+                "screen readers and search engines rely on the page title."
+            ),
+            "fix_prompt": (
+                "Add a descriptive <title> tag to the <head> of your HTML. "
+                "It should clearly describe what the page is about."
+            ),
+        })
+
+    # Missing viewport meta tag (check text_snippet / metadata)
+    text_snippet = crawl.get("text_snippet", "") or ""
+    has_viewport = crawl.get("has_viewport_meta", None)
+    if has_viewport is False:
+        findings.append({
+            "severity": "high",
+            "category": "layout",
+            "title": "Missing viewport meta tag",
+            "description": (
+                "The page doesn't have a <meta name='viewport'> tag. "
+                "This causes the page to not render correctly on mobile devices."
+            ),
+            "fix_prompt": (
+                "Add this tag to your <head>: "
+                '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+            ),
+        })
+
+    # Buttons with no text
+    buttons = crawl.get("buttons") or []
+    empty_buttons = [b for b in buttons if not (b if isinstance(b, str) else "").strip()]
+    if empty_buttons:
+        findings.append({
+            "severity": "medium",
+            "category": "accessibility",
+            "title": f"{len(empty_buttons)} button(s) with no accessible text",
+            "description": (
+                "Some buttons have no visible text or aria-label. "
+                "Screen readers cannot describe these buttons to users."
+            ),
+            "fix_prompt": (
+                "Add visible text or aria-label attributes to all buttons. "
+                f"{len(empty_buttons)} button(s) need accessible labels."
+            ),
+        })
+
+    # Forms with no labels
+    forms = crawl.get("forms") or []
+    if forms:
+        # We can't deeply inspect form labels from crawl data,
+        # but we can flag forms for manual review
+        form_count = len(forms)
+        findings.append({
+            "severity": "low",
+            "category": "accessibility",
+            "title": f"{form_count} form(s) detected — verify labels",
+            "description": (
+                f"Found {form_count} form(s) on the page. "
+                "Ensure all form inputs have associated <label> elements for accessibility."
+            ),
+            "fix_prompt": (
+                "Review all form inputs and ensure each one has an associated <label>. "
+                "Use the 'for' attribute matching the input's 'id'."
+            ),
+        })
+
+    # Compute a basic score from findings
+    severity_deductions = {"critical": 20, "high": 12, "medium": 6, "low": 2}
+    score = 100
+    for f in findings:
+        score -= severity_deductions.get(f["severity"], 5)
+    score = max(0, min(100, score))
+
+    summary = (
+        f"Basic technical audit completed (AI analysis was unavailable). "
+        f"Found {len(findings)} issue(s) from automated checks."
+    )
+    if not findings:
+        summary = "Basic technical audit completed — no issues detected from automated checks."
+
+    return {
+        "score": score if findings else None,
+        "confidence": None,  # Signal that this is not AI-powered
+        "findings": findings,
+        "summary": summary,
+        "analysis_limited": True,
+    }
 
 
 # ── 24-hour file-based cache ─────────────────────────────────────────────────
@@ -252,16 +567,24 @@ def _parse_json_response(text: str) -> dict:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
-def judge_visual(crawl: dict) -> dict[str, Any]:
+def judge_visual(crawl: dict, user_api_key: str | None = None) -> dict[str, Any]:
     """
     Send desktop + mobile screenshots to Gemini for visual bug detection.
+
+    Fallback chain:
+      1. User's own API key (if provided)
+      2. Shared Gemini key pool with rotation
+      3. Groq vision (LLaMA 4 Scout)
+      4. Playwright-only analysis (no AI)
 
     Args:
         crawl: Dict from run_web_audit() containing screenshot_b64 fields,
                console_errors, failed_requests, and page metadata.
+        user_api_key: Optional per-user Gemini API key.
 
     Returns:
         Dict with score, confidence, findings[], summary.
+        When AI is unavailable, confidence will be None.
     """
     url = crawl.get("url", "")
 
@@ -269,8 +592,6 @@ def judge_visual(crawl: dict) -> dict[str, Any]:
     cached = _get_cached(url)
     if cached is not None:
         return cached
-
-    model = _get_gemini_model()
 
     # Build the prompt with crawl metadata
     prompt_text = _VISUAL_JUDGE_PROMPT.format(
@@ -285,7 +606,7 @@ def judge_visual(crawl: dict) -> dict[str, Any]:
         text_snippet=(crawl.get("text_snippet", "") or "")[:500],
     )
 
-    # ── PII masking pass — strip emails, phones, cards before sending to Gemini
+    # ── PII masking pass — strip emails, phones, cards before sending
     prompt_text = _mask_pii(prompt_text)
 
     # Build content parts: text + images
@@ -302,26 +623,44 @@ def judge_visual(crawl: dict) -> dict[str, Any]:
     if not desktop_b64 and not mobile_b64:
         _log.warning("[GeminiJudge] No screenshots available — text-only analysis")
 
-    # ── Call Gemini with backoff + rate limiting ──
-    try:
-        raw_text = _call_gemini_with_backoff(model, parts)
-    except Exception as exc:
-        _log.error("[GeminiJudge] Gemini API call failed after retries: %s", exc)
-        return {
-            "score": 0,
-            "confidence": 0,
-            "findings": [
-                {
-                    "severity": "critical",
-                    "category": "functionality",
-                    "title": "Analysis failed",
-                    "description": f"Could not complete visual analysis: {str(exc)[:200]}",
-                    "fix_prompt": "Please try running the audit again.",
-                }
-            ],
-            "summary": "Visual analysis could not be completed due to an API error.",
-        }
+    # ── Layer 1 & 2: Try Gemini (user key or shared pool with rotation) ──
+    user_key_exhausted = False
+    raw_text = None
 
+    try:
+        raw_text = _call_gemini_with_rotation(parts, user_api_key=user_api_key)
+    except _SingleKey429:
+        # User's own key is exhausted
+        _log.warning("[GeminiJudge] User's own API key quota exhausted")
+        user_key_exhausted = True
+    except _AllKeysExhausted:
+        _log.warning("[GeminiJudge] All shared Gemini keys exhausted — trying Groq")
+    except Exception as exc:
+        _log.error("[GeminiJudge] Gemini call failed (non-429): %s", type(exc).__name__)
+
+    # ── Layer 3: Try Groq vision if Gemini failed ──
+    if raw_text is None and not user_key_exhausted:
+        groq_verdict = _try_groq_vision(prompt_text, desktop_b64)
+        if groq_verdict and groq_verdict.get("findings") is not None:
+            verdict = groq_verdict
+            verdict.setdefault("score", 50)
+            verdict.setdefault("confidence", 60)
+            verdict.setdefault("summary", "Analysis completed via backup AI model.")
+            verdict["findings"] = _clean_findings(verdict.get("findings", []))
+            verdict["score"] = max(0, min(100, int(verdict["score"])))
+            verdict["confidence"] = max(0, min(100, int(verdict["confidence"])))
+            _set_cached(url, verdict)
+            return verdict
+
+    # ── Layer 4: Playwright-only fallback ──
+    if raw_text is None:
+        _log.warning("[GeminiJudge] All AI layers failed — using Playwright-only fallback")
+        verdict = _playwright_fallback_analysis(crawl)
+        verdict["user_key_exhausted"] = user_key_exhausted
+        # Don't cache fallback results — retry with AI next time
+        return verdict
+
+    # ── Parse successful Gemini response ──
     verdict = _parse_json_response(raw_text)
 
     # Ensure required fields
@@ -338,10 +677,20 @@ def judge_visual(crawl: dict) -> dict[str, Any]:
     verdict["score"] = max(0, min(100, int(verdict["score"])))
     verdict["confidence"] = max(0, min(100, int(verdict["confidence"])))
 
-    # Ensure each finding has all required fields
-    clean_findings = []
-    for f in verdict["findings"]:
-        clean_findings.append(
+    # Clean findings
+    verdict["findings"] = _clean_findings(verdict.get("findings", []))
+
+    # ── Cache the result for future calls ──
+    _set_cached(url, verdict)
+
+    return verdict
+
+
+def _clean_findings(findings: list) -> list[dict]:
+    """Ensure each finding has all required fields."""
+    clean: list[dict] = []
+    for f in findings:
+        clean.append(
             {
                 "severity": f.get("severity", "medium"),
                 "category": f.get("category", "functionality"),
@@ -350,11 +699,4 @@ def judge_visual(crawl: dict) -> dict[str, Any]:
                 "fix_prompt": f.get("fix_prompt", ""),
             }
         )
-    verdict["findings"] = clean_findings
-
-    # ── Cache the result for future calls ──
-    _set_cached(url, verdict)
-
-    return verdict
-
-
+    return clean

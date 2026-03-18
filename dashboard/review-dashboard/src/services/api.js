@@ -146,4 +146,20 @@ export const api = {
   getAgenticQAStatus(id) {
     return request(`/agentic-qa/status/${encodeURIComponent(id)}`);
   },
+
+  // ── Gemini API key management ──
+  saveGeminiKey(apiKey) {
+    return request('/auth/gemini-key', {
+      method: 'PUT',
+      body: JSON.stringify({ api_key: apiKey }),
+    });
+  },
+  getGeminiKeyStatus() {
+    return request('/auth/gemini-key/status');
+  },
+  deleteGeminiKey() {
+    return request('/auth/gemini-key', {
+      method: 'DELETE',
+    });
+  },
 };

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Loader } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { ArrowRight, Loader, Zap, ChevronDown, ChevronUp, Key } from 'lucide-react';
 import { api } from '../../services/api';
 import TierPill from '../../components/TierPill.jsx';
 import LoadingSteps from '../../components/LoadingSteps.jsx';
@@ -16,6 +16,95 @@ const AUDIT_STEPS = [
   { label: 'Generating fix prompts...' },
 ];
 
+/* ── Quota Exhaustion Banner ─────────────────────────────────────────────── */
+
+function QuotaBanner({ hasUserKey }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (hasUserKey) {
+    return (
+      <div style={{
+        padding: '14px 20px', marginBottom: 20, borderRadius: 'var(--radius-md)',
+        background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)',
+        color: '#d97706', fontSize: 13, lineHeight: 1.6,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Zap size={16} />
+          <span>
+            <strong>Your Gemini API key's daily quota is exhausted.</strong>{' '}
+            Full analysis will resume when it resets — usually within 24 hours.
+            Basic technical audit shown below.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      padding: '14px 20px', marginBottom: 20, borderRadius: 'var(--radius-md)',
+      background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)',
+      color: '#d97706', fontSize: 13, lineHeight: 1.6,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+        <Zap size={16} style={{ marginTop: 2, flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <strong>AI visual analysis is temporarily rate-limited.</strong>{' '}
+          Showing basic technical audit only.
+          <div style={{ marginTop: 10, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              Get full analysis instantly: connect your free Gemini API key in Settings — takes 2 minutes.
+            </span>
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <Link
+              to="/app/settings/workspace"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '6px 14px', borderRadius: 'var(--radius-sm)',
+                background: '#d97706', color: '#fff', fontSize: 12, fontWeight: 600,
+                textDecoration: 'none', whiteSpace: 'nowrap',
+              }}
+            >
+              <Key size={14} /> Connect API Key
+            </Link>
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '6px 12px', borderRadius: 'var(--radius-sm)',
+                background: 'transparent', border: '1px solid rgba(245, 158, 11, 0.3)',
+                color: '#d97706', fontSize: 12, cursor: 'pointer',
+              }}
+            >
+              Learn More {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          </div>
+          {expanded && (
+            <div style={{
+              marginTop: 12, padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+              background: 'rgba(245, 158, 11, 0.04)', fontSize: 12,
+              color: 'var(--text-secondary)', lineHeight: 1.7,
+            }}>
+              AI Breaker uses Google's Gemini Vision API to analyze screenshots. All free-tier users
+              share a limited pool of API keys. When this shared quota runs out, we can only show
+              automated technical checks until the quota resets.
+              <br /><br />
+              By connecting your own free Gemini API key (from{' '}
+              <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer"
+                style={{ color: '#d97706', textDecoration: 'underline' }}>
+                aistudio.google.com
+              </a>), you get your own dedicated quota — no more waiting.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Main Page ───────────────────────────────────────────────────────────── */
+
 export default function VibeCheckPage() {
   const navigate = useNavigate();
   const [url, setUrl] = useState('');
@@ -26,8 +115,14 @@ export default function VibeCheckPage() {
   const [error, setError] = useState('');
   const [currentStep, setCurrentStep] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [hasUserKey, setHasUserKey] = useState(false);
   const pollRef = useRef(null);
   const stepRef = useRef(null);
+
+  // Check if user has their own Gemini key
+  useEffect(() => {
+    api.getGeminiKeyStatus().then((d) => setHasUserKey(d?.has_key || false)).catch(() => {});
+  }, []);
 
   const handleTierChange = (newTier) => {
     if (newTier !== 'vibe') {
@@ -93,7 +188,9 @@ export default function VibeCheckPage() {
   }, [auditId]);
 
   const findings = result?.findings || [];
-  const score = result?.score ?? 0;
+  const score = result?.score;
+  const confidence = result?.confidence;
+  const analysisLimited = result?.analysis_limited || false;
 
   const phase = result ? 'results' : loading ? 'loading' : 'input';
 
@@ -152,23 +249,32 @@ export default function VibeCheckPage() {
 
       {phase === 'results' && (
         <div className="slide-up">
+          {/* Quota exhaustion banner */}
+          {analysisLimited && <QuotaBanner hasUserKey={hasUserKey} />}
+
           <div className="card" style={{
             padding: 32, marginBottom: 24,
             background: 'linear-gradient(135deg, rgba(52, 211, 153, 0.06), rgba(59, 180, 255, 0.04))',
             borderColor: 'rgba(52, 211, 153, 0.15)',
             display: 'flex', alignItems: 'center', gap: 32, flexWrap: 'wrap',
           }}>
-            <ScoreRing score={score} size={140} label="/100" />
+            {/* Only show ScoreRing when AI analysis was available */}
+            {score != null && <ScoreRing score={score} size={140} label="/100" />}
             <div style={{ flex: 1, minWidth: 200 }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
-                Reliability Score: {score}
+                {score != null ? `Reliability Score: ${score}` : 'Technical Audit'}
               </div>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
-                <span className={`badge ${score >= 80 ? 'badge-green' : score >= 50 ? 'badge-amber' : 'badge-red'}`}>
-                  {score >= 80 ? 'Healthy' : score >= 50 ? 'Needs Work' : 'Critical'}
-                </span>
-                {result?.confidence != null && (
-                  <span className="badge badge-blue">{result.confidence}% confident</span>
+                {score != null && (
+                  <span className={`badge ${score >= 80 ? 'badge-green' : score >= 50 ? 'badge-amber' : 'badge-red'}`}>
+                    {score >= 80 ? 'Healthy' : score >= 50 ? 'Needs Work' : 'Critical'}
+                  </span>
+                )}
+                {confidence != null && (
+                  <span className="badge badge-blue">{confidence}% confident</span>
+                )}
+                {analysisLimited && (
+                  <span className="badge badge-amber">Basic Audit</span>
                 )}
               </div>
               {result?.summary && (

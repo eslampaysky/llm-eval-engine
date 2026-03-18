@@ -39,6 +39,9 @@ from api.database import (
     mark_password_reset_token_used,
     update_user_password,
     update_user_profile,
+    set_user_gemini_key,
+    has_user_gemini_key,
+    delete_user_gemini_key,
 )
 from api.plans import get_plan_limits, resolve_plan
 from api.user_auth import (
@@ -248,6 +251,7 @@ def me(current_user: Annotated[dict, Depends(get_current_user)]) -> dict:
         "tests_per_run_limit": None if int(tests_per_run_limit or 0) < 0 else int(tests_per_run_limit or 0),
         "agentic_enabled": bool(limits.get("agentic", False)),
         "total_runs_all_time": int(total_runs_all_time or 0),
+        "has_gemini_key": has_user_gemini_key(current_user["user_id"]),
     }
 
 
@@ -443,3 +447,41 @@ def reset_password(payload: ResetPasswordRequest) -> dict:
 
     mark_password_reset_token_used(payload.token)
     return {"message": "Password reset successfully."}
+
+
+# ── Per-user Gemini API key management ────────────────────────────────────────
+
+class SaveGeminiKeyRequest(BaseModel):
+    api_key: str = Field(..., min_length=10, max_length=256)
+
+
+@auth_router.put("/gemini-key", summary="Save your Gemini API key")
+def save_gemini_key(
+    payload: SaveGeminiKeyRequest,
+    current_user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Encrypt and store the user's own Gemini API key."""
+    ok = set_user_gemini_key(current_user["user_id"], payload.api_key.strip())
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save API key.",
+        )
+    return {"success": True, "has_key": True}
+
+
+@auth_router.get("/gemini-key/status", summary="Check if you have a Gemini key stored")
+def gemini_key_status(
+    current_user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Returns whether the user has a Gemini API key stored. Never exposes the actual key."""
+    return {"has_key": has_user_gemini_key(current_user["user_id"])}
+
+
+@auth_router.delete("/gemini-key", summary="Remove your stored Gemini API key")
+def remove_gemini_key(
+    current_user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Remove the user's stored Gemini API key."""
+    delete_user_gemini_key(current_user["user_id"])
+    return {"success": True, "has_key": False}
