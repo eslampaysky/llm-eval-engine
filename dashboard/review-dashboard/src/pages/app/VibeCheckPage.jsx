@@ -120,7 +120,10 @@ export default function VibeCheckPage() {
   const [hasUserKey, setHasUserKey] = useState(false);
   const stepRef = useRef(null);
 
-  const { activeAudit, auditComplete, clearAuditComplete } = useAppShell();
+  const shell = useAppShell();
+  const activeAudit = shell?.activeAudit ?? null;
+  const auditComplete = shell?.auditComplete ?? null;
+  const clearAuditComplete = shell?.clearAuditComplete ?? (() => {});
 
   // Check if user has their own Gemini key
   useEffect(() => {

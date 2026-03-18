@@ -4,7 +4,9 @@ import { Loader, CheckCircle, ArrowRight, X } from 'lucide-react';
 import { useAppShell } from '../context/AppShellContext.jsx';
 
 export default function AuditBanner() {
-  const { activeAudit, auditComplete, clearAuditComplete } = useAppShell();
+  const shell = useAppShell();
+  if (!shell) return null;
+  const { activeAudit, auditComplete, clearAuditComplete } = shell;
   const [dismissed, setDismissed] = useState(false);
 
   // Reset dismissed when a new audit completes

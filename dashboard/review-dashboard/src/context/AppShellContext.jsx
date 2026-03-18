@@ -196,7 +196,9 @@ export function AppShellProvider({ children }) {
 }
 
 export function useAppShell() {
-  const value = useContext(AppShellContext);
-  if (!value) throw new Error('useAppShell must be used within AppShellProvider');
-  return value;
+  const ctx = useContext(AppShellContext);
+  if (!ctx) {
+    return null; // graceful fallback instead of crashing
+  }
+  return ctx;
 }
