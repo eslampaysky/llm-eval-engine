@@ -45,7 +45,7 @@ async def _keep_alive_loop(interval: int = 55) -> None:
     Prevents Railway (and similar platforms) from sleeping the dyno
     while a long-running job is in progress.
     Set SELF_BASE_URL env var to the deployed app URL, e.g.
-    https://your-app.up.railway.app
+    https://ai-breaker-labs.vercel.app
     If SELF_BASE_URL is not set this function exits immediately (safe for local dev).
     """
     base = os.getenv("SELF_BASE_URL", "").rstrip("/")

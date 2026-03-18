@@ -67,6 +67,7 @@ from api.database import (
     reset_report_for_retry,
     get_stuck_processing_reports,
     get_history_for_client,
+    list_agentic_qa_history_for_client,
     get_report_row,
     get_report_row_by_share_token,
     get_target_by_id,
@@ -3176,6 +3177,18 @@ def get_history(
     return get_history_for_client(
         client_name=auth_ctx.get("client_name"),
         limit=int(limit),
+    )
+
+
+@router.get("/agentic-qa/history")
+@limiter.limit(LIMIT_READ)
+def get_agentic_qa_history_route(
+    request: Request,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> list[dict[str, Any]]:
+    return list_agentic_qa_history_for_client(
+        client_name=auth_ctx.get("client_name"),
+        limit=20,
     )
 
 
