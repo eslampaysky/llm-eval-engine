@@ -387,6 +387,8 @@ def init_db():
             cur.execute("ALTER TABLE users ADD COLUMN paddle_subscription_id TEXT")
         if "gemini_api_key_enc" not in existing_users:
             cur.execute("ALTER TABLE users ADD COLUMN gemini_api_key_enc TEXT")
+        if "is_admin" not in existing_users:
+            cur.execute("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

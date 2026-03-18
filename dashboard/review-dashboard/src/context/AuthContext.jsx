@@ -55,10 +55,12 @@ export function AuthProvider({ children }) {
     // token was restored from localStorage, verify it's still valid
     authFetch('/auth/me')
       .then((userData) => setUser(userData))
-      .catch(() => {
-        token = null;
-        localStorage.removeItem('auth_token');
-        setUser(null);
+      .catch((err) => {
+        if (err.status === 401 || err.status === 403) {
+          token = null;
+          localStorage.removeItem('auth_token');
+          setUser(null);
+        }
       })
       .finally(() => setLoading(false));
   }, []);

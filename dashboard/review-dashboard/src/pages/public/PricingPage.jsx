@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, ChevronDown, ChevronUp, ArrowRight, Zap, Search, Wrench } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const TIERS = [
   {
@@ -111,6 +112,7 @@ function renderCell(val) {
 
 export default function PricingPage() {
   const [openFaq, setOpenFaq] = useState(null);
+  const { isAuthenticated, loading } = useAuth();
 
   return (
     <div className="fade-in" style={{
@@ -227,7 +229,7 @@ export default function PricingPage() {
               </div>
 
               <Link
-                to={tier.ctaLink}
+                to={!loading && isAuthenticated ? '/app/settings/billing' : `/auth/signup?plan=${tier.id}`}
                 className={tier.popular ? 'btn btn-primary' : 'btn btn-ghost'}
                 style={{ width: '100%', textAlign: 'center', marginBottom: 20, justifyContent: 'center' }}
               >

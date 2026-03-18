@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowRight, Loader, Zap, ChevronDown, ChevronUp, Key } from 'lucide-react';
-import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext.jsx';
 import TierPill from '../../components/TierPill.jsx';
 import LoadingSteps from '../../components/LoadingSteps.jsx';
 import ScoreRing from '../../components/ScoreRing.jsx';
@@ -124,8 +124,11 @@ export default function VibeCheckPage() {
     api.getGeminiKeyStatus().then((d) => setHasUserKey(d?.has_key || false)).catch(() => {});
   }, []);
 
+  const { user } = useAuth();
+  const isAdmin = user?.is_admin || false;
+
   const handleTierChange = (newTier) => {
-    if (newTier !== 'vibe') {
+    if (newTier !== 'vibe' && !isAdmin) {
       setShowUpgradeModal(true);
       return;
     }

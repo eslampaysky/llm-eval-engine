@@ -239,6 +239,12 @@ def me(current_user: Annotated[dict, Depends(get_current_user)]) -> dict:
     total_runs_all_time = get_usage_count(client_name, None)
     run_limit = limits.get("runs_per_month", 0)
     tests_per_run_limit = limits.get("tests_per_run", 0)
+    
+    is_admin = bool(current_user.get("is_admin", False))
+    if is_admin:
+        run_limit = -1
+        tests_per_run_limit = -1
+
     return {
         "user_id": current_user["user_id"],
         "name": current_user["name"],
@@ -252,6 +258,7 @@ def me(current_user: Annotated[dict, Depends(get_current_user)]) -> dict:
         "agentic_enabled": bool(limits.get("agentic", False)),
         "total_runs_all_time": int(total_runs_all_time or 0),
         "has_gemini_key": has_user_gemini_key(current_user["user_id"]),
+        "is_admin": is_admin,
     }
 
 

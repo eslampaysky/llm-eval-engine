@@ -280,7 +280,11 @@ export default function AppLayout() {
                 fontSize: 11,
                 color: 'var(--text-dim)',
               }}>
-                Free plan
+                {user?.is_admin ? (
+                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Admin</span>
+                ) : (
+                  'Free plan'
+                )}
               </div>
             </div>
           </div>

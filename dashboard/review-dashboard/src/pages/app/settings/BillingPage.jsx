@@ -52,7 +52,41 @@ export default function BillingPage() {
           </div>
         </div>
 
-        <Link to="/pricing" className="btn btn-primary">Upgrade Plan</Link>
+      </div>
+
+      <div className="card" style={{ padding: 28 }}>
+        <div className="card-label">Change Plan</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+          {[
+            { id: 'vibe', name: 'Vibe Check', price: 'Free', current: true },
+            { id: 'deep', name: 'Deep Dive', price: '$29/mo', current: false },
+            { id: 'fix', name: 'Fix & Verify', price: '$79/mo', current: false },
+          ].map((plan) => (
+            <div key={plan.id} style={{
+              padding: 24, border: `1px solid ${plan.current ? 'var(--accent)' : 'var(--line)'}`, borderRadius: 'var(--radius-md)',
+              background: plan.current ? 'var(--accent-dim)' : 'var(--bg-surface)',
+              position: 'relative'
+            }}>
+              {plan.current && (
+                <div style={{ position: 'absolute', top: -10, right: 16, background: 'var(--accent)', color: '#000', fontSize: 10, padding: '2px 8px', borderRadius: 99, fontWeight: 600 }}>CURRENT</div>
+              )}
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{plan.name}</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--hi)', marginBottom: 16, fontFamily: 'var(--font-display)' }}>{plan.price}</div>
+              {plan.current ? (
+                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} disabled>Active</button>
+              ) : (
+                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => {
+                  if (import.meta.env.VITE_STRIPE_URL) {
+                    window.location.href = import.meta.env.VITE_STRIPE_URL;
+                  } else {
+                    alert('Checkout coming soon! We will email you access.');
+                    window.location.href = "mailto:eslamsamy650@gmail.com?subject=Upgrade to " + plan.name;
+                  }
+                }}>Upgrade</button>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="card" style={{ padding: 28 }}>
