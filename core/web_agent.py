@@ -191,11 +191,14 @@ async def run_web_audit(
     *,
     record_video: bool = True,
     run_journeys: list[dict] | None = None,
+    max_pages: int = 1,
 ) -> dict:
     """
     Open a URL, capture dual-viewport screenshots, console errors,
     failed network requests, page metadata, and optionally execute
     user journeys.
+
+    If max_pages > 1, crawl additional internal links found on the homepage.
 
     Returns a dict with all crawl data.
     """
@@ -217,6 +220,8 @@ async def run_web_audit(
         "screenshot_b64": None,       # kept for backward compat (= desktop)
         "video_path": None,
         "journey_results": None,
+        "page_html": None,
+        "extra_pages": [],
     }
 
     video_dir = None
@@ -307,6 +312,77 @@ async def run_web_audit(
 
             # Reset to desktop for journey execution
             await page.set_viewport_size(DESKTOP_VIEWPORT)
+
+            # ── Capture page HTML (for code analysis) ─────────────────────
+            try:
+                raw_html = await page.content()
+                result["page_html"] = raw_html[:30000]  # truncate for Groq context
+            except Exception:
+                result["page_html"] = None
+
+            # ── Multi-page crawl (deep/fix tiers) ─────────────────────────
+            if max_pages > 1 and result["nav_links"]:
+                from urllib.parse import urlparse, urljoin
+                base_parsed = urlparse(url)
+                visited = {url.rstrip("/")}
+                extra_pages: list[dict] = []
+
+                # Pick internal links only
+                candidates = []
+                for link in result["nav_links"]:
+                    href = link.get("href", "")
+                    if not href:
+                        continue
+                    full_url = urljoin(url, href).split("#")[0].split("?")[0]
+                    parsed = urlparse(full_url)
+                    if parsed.netloc == base_parsed.netloc and full_url.rstrip("/") not in visited:
+                        candidates.append(full_url)
+                        visited.add(full_url.rstrip("/"))
+                    if len(candidates) >= max_pages - 1:
+                        break
+
+                for extra_url in candidates:
+                    try:
+                        _log.info("[MultiCrawl] Crawling extra page: %s", extra_url)
+                        extra_resp = await page.goto(
+                            extra_url, timeout=15000, wait_until="domcontentloaded"
+                        )
+                        await page.wait_for_timeout(800)
+
+                        extra_data: dict = {
+                            "url": extra_url,
+                            "title": await page.title(),
+                            "status_code": extra_resp.status if extra_resp else None,
+                            "html": None,
+                            "console_errors": [],
+                            "failed_requests": [],
+                        }
+
+                        # Capture HTML
+                        try:
+                            extra_html = await page.content()
+                            extra_data["html"] = extra_html[:30000]
+                        except Exception:
+                            pass
+
+                        # Capture text snippet
+                        try:
+                            extra_data["text_snippet"] = (await page.inner_text("body"))[:500]
+                        except Exception:
+                            extra_data["text_snippet"] = ""
+
+                        extra_pages.append(extra_data)
+                    except Exception as exc:
+                        _log.warning("[MultiCrawl] Failed to crawl %s: %s", extra_url, exc)
+
+                result["extra_pages"] = extra_pages
+
+                # Navigate back to homepage for journeys
+                if extra_pages:
+                    try:
+                        await page.goto(url, timeout=15000, wait_until="domcontentloaded")
+                    except Exception:
+                        pass
 
             # ── User journeys (optional) ──────────────────────────────────
             if run_journeys:

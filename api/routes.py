@@ -3276,7 +3276,7 @@ async def start_agentic_qa(
 ) -> dict:
     """Start an agentic QA audit. Poll GET /agentic-qa/status/{id}."""
     audit_id = str(uuid.uuid4())
-    total_steps = {"vibe": 3, "deep": 4, "fix": 5}.get(payload.tier, 3)
+    total_steps = {"vibe": 3, "deep": 5, "fix": 6}.get(payload.tier, 3)
     _init_progress(audit_id, total_steps)
     insert_agentic_qa_report(
         audit_id=audit_id,
@@ -3352,6 +3352,48 @@ def get_agentic_qa_status(
         "mobile_screenshot_url": f"/agentic-qa/{audit_id}/screenshot/mobile" if row.get("mobile_ss_b64") else None,
         "created_at": row.get("created_at"),
     }
+
+
+@router.get("/agentic-qa/{audit_id}/screenshot/desktop")
+@limiter.limit(LIMIT_READ)
+def get_agentic_qa_screenshot_desktop(
+    request: Request,
+    audit_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+):
+    """Return the desktop screenshot as a PNG image."""
+    row = get_agentic_qa_row(audit_id)
+    if not row or row.get("client_name") != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=404, detail="Audit not found")
+    b64 = row.get("desktop_ss_b64")
+    if not b64:
+        raise HTTPException(status_code=404, detail="Desktop screenshot not available")
+    import base64 as b64mod
+    return Response(
+        content=b64mod.b64decode(b64),
+        media_type="image/png",
+    )
+
+
+@router.get("/agentic-qa/{audit_id}/screenshot/mobile")
+@limiter.limit(LIMIT_READ)
+def get_agentic_qa_screenshot_mobile(
+    request: Request,
+    audit_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+):
+    """Return the mobile screenshot as a PNG image."""
+    row = get_agentic_qa_row(audit_id)
+    if not row or row.get("client_name") != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=404, detail="Audit not found")
+    b64 = row.get("mobile_ss_b64")
+    if not b64:
+        raise HTTPException(status_code=404, detail="Mobile screenshot not available")
+    import base64 as b64mod
+    return Response(
+        content=b64mod.b64decode(b64),
+        media_type="image/png",
+    )
 
 
 def _run_agentic_qa_job(audit_id, url, tier, journeys, client_name, user_api_key=None):

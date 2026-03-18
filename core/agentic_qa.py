@@ -105,6 +105,7 @@ def build_bundled_fix_prompt(findings: list[Finding], url: str) -> str:
 def _run_code_analysis(findings: list[Finding], crawl: dict) -> str | None:
     """
     Use Groq/Llama 3.3 to generate deeper code-level fix suggestions.
+    Analyses the actual page HTML (not just metadata) for concrete fixes.
     Returns an enhanced bundled fix prompt, or None if Groq is unavailable.
     """
     groq_key = os.getenv("GROQ_API_KEY", "").strip()
@@ -123,6 +124,8 @@ def _run_code_analysis(findings: list[Finding], crawl: dict) -> str | None:
         findings_text = "\n".join(
             f"- [{f.severity}] {f.title}: {f.description}" for f in findings
         )
+
+        # Build crawl context with page HTML for deeper analysis
         crawl_summary = json.dumps(
             {
                 "url": crawl.get("url"),
@@ -137,27 +140,45 @@ def _run_code_analysis(findings: list[Finding], crawl: dict) -> str | None:
             indent=2,
         )
 
+        # Include actual page HTML for code-level analysis
+        page_html = crawl.get("page_html") or ""
+        # Truncate to fit Groq context — keep first 12k chars
+        html_section = ""
+        if page_html:
+            html_section = f"\n\nHomepage HTML (truncated):\n```html\n{page_html[:12000]}\n```"
+
+        # Also include extra page HTML if available
+        extra_pages = crawl.get("extra_pages") or []
+        for ep in extra_pages[:2]:  # max 2 extra pages
+            ep_html = ep.get("html", "") or ""
+            if ep_html:
+                html_section += (
+                    f"\n\nAdditional page ({ep.get('url', 'unknown')}) HTML (truncated):\n"
+                    f"```html\n{ep_html[:8000]}\n```"
+                )
+
         prompt = f"""You are a senior full-stack developer. A QA audit found these issues on a web app:
 
 {findings_text}
 
 Crawl data:
-{crawl_summary}
+{crawl_summary}{html_section}
 
-Write a SINGLE, comprehensive fix prompt that a non-technical founder can paste into an AI code editor (like Lovable, Bolt.new, or Replit Agent) to fix ALL issues at once.
+Using the actual HTML code above, write a SINGLE, comprehensive fix prompt that a non-technical founder can paste into an AI code editor (like Lovable, Bolt.new, or Replit Agent) to fix ALL issues at once.
 
 The prompt should:
-1. Reference specific elements (buttons, forms, layouts) by their text/selector
+1. Reference specific HTML elements, classes, and IDs from the actual code
 2. Include both desktop (1280px) and mobile (390px) fixes
-3. Be written as clear instructions, not code
-4. Be thorough but concise — one prompt to fix everything
+3. Identify exact CSS classes, component names, or HTML structures that need changing
+4. Be written as clear instructions, not raw code
+5. Be thorough but concise — one prompt to fix everything
 
 Return ONLY the fix prompt text, nothing else."""
 
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=1500,
+            max_tokens=2000,
             temperature=0.3,
         )
         return response.choices[0].message.content.strip()
@@ -201,13 +222,15 @@ def run_agentic_qa(
             except Exception:
                 pass
 
-    total_steps = {"vibe": 3, "deep": 4, "fix": 5}[tier]
+    total_steps = {"vibe": 3, "deep": 5, "fix": 6}[tier]
 
     # Step 1: Browser crawl
     _progress(1, total_steps, "Opening browser and crawling site...")
 
+    # ── Tier-specific crawl parameters ────────────────────────────────────
     record_video = tier in ("deep", "fix")
     run_journeys = journeys if tier in ("deep", "fix") else None
+    max_pages = 3 if tier in ("deep", "fix") else 1
 
     try:
         crawl = asyncio.run(
@@ -215,6 +238,7 @@ def run_agentic_qa(
                 url,
                 record_video=record_video,
                 run_journeys=run_journeys,
+                max_pages=max_pages,
             )
         )
     except Exception as exc:
@@ -238,8 +262,23 @@ def run_agentic_qa(
             error="Site could not be loaded",
         )
 
-    # Step 2: Visual analysis via Gemini (with full fallback chain)
-    _progress(2, total_steps, "Running AI visual analysis...")
+    # Step 2: Merge extra page data into crawl for deep/fix tiers
+    if tier in ("deep", "fix") and crawl.get("extra_pages"):
+        _progress(2, total_steps, f"Analyzing {len(crawl['extra_pages'])} additional pages...")
+        for ep in crawl["extra_pages"]:
+            # Merge console errors from extra pages
+            for err in (ep.get("console_errors") or []):
+                crawl["console_errors"].append(f"[{ep.get('url', '?')}] {err}")
+            # Merge failed requests from extra pages
+            for fr in (ep.get("failed_requests") or []):
+                fr_copy = dict(fr)
+                fr_copy["source_page"] = ep.get("url", "")
+                crawl["failed_requests"].append(fr_copy)
+    else:
+        _progress(2, total_steps, "Preparing analysis...")
+
+    # Step 3: Visual analysis via Gemini (with full fallback chain)
+    _progress(3, total_steps, "Running AI visual analysis...")
 
     try:
         verdict = judge_visual(crawl, user_api_key=user_api_key)
@@ -271,7 +310,9 @@ def run_agentic_qa(
         for f in verdict.get("findings", [])
     ]
 
-    # For vibe tier, limit to top 3 findings by severity
+    # ── Tier-specific finding limits ──────────────────────────────────────
+    # Vibe: top 3 findings only (quick scan)
+    # Deep/Fix: ALL findings (comprehensive audit)
     if tier == "vibe" and len(findings) > 3:
         severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
         findings.sort(key=lambda f: severity_order.get(f.severity, 99))
@@ -287,18 +328,22 @@ def run_agentic_qa(
         score = compute_score(findings)
         confidence = verdict.get("confidence", 50)
 
-    # Step 3: Build fix prompt bundle
-    _progress(3, total_steps, "Generating fix prompts...")
+    # Step 4: Build fix prompt bundle
+    _progress(4, total_steps, "Generating fix prompts...")
     bundled = build_bundled_fix_prompt(findings, url)
 
-    # Step 4 (fix tier only): Code-level analysis
+    # Step 5 (fix tier only): Code-level analysis using actual page HTML
     if tier == "fix":
-        _progress(4, total_steps, "Running code-level analysis...")
+        _progress(5, total_steps, "Running code-level analysis on page HTML...")
         code_fix = _run_code_analysis(findings, crawl)
         if code_fix:
-            bundled = code_fix  # Replace basic bundle with enhanced version
+            bundled = code_fix  # Replace basic bundle with enhanced HTML-aware version
 
     _progress(total_steps, total_steps, "Done!")
+
+    # ── Determine what to include in result per tier ──────────────────────
+    # Vibe: no video path (even if accidentally recorded)
+    video_path = crawl.get("video_path") if tier in ("deep", "fix") else None
 
     return AgenticQAResult(
         url=url,
@@ -308,7 +353,7 @@ def run_agentic_qa(
         findings=findings,
         summary=verdict.get("summary", ""),
         bundled_fix_prompt=bundled or None,
-        video_path=crawl.get("video_path"),
+        video_path=video_path,
         desktop_screenshot_b64=crawl.get("desktop_screenshot_b64"),
         mobile_screenshot_b64=crawl.get("mobile_screenshot_b64"),
         journey_results=crawl.get("journey_results"),
