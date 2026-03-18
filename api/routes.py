@@ -3354,6 +3354,25 @@ def get_agentic_qa_status(
     }
 
 
+@router.get("/agentic-qa/{audit_id}/video")
+@limiter.limit(LIMIT_READ)
+def get_agentic_qa_video(
+    request: Request,
+    audit_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+):
+    """Returns the Playwright screen recording of the agentic QA session as a .webm video stream."""
+    row = get_agentic_qa_row(audit_id)
+    if not row or row.get("client_name") != auth_ctx.get("client_name"):
+        raise HTTPException(status_code=404, detail="Audit not found")
+    if row.get("status") != "done":
+        raise HTTPException(status_code=404, detail="Video not available")
+    video_path = row.get("video_path")
+    if not video_path or not Path(video_path).exists():
+        raise HTTPException(status_code=404, detail="Video expired or not recorded")
+    return FileResponse(video_path, media_type="video/webm")
+
+
 @router.get("/agentic-qa/{audit_id}/screenshot/desktop")
 @limiter.limit(LIMIT_READ)
 def get_agentic_qa_screenshot_desktop(
