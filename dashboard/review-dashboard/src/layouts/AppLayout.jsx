@@ -5,6 +5,7 @@ import {
   LayoutDashboard, Zap, Search, Wrench, History, Radio,
   Key, Settings, ChevronRight, Menu, X, LogOut
 } from 'lucide-react';
+import AuditBanner from '../components/AuditBanner.jsx';
 
 const NAV_SECTIONS = [
   {
@@ -330,6 +331,7 @@ export default function AppLayout() {
       }}
       className="app-main"
       >
+        <AuditBanner />
         <Outlet />
       </main>
 

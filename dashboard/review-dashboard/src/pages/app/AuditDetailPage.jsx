@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { RotateCcw, Share2, Download, Monitor, Smartphone, Check, Loader } from 'lucide-react';
-import { API_BASE, ReportPage, SHARE_BASE, api, getApiKey } from '../../App.jsx';
+import { API_BASE, SHARE_BASE, getApiKey } from '../../App.jsx';
 import { getAuthHeader } from '../../context/AuthContext.jsx';
+import { api } from '../../services/api';
 import ScoreRing from '../../components/ScoreRing.jsx';
 import FindingCard from '../../components/FindingCard.jsx';
 import CopyButton from '../../components/CopyButton.jsx';
@@ -19,38 +20,44 @@ export default function AuditDetailPage() {
   const [pdfError, setPdfError] = useState('');
   const [progress, setProgress] = useState(null);
 
-  // Fetch report
+  // Fetch report — use agentic QA status endpoint (the correct one)
   useEffect(() => {
     setLoading(true);
-    api.getReport(auditId)
+    api.getAgenticQAStatus(auditId)
       .then((r) => { setReport(r); setError(''); })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [auditId]);
 
-  // Poll progress while processing
+  // Poll for results while processing
   useEffect(() => {
-    if (!report || report.status !== 'processing') { setProgress(null); return; }
+    if (!report || (report.status !== 'processing' && report.status !== 'queued')) {
+      setProgress(null);
+      return;
+    }
     let active = true;
-    const tick = async () => {
+    async function poll() {
       try {
-        const res = await fetch(`${API_BASE}/report/${encodeURIComponent(auditId)}/progress`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (active) setProgress(data);
+        const data = await api.getAgenticQAStatus(auditId);
+        if (!active) return;
+        if (data.status === 'done' || data.status === 'failed') {
+          setReport(data);
+          setProgress(null);
+        } else {
+          setProgress({ current_step: `Status: ${data.status}`, progress_pct: 50 });
+        }
       } catch {}
-    };
-    tick();
-    const timer = setInterval(tick, 2000);
+    }
+    poll();
+    const timer = setInterval(poll, 3000);
     return () => { active = false; clearInterval(timer); };
-  }, [report, auditId]);
+  }, [report?.status, auditId]);
 
   const handleShare = async () => {
     if (shareBusy) return;
     setShareBusy(true);
     try {
-      if (report?.report_id) await api.shareReport(report.report_id);
-      const url = `${window.location.origin}/report/${auditId}`;
+      const url = `${window.location.origin}/app/audits/${auditId}`;
       await navigator.clipboard.writeText(url);
       setShareToast(true);
       setTimeout(() => setShareToast(false), 2500);
@@ -58,18 +65,18 @@ export default function AuditDetailPage() {
   };
 
   const downloadPdf = async () => {
-    if (!report?.report_id || pdfBusy) return;
+    if (!report?.audit_id || pdfBusy) return;
     setPdfBusy(true);
     setPdfError('');
     try {
-      const res = await fetch(`${API_BASE}/report/${encodeURIComponent(report.report_id)}/pdf`, {
+      const res = await fetch(`${API_BASE}/report/${encodeURIComponent(report.audit_id)}/pdf`, {
         headers: { ...getAuthHeader(), 'X-API-KEY': getApiKey() },
       });
       if (!res.ok) throw new Error(`Download failed (${res.status})`);
       const blob = await res.blob();
       const disposition = res.headers.get('content-disposition') || '';
       const match = disposition.match(/filename=([^;]+)/i);
-      const filename = match ? match[1].replace(/"/g, '') : `aibreaker-audit-${report.report_id}.pdf`;
+      const filename = match ? match[1].replace(/"/g, '') : `aibreaker-audit-${report.audit_id}.pdf`;
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -97,23 +104,25 @@ export default function AuditDetailPage() {
   const findings = Array.isArray(report.findings) ? report.findings : [];
   const tier = (report.tier || 'vibe').replace(/^\w/, (c) => c.toUpperCase());
 
+  // Build screenshot URL from base64 or URL fields
+  const screenshotUrl = viewport === 'desktop'
+    ? report.desktop_screenshot_url
+    : report.mobile_screenshot_url;
+
   return (
     <div className="page-container fade-in">
       {/* Progress bar for processing */}
-      {report.status === 'processing' && progress && (
+      {(report.status === 'processing' || report.status === 'queued') && (
         <div className="card" style={{ padding: 20, marginBottom: 24 }}>
           <div className="card-label">Audit Progress</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
-            {progress.current_step || 'Processing…'}
+            {progress?.current_step || 'Processing…'}
           </div>
           <div style={{ height: 6, borderRadius: 'var(--radius-full)', background: 'var(--bg-surface)', overflow: 'hidden' }}>
             <div style={{
-              height: '100%', width: `${progress.progress_pct || 0}%`,
+              height: '100%', width: `${progress?.progress_pct || 0}%`,
               background: 'var(--accent)', transition: 'width 0.4s ease',
             }} />
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, fontFamily: 'var(--font-mono)' }}>
-            Step {progress.steps_done || 0} / {progress.steps_total || 0} · {progress.elapsed_seconds || 0}s
           </div>
         </div>
       )}
@@ -147,6 +156,18 @@ export default function AuditDetailPage() {
       {shareToast && <div className="toast"><Check size={14} style={{ color: 'var(--green)' }} /> Link copied to clipboard</div>}
       {pdfError && <div className="error-box">{pdfError}</div>}
 
+      {/* Video (deep/fix tiers) */}
+      {report.video_url && (
+        <div className="card" style={{ padding: 20, marginBottom: 24 }}>
+          <div className="card-label">Video Replay</div>
+          <video
+            controls
+            src={`${API_BASE}${report.video_url}`}
+            style={{ width: '100%', borderRadius: 'var(--radius-md)', background: '#000' }}
+          />
+        </div>
+      )}
+
       {/* Screenshots */}
       <div className="card" style={{ padding: 20, marginBottom: 24 }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
@@ -164,8 +185,8 @@ export default function AuditDetailPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           border: '1px solid var(--line)',
         }}>
-          {report.screenshot_url ? (
-            <img src={report.screenshot_url} alt="Screenshot"
+          {screenshotUrl ? (
+            <img src={`${API_BASE}${screenshotUrl}`} alt="Screenshot"
               style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }} />
           ) : (
             <span style={{ fontSize: 13, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
@@ -174,6 +195,21 @@ export default function AuditDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Summary */}
+      {report.summary && (
+        <div className="card" style={{ padding: 20, marginBottom: 24 }}>
+          <div className="card-label">Summary</div>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{report.summary}</p>
+        </div>
+      )}
+
+      {/* Bundled fix prompt */}
+      {report.bundled_fix_prompt && (
+        <div style={{ marginBottom: 24 }}>
+          <CopyButton text={report.bundled_fix_prompt} label="Copy All Fix Prompts" size="lg" />
+        </div>
+      )}
 
       {/* Findings */}
       {findings.length > 0 && (

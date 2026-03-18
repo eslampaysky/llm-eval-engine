@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowRight, Loader, Zap, ChevronDown, ChevronUp, Key } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useAppShell } from '../../context/AppShellContext.jsx';
 import TierPill from '../../components/TierPill.jsx';
 import LoadingSteps from '../../components/LoadingSteps.jsx';
 import ScoreRing from '../../components/ScoreRing.jsx';
@@ -117,8 +118,9 @@ export default function VibeCheckPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [hasUserKey, setHasUserKey] = useState(false);
-  const pollRef = useRef(null);
   const stepRef = useRef(null);
+
+  const { activeAudit, auditComplete, clearAuditComplete } = useAppShell();
 
   // Check if user has their own Gemini key
   useEffect(() => {
@@ -136,6 +138,27 @@ export default function VibeCheckPage() {
     setTier(newTier);
   };
 
+  // Resume display if there's an active audit (returned from another page)
+  useEffect(() => {
+    if (activeAudit && !auditId && !result) {
+      setAuditId(activeAudit.auditId);
+      setLoading(true);
+      setCurrentStep(2); // show mid-progress
+    }
+  }, [activeAudit]);
+
+  // When global polling finishes, show results
+  useEffect(() => {
+    if (auditComplete && auditComplete.audit_id === auditId) {
+      clearInterval(stepRef.current);
+      setCurrentStep(AUDIT_STEPS.length);
+      setTimeout(() => {
+        setResult(auditComplete);
+        setLoading(false);
+      }, 600);
+    }
+  }, [auditComplete, auditId]);
+
   async function startAudit() {
     if (!url) return;
     setLoading(true);
@@ -151,8 +174,16 @@ export default function VibeCheckPage() {
     }, 3000);
 
     try {
+      console.log('Starting audit with tier:', tier);
       const data = await api.startAgenticQA({ url, tier });
       setAuditId(data.audit_id);
+      // Save to localStorage for global polling (survives tab switches)
+      localStorage.setItem('abl_active_audit', JSON.stringify({
+        auditId: data.audit_id,
+        url,
+        tier,
+        startedAt: Date.now(),
+      }));
     } catch (err) {
       setLoading(false);
       setError(err.message || 'Failed to start audit');
@@ -160,7 +191,8 @@ export default function VibeCheckPage() {
     }
   }
 
-  // Poll for results
+  // Poll for results via global context — but also keep a local fallback
+  // in case the user stays on this page
   useEffect(() => {
     if (!auditId) return;
     let cancelled = false;
@@ -172,6 +204,8 @@ export default function VibeCheckPage() {
         if (data.status === 'done') {
           clearInterval(stepRef.current);
           setCurrentStep(AUDIT_STEPS.length);
+          // Clear localStorage since we're handling it here
+          localStorage.removeItem('abl_active_audit');
           setTimeout(() => {
             setResult(data);
             setLoading(false);
@@ -180,15 +214,17 @@ export default function VibeCheckPage() {
           clearInterval(stepRef.current);
           setLoading(false);
           setError('Audit failed. Please try again.');
+          localStorage.removeItem('abl_active_audit');
         } else {
-          pollRef.current = setTimeout(poll, 2500);
+          if (!cancelled) setTimeout(poll, 2500);
         }
       } catch {
-        if (!cancelled) pollRef.current = setTimeout(poll, 4000);
+        if (!cancelled) setTimeout(poll, 4000);
       }
     }
     poll();
-    return () => { cancelled = true; clearTimeout(pollRef.current); };
+    // Do NOT cancel polling on unmount — let global context handle it
+    return () => { cancelled = true; };
   }, [auditId]);
 
   const findings = result?.findings || [];

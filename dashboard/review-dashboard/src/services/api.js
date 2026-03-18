@@ -146,6 +146,9 @@ export const api = {
   getAgenticQAStatus(id) {
     return request(`/agentic-qa/status/${encodeURIComponent(id)}`);
   },
+  getAgenticQAHistory() {
+    return request('/agentic-qa/history');
+  },
 
   // ── Gemini API key management ──
   saveGeminiKey(apiKey) {

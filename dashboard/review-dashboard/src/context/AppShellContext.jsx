@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { api, getApiKey, ls, pollActive, pollStart, pollSub, setApiKey } from '../App.jsx';
+import { createContext, useContext, useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { api as legacyApi, getApiKey, ls, pollActive, pollStart, pollSub, setApiKey } from '../App.jsx';
+import { api } from '../services/api';
 
 const AppShellContext = createContext(null);
 
@@ -12,6 +13,94 @@ export function AppShellProvider({ children }) {
   const [groqApiKey, setGroqApiKeyState] = useState(() => ls.get('abl_groq_api_key') || '');
   const [running, setRunning] = useState(pollActive());
 
+  // ── Agentic QA global polling (survives tab switches) ──────────────────
+  const [activeAudit, setActiveAudit] = useState(null);
+  const [auditComplete, setAuditComplete] = useState(null);
+  const auditPollRef = useRef(null);
+
+  const clearAuditComplete = useCallback(() => {
+    setAuditComplete(null);
+  }, []);
+
+  // Start polling for an active agentic QA audit
+  const startAuditPolling = useCallback((auditInfo) => {
+    // Clear any existing poll
+    if (auditPollRef.current) clearTimeout(auditPollRef.current);
+
+    setActiveAudit(auditInfo);
+    let cancelled = false;
+
+    async function poll() {
+      if (cancelled) return;
+      try {
+        const data = await api.getAgenticQAStatus(auditInfo.auditId);
+        if (cancelled) return;
+
+        if (data.status === 'done') {
+          localStorage.removeItem('abl_active_audit');
+          setActiveAudit(null);
+          setAuditComplete(data);
+          return;
+        } else if (data.status === 'failed') {
+          localStorage.removeItem('abl_active_audit');
+          setActiveAudit(null);
+          return;
+        }
+        // Still processing — continue polling
+        if (!cancelled) {
+          auditPollRef.current = setTimeout(poll, 3000);
+        }
+      } catch {
+        // Network error — retry
+        if (!cancelled) {
+          auditPollRef.current = setTimeout(poll, 5000);
+        }
+      }
+    }
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (auditPollRef.current) clearTimeout(auditPollRef.current);
+    };
+  }, []);
+
+  // On mount, check localStorage for an active audit and resume polling
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('abl_active_audit');
+      if (!saved) return;
+      const auditInfo = JSON.parse(saved);
+      if (!auditInfo?.auditId) {
+        localStorage.removeItem('abl_active_audit');
+        return;
+      }
+      // Start polling
+      const cleanup = startAuditPolling(auditInfo);
+      return cleanup;
+    } catch {
+      localStorage.removeItem('abl_active_audit');
+    }
+  }, [startAuditPolling]);
+
+  // Watch for new audits being saved to localStorage (from VibeCheckPage)
+  useEffect(() => {
+    function onStorage(e) {
+      if (e.key === 'abl_active_audit' && e.newValue) {
+        try {
+          const auditInfo = JSON.parse(e.newValue);
+          if (auditInfo?.auditId) {
+            startAuditPolling(auditInfo);
+          }
+        } catch {}
+      }
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [startAuditPolling]);
+
+  // ── Legacy LLM eval polling ────────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
 
@@ -22,11 +111,11 @@ export function AppShellProvider({ children }) {
 
       if (savedDemoId) {
         try {
-          const nextReport = await api.getDemoReport(savedDemoId);
+          const nextReport = await legacyApi.getDemoReport(savedDemoId);
           if (!mounted) return;
           if (nextReport.status === 'processing') {
             setRunning(true);
-            pollStart(savedDemoId, nextReport.sample_count || 5, api.getDemoReport, 'demo');
+            pollStart(savedDemoId, nextReport.sample_count || 5, legacyApi.getDemoReport, 'demo');
             return;
           }
         } catch {}
@@ -35,11 +124,11 @@ export function AppShellProvider({ children }) {
 
       if (savedId) {
         try {
-          const nextReport = await api.getReport(savedId);
+          const nextReport = await legacyApi.getReport(savedId);
           if (!mounted) return;
           if (nextReport.status === 'processing') {
             setRunning(true);
-            pollStart(savedId, nextReport.sample_count || 20, api.getReport, 'break');
+            pollStart(savedId, nextReport.sample_count || 20, legacyApi.getReport, 'break');
             return;
           }
         } catch {}
@@ -97,7 +186,11 @@ export function AppShellProvider({ children }) {
     groqApiKey,
     setGroqApiKey: updateGroqApiKey,
     running,
-  }), [report, demoReport, compareFocus, persona, apiKey, groqApiKey, running]);
+    // Agentic QA audit state
+    activeAudit,
+    auditComplete,
+    clearAuditComplete,
+  }), [report, demoReport, compareFocus, persona, apiKey, groqApiKey, running, activeAudit, auditComplete, clearAuditComplete]);
 
   return <AppShellContext.Provider value={value}>{children}</AppShellContext.Provider>;
 }
