@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { RotateCcw, Share2, Download, Monitor, Smartphone, Check, Loader } from 'lucide-react';
-import { API_BASE, SHARE_BASE, getApiKey } from '../../App.jsx';
 import { getAuthHeader } from '../../context/AuthContext.jsx';
 import { api } from '../../services/api';
 import ScoreRing from '../../components/ScoreRing.jsx';
@@ -19,6 +18,7 @@ export default function AuditDetailPage() {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState('');
   const [progress, setProgress] = useState(null);
+  const [mediaUrls, setMediaUrls] = useState({ video: '', desktop: '', mobile: '' });
 
   // Fetch report — use agentic QA status endpoint (the correct one)
   useEffect(() => {
@@ -36,25 +36,13 @@ export default function AuditDetailPage() {
       return;
     }
     let active = true;
-    let pollCount = 0;
-    const MAX_POLLS = 20; // 60 seconds / 3s
     async function poll() {
       try {
         const data = await api.getAgenticQAStatus(auditId);
         if (!active) return;
-        pollCount++;
         
         if (data.status === 'done' || data.status === 'failed') {
           setReport(data);
-          setProgress(null);
-          active = false;
-        } else if (pollCount >= MAX_POLLS) {
-          setReport((prev) => ({ 
-            ...data, 
-            status: 'failed', 
-            error: 'Audit timed out after 1 minute of inactivity.', 
-            summary: 'The audit took too long and was aborted. Please try again later.' 
-          }));
           setProgress(null);
           active = false;
         } else {
@@ -83,8 +71,8 @@ export default function AuditDetailPage() {
     setPdfBusy(true);
     setPdfError('');
     try {
-      const res = await fetch(`${API_BASE}/report/${encodeURIComponent(report.audit_id)}/pdf`, {
-        headers: { ...getAuthHeader(), 'X-API-KEY': getApiKey() },
+      const res = await fetch(`${api.baseUrl}/report/${encodeURIComponent(report.audit_id)}/pdf`, {
+        headers: { ...getAuthHeader(), 'X-API-KEY': api.getApiKey() },
       });
       if (!res.ok) throw new Error(`Download failed (${res.status})`);
       const blob = await res.blob();
@@ -104,6 +92,41 @@ export default function AuditDetailPage() {
     } finally { setPdfBusy(false); }
   };
 
+  useEffect(() => {
+    if (!report) return;
+    const urlsToRevoke = [];
+    let cancelled = false;
+
+    async function loadProtectedAsset(relativePath, key) {
+      if (!relativePath) return;
+      try {
+        const res = await fetch(`${api.baseUrl}${relativePath}`, {
+          headers: {
+            ...getAuthHeader(),
+            'X-API-KEY': api.getApiKey(),
+          },
+        });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        urlsToRevoke.push(objectUrl);
+        if (!cancelled) {
+          setMediaUrls((prev) => ({ ...prev, [key]: objectUrl }));
+        }
+      } catch {}
+    }
+
+    setMediaUrls({ video: '', desktop: '', mobile: '' });
+    loadProtectedAsset(report.video_url, 'video');
+    loadProtectedAsset(report.desktop_screenshot_url, 'desktop');
+    loadProtectedAsset(report.mobile_screenshot_url, 'mobile');
+
+    return () => {
+      cancelled = true;
+      urlsToRevoke.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [report]);
+
   if (loading) {
     return (
       <div className="page-container fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
@@ -120,8 +143,8 @@ export default function AuditDetailPage() {
 
   // Build screenshot URL from base64 or URL fields
   const screenshotUrl = viewport === 'desktop'
-    ? report.desktop_screenshot_url
-    : report.mobile_screenshot_url;
+    ? mediaUrls.desktop
+    : mediaUrls.mobile;
 
   return (
     <div className="page-container fade-in">
@@ -174,11 +197,21 @@ export default function AuditDetailPage() {
       {report.video_url && (
         <div className="card" style={{ padding: 20, marginBottom: 24 }}>
           <div className="card-label">Video Replay</div>
-          <video
-            controls
-            src={`${API_BASE}${report.video_url}`}
-            style={{ width: '100%', borderRadius: 'var(--radius-md)', background: '#000' }}
-          />
+          {mediaUrls.video ? (
+            <video
+              controls
+              src={mediaUrls.video}
+              style={{ width: '100%', borderRadius: 'var(--radius-md)', background: '#000' }}
+            />
+          ) : (
+            <div style={{
+              width: '100%', minHeight: 180, borderRadius: 'var(--radius-md)', background: '#000',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)',
+              fontSize: 13,
+            }}>
+              Loading video replay…
+            </div>
+          )}
         </div>
       )}
 
@@ -200,7 +233,7 @@ export default function AuditDetailPage() {
           border: '1px solid var(--line)',
         }}>
           {screenshotUrl ? (
-            <img src={`${API_BASE}${screenshotUrl}`} alt="Screenshot"
+            <img src={screenshotUrl} alt="Screenshot"
               style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }} />
           ) : (
             <span style={{ fontSize: 13, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>

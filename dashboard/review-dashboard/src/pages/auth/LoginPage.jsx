@@ -77,14 +77,14 @@ export default function LoginPage() {
         {error && <div className="error-box">{error}</div>}
 
         <div style={{ marginBottom: 14 }}>
-          <label className="form-label">Email</label>
-          <input className="form-input" type="email" value={email}
+          <label className="form-label" htmlFor="login-email">Email</label>
+          <input id="login-email" className="form-input" type="email" value={email}
             onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" required />
         </div>
 
         <div style={{ marginBottom: 8 }}>
-          <label className="form-label">Password</label>
-          <input className="form-input" type="password" value={password}
+          <label className="form-label" htmlFor="login-password">Password</label>
+          <input id="login-password" className="form-input" type="password" value={password}
             onChange={(e) => setPassword(e.target.value)} placeholder="Your password" required />
         </div>
 

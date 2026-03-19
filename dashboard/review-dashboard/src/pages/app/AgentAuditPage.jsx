@@ -1,32 +1,47 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, ArrowRight, RotateCcw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronDown, ChevronUp, ArrowRight, Loader } from 'lucide-react';
 import TierPill from '../../components/TierPill.jsx';
-import LoadingSteps from '../../components/LoadingSteps.jsx';
-import ScoreRing from '../../components/ScoreRing.jsx';
-import FindingCard from '../../components/FindingCard.jsx';
-import CopyButton from '../../components/CopyButton.jsx';
+import { useAppShell } from '../../context/AppShellContext.jsx';
+import { api } from '../../services/api';
 
 export default function AgentAuditPage() {
+  const navigate = useNavigate();
+  const shell = useAppShell();
+  const activeAudit = shell?.activeAudit ?? null;
+  const beginAudit = shell?.beginAudit ?? (() => {});
+  const hasActiveAudit = shell?.hasActiveAudit ?? false;
   const [url, setUrl] = useState('');
   const [tier, setTier] = useState('fix');
   const [showCode, setShowCode] = useState(false);
   const [code, setCode] = useState('');
-  const [phase, setPhase] = useState('input');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const bundledFix = `// Bundled Fix Prompt for your app
-// Paste this into your AI builder (Cursor, Bolt, etc.)
+  async function startAudit() {
+    if (!url.trim()) return;
+    if (hasActiveAudit) {
+      setError('An audit is already running. Wait for it to finish before starting another.');
+      return;
+    }
 
-1. Fix the checkout button z-index issue on mobile:
-   In CheckoutForm, add position: relative; z-index: 10;
-
-2. Add email validation before createUser():
-   if (!email || !email.includes('@')) {
-     setError('Please enter a valid email');
-     return;
-   }
-
-3. Fix hero headline overflow:
-   Add word-wrap: break-word; max-width: 100%;`;
+    setLoading(true);
+    setError('');
+    try {
+      const data = await api.startAgenticQA({ url, tier });
+      beginAudit({
+        auditId: data.audit_id,
+        url,
+        tier,
+        startedAt: Date.now(),
+        hasSourceCode: Boolean(code.trim()),
+      });
+      navigate(`/app/audits/${data.audit_id}`);
+    } catch (err) {
+      setError(err.message || 'Failed to start audit');
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="page-container fade-in">
@@ -36,7 +51,27 @@ export default function AgentAuditPage() {
         <p className="page-subtitle">AI-powered fixes with verification. Paste code for deeper analysis.</p>
       </div>
 
-      {phase === 'input' && (
+      {error && (
+        <div className="card" style={{
+          padding: '12px 16px', marginBottom: 20,
+          background: 'rgba(232, 89, 60, 0.08)', border: '1px solid rgba(232, 89, 60, 0.3)',
+          color: 'var(--coral)', fontSize: 13, borderRadius: 'var(--radius-md)',
+        }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      {hasActiveAudit && (
+        <div className="card" style={{
+          padding: '12px 16px', marginBottom: 20,
+          background: 'rgba(59, 180, 255, 0.08)', border: '1px solid rgba(59, 180, 255, 0.2)',
+          color: 'var(--text-primary)', fontSize: 13, borderRadius: 'var(--radius-md)',
+        }}>
+          An audit is already running for {activeAudit?.url || 'another URL'}. Finish it before starting a new Fix & Verify run.
+        </div>
+      )}
+
+      {!loading && (
         <>
           <div className="card" style={{ padding: 32, marginBottom: 20 }}>
             <label className="form-label" style={{ marginBottom: 8 }}>URL to Audit</label>
@@ -77,70 +112,17 @@ export default function AgentAuditPage() {
             )}
           </div>
 
-          <button className="btn btn-primary-lg" onClick={() => setPhase('loading')}
-            disabled={!url.trim()} style={{ width: '100%' }}>
+          <button className="btn btn-primary-lg" onClick={startAudit}
+            disabled={!url.trim() || hasActiveAudit} style={{ width: '100%' }}>
             Run Fix & Verify Audit <ArrowRight size={18} />
           </button>
         </>
       )}
 
-      {phase === 'loading' && (
-        <LoadingSteps
-          steps={[
-            { label: 'Launching browser...' },
-            { label: 'Analyzing source code...' },
-            { label: 'Running visual audit...' },
-            { label: 'Generating AI fixes...' },
-            { label: 'Preparing verification plan...' },
-          ]}
-          currentStep={3}
-        />
-      )}
-
-      {phase === 'results' && (
-        <div className="slide-up">
-          {/* Bundled fix at top */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(59, 180, 255, 0.08), rgba(52, 211, 153, 0.05))',
-            border: '2px solid rgba(59, 180, 255, 0.2)',
-            borderRadius: 'var(--radius-lg)',
-            padding: 24,
-            marginBottom: 24,
-          }}>
-            <div className="card-label" style={{ color: 'var(--accent)' }}>Bundled Fix Prompt</div>
-            <pre style={{
-              fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)',
-              lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: 16,
-            }}>
-              {bundledFix}
-            </pre>
-            <CopyButton text={bundledFix} label="Copy Bundled Fix" size="lg" />
-          </div>
-
-          <div className="card" style={{
-            padding: 32, marginBottom: 24,
-            display: 'flex', alignItems: 'center', gap: 32, flexWrap: 'wrap',
-          }}>
-            <ScoreRing score={67} size={120} label="/100" />
-            <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>
-                Fix & Verify Complete
-              </div>
-              <span className="badge badge-amber">Needs Work</span>
-            </div>
-          </div>
-
-          <div className="card-label" style={{ marginBottom: 12 }}>Findings</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-            <FindingCard severity="critical" category="flow" title="Checkout button unreachable on mobile"
-              description="Button behind footer on small screens." fixPrompt="Add: position: relative; z-index: 10;" />
-            <FindingCard severity="warning" category="logic" title="Form accepts empty emails"
-              fixPrompt="Add email validation before createUser()" />
-          </div>
-
-          <button className="btn btn-primary" onClick={() => setPhase('input')}>
-            <RotateCcw size={16} /> Re-run to Verify Fixes
-          </button>
+      {loading && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 16 }}>
+          <Loader size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent)' }} />
+          <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Starting Fix & Verify Audit...</div>
         </div>
       )}
     </div>

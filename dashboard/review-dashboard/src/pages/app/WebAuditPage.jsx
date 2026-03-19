@@ -2,12 +2,17 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, GripVertical, Trash2, ArrowRight, Loader } from 'lucide-react';
 import TierPill from '../../components/TierPill.jsx';
+import { useAppShell } from '../../context/AppShellContext.jsx';
 import { api } from '../../services/api';
 
 const ACTIONS = ['Click', 'Fill', 'Expect text', 'Wait'];
 
 export default function WebAuditPage() {
   const navigate = useNavigate();
+  const shell = useAppShell();
+  const activeAudit = shell?.activeAudit ?? null;
+  const beginAudit = shell?.beginAudit ?? (() => {});
+  const hasActiveAudit = shell?.hasActiveAudit ?? false;
   const [url, setUrl] = useState('');
   const [tier, setTier] = useState('deep');
   const [steps, setSteps] = useState([{ action: 'Click', selector: '', value: '' }]);
@@ -20,10 +25,20 @@ export default function WebAuditPage() {
 
   async function startAudit() {
     if (!url.trim()) return;
+    if (hasActiveAudit) {
+      setError('An audit is already running. Wait for it to finish before starting another.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
       const data = await api.startAgenticQA({ url, tier, journeys: steps });
+      beginAudit({
+        auditId: data.audit_id,
+        url,
+        tier,
+        startedAt: Date.now(),
+      });
       navigate(`/app/audits/${data.audit_id}`);
     } catch (err) {
       setError(err.message || 'Failed to start audit');
@@ -46,6 +61,16 @@ export default function WebAuditPage() {
           color: 'var(--coral)', fontSize: 13, borderRadius: 'var(--radius-md)',
         }}>
           ⚠ {error}
+        </div>
+      )}
+
+      {hasActiveAudit && (
+        <div className="card" style={{
+          padding: '12px 16px', marginBottom: 20,
+          background: 'rgba(59, 180, 255, 0.08)', border: '1px solid rgba(59, 180, 255, 0.2)',
+          color: 'var(--text-primary)', fontSize: 13, borderRadius: 'var(--radius-md)',
+        }}>
+          An audit is already running for {activeAudit?.url || 'another URL'}. Finish it before starting a new Deep Dive.
         </div>
       )}
 
@@ -103,7 +128,7 @@ export default function WebAuditPage() {
           </div>
 
           <button className="btn btn-primary-lg" onClick={startAudit}
-            disabled={!url.trim() || loading} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+            disabled={!url.trim() || loading || hasActiveAudit} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
             Run Deep Dive Audit <ArrowRight size={18} />
           </button>
         </>

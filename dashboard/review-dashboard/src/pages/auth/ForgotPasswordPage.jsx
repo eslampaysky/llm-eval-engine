@@ -29,8 +29,8 @@ export default function ForgotPasswordPage() {
       ) : (
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 20 }}>
-            <label className="form-label">Email</label>
-            <input className="form-input" type="email" value={email}
+            <label className="form-label" htmlFor="forgot-email">Email</label>
+            <input id="forgot-email" className="form-input" type="email" value={email}
               onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" required />
           </div>
           <button type="submit" className="btn btn-primary"

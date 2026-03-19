@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowRight, Loader, Zap, ChevronDown, ChevronUp, Key } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext.jsx';
 import { useAppShell } from '../../context/AppShellContext.jsx';
 import TierPill from '../../components/TierPill.jsx';
 import LoadingSteps from '../../components/LoadingSteps.jsx';
@@ -108,7 +107,6 @@ function QuotaBanner({ hasUserKey }) {
 /* ── Main Page ───────────────────────────────────────────────────────────── */
 
 export default function VibeCheckPage() {
-  const navigate = useNavigate();
   const [url, setUrl] = useState('');
   const [tier, setTier] = useState('vibe');
   const [auditId, setAuditId] = useState(null);
@@ -116,39 +114,44 @@ export default function VibeCheckPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentStep, setCurrentStep] = useState(0);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [hasUserKey, setHasUserKey] = useState(false);
   const stepRef = useRef(null);
 
   const shell = useAppShell();
   const activeAudit = shell?.activeAudit ?? null;
+  const beginAudit = shell?.beginAudit ?? (() => {});
   const auditComplete = shell?.auditComplete ?? null;
   const clearAuditComplete = shell?.clearAuditComplete ?? (() => {});
+  const hasActiveAudit = shell?.hasActiveAudit ?? false;
+  const activeAuditIsVibe = activeAudit?.tier === 'vibe';
 
   // Check if user has their own Gemini key
   useEffect(() => {
     api.getGeminiKeyStatus().then((d) => setHasUserKey(d?.has_key || false)).catch(() => {});
   }, []);
 
-  const { user } = useAuth();
-  const isAdmin = user?.is_admin || false;
+  const isCurrentAuditActive = Boolean(activeAudit?.auditId && activeAudit.auditId === auditId);
 
   const handleTierChange = (newTier) => {
-    if (newTier !== 'vibe' && !isAdmin) {
-      setShowUpgradeModal(true);
+    if (newTier === 'deep') {
+      navigate('/app/web-audit');
       return;
     }
-    setTier(newTier);
+    if (newTier === 'fix') {
+      navigate('/app/agent-audit');
+      return;
+    }
+    setTier('vibe');
   };
 
   // Resume display if there's an active audit (returned from another page)
   useEffect(() => {
-    if (activeAudit && !auditId && !result) {
+    if (activeAuditIsVibe && activeAudit && !auditId && !result) {
       setAuditId(activeAudit.auditId);
       setLoading(true);
       setCurrentStep(2); // show mid-progress
     }
-  }, [activeAudit]);
+  }, [activeAudit, activeAuditIsVibe, auditId, result]);
 
   // When global polling finishes, show results
   useEffect(() => {
@@ -158,12 +161,17 @@ export default function VibeCheckPage() {
       setTimeout(() => {
         setResult(auditComplete);
         setLoading(false);
+        clearAuditComplete();
       }, 600);
     }
-  }, [auditComplete, auditId]);
+  }, [auditComplete, auditId, clearAuditComplete]);
 
   async function startAudit() {
     if (!url) return;
+    if (hasActiveAudit && !isCurrentAuditActive) {
+      setError('An audit is already running. Wait for it to finish before starting another.');
+      return;
+    }
     setLoading(true);
     setResult(null);
     setError('');
@@ -180,55 +188,18 @@ export default function VibeCheckPage() {
       console.log('Starting audit with tier:', tier);
       const data = await api.startAgenticQA({ url, tier });
       setAuditId(data.audit_id);
-      // Save to localStorage for global polling (survives tab switches)
-      localStorage.setItem('abl_active_audit', JSON.stringify({
+      beginAudit({
         auditId: data.audit_id,
         url,
         tier,
         startedAt: Date.now(),
-      }));
+      });
     } catch (err) {
       setLoading(false);
       setError(err.message || 'Failed to start audit');
       clearInterval(stepRef.current);
     }
   }
-
-  // Poll for results via global context — but also keep a local fallback
-  // in case the user stays on this page
-  useEffect(() => {
-    if (!auditId) return;
-    let cancelled = false;
-
-    async function poll() {
-      try {
-        const data = await api.getAgenticQAStatus(auditId);
-        if (cancelled) return;
-        if (data.status === 'done') {
-          clearInterval(stepRef.current);
-          setCurrentStep(AUDIT_STEPS.length);
-          // Clear localStorage since we're handling it here
-          localStorage.removeItem('abl_active_audit');
-          setTimeout(() => {
-            setResult(data);
-            setLoading(false);
-          }, 600);
-        } else if (data.status === 'failed') {
-          clearInterval(stepRef.current);
-          setLoading(false);
-          setError('Audit failed. Please try again.');
-          localStorage.removeItem('abl_active_audit');
-        } else {
-          if (!cancelled) setTimeout(poll, 2500);
-        }
-      } catch {
-        if (!cancelled) setTimeout(poll, 4000);
-      }
-    }
-    poll();
-    // Do NOT cancel polling on unmount — let global context handle it
-    return () => { cancelled = true; };
-  }, [auditId]);
 
   const findings = result?.findings || [];
   const score = result?.score;
@@ -255,6 +226,29 @@ export default function VibeCheckPage() {
         </div>
       )}
 
+      {hasActiveAudit && !isCurrentAuditActive && (
+        <div className="card" style={{
+          padding: '12px 16px', marginBottom: 20,
+          background: 'rgba(59, 180, 255, 0.08)', border: '1px solid rgba(59, 180, 255, 0.2)',
+          color: 'var(--text-primary)', fontSize: 13, borderRadius: 'var(--radius-md)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <span>
+              A {activeAudit?.tier || 'running'} audit is already running for {activeAudit?.url || 'another URL'}.
+            </span>
+            {activeAudit?.auditId && (
+              <Link
+                to={`/app/audits/${activeAudit.auditId}`}
+                className="btn btn-ghost"
+                style={{ padding: '8px 14px', whiteSpace: 'nowrap' }}
+              >
+                View Running Audit
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
       {phase === 'input' && (
         <div className="card" style={{ padding: 32 }}>
           <label className="form-label" style={{ marginBottom: 8 }}>URL to Audit</label>
@@ -271,12 +265,15 @@ export default function VibeCheckPage() {
           <div style={{ marginBottom: 24 }}>
             <label className="form-label" style={{ marginBottom: 8 }}>Audit Tier</label>
             <TierPill selected={tier} onChange={handleTierChange} />
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)' }}>
+              Deep Dive and Fix & Verify open their dedicated pages, where the finished audit shows video, screenshots, and copyable fix prompts.
+            </div>
           </div>
 
           <button
             className="btn btn-primary-lg"
             onClick={startAudit}
-            disabled={!url.trim()}
+            disabled={!url.trim() || (hasActiveAudit && !isCurrentAuditActive)}
             style={{ width: '100%' }}
           >
             Run Audit <ArrowRight size={18} />
@@ -361,27 +358,9 @@ export default function VibeCheckPage() {
           <div style={{ marginTop: 24 }}>
             <button className="btn btn-ghost" onClick={() => {
               setResult(null); setAuditId(null); setUrl(''); setError('');
-            }}>
+            }} disabled={hasActiveAudit}>
               Run Another Audit
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Upgrade modal */}
-      {showUpgradeModal && (
-        <div className="modal-overlay" onClick={() => setShowUpgradeModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
-              Upgrade to unlock {tier === 'deep' ? 'Deep Dive' : 'Fix & Verify'}
-            </h3>
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
-              This tier requires a paid plan. Upgrade to access video replay, journey testing, and more.
-            </p>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <a href="/pricing" className="btn btn-primary">View Plans</a>
-              <button className="btn btn-ghost" onClick={() => setShowUpgradeModal(false)}>Maybe Later</button>
-            </div>
           </div>
         </div>
       )}

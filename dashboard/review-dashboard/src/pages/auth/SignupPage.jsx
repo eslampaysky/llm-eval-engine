@@ -89,8 +89,9 @@ export default function SignupPage() {
         {error && <div className="error-box">{error}</div>}
 
         <div style={{ marginBottom: 14 }}>
-          <label className="form-label">Name</label>
+          <label className="form-label" htmlFor="signup-name">Name</label>
           <input
+            id="signup-name"
             className="form-input"
             type="text"
             value={name}
@@ -101,8 +102,9 @@ export default function SignupPage() {
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <label className="form-label">Email</label>
+          <label className="form-label" htmlFor="signup-email">Email</label>
           <input
+            id="signup-email"
             className="form-input"
             type="email"
             value={email}
@@ -113,8 +115,9 @@ export default function SignupPage() {
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <label className="form-label">Password</label>
+          <label className="form-label" htmlFor="signup-password">Password</label>
           <input
+            id="signup-password"
             className="form-input"
             type="password"
             value={password}

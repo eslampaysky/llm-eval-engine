@@ -121,7 +121,7 @@ export default function OverviewPage() {
         <div className="card" style={{ padding: 24, marginBottom: 28 }}>
           <div className="card-label">Score Trend — Last 10 Audits</div>
           <div style={{ height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={chartData}>
                 <XAxis
                   dataKey="name"

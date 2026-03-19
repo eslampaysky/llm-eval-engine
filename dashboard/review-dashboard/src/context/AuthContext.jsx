@@ -1,8 +1,20 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ||
-  'https://ai-breaker-labs.vercel.app';
+function resolveApiBase() {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configured) return configured;
+
+  if (typeof window !== 'undefined') {
+    const { hostname } = window.location;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:8000';
+    }
+  }
+
+  return 'https://llm-eval-engine-production.up.railway.app';
+}
+
+const API_BASE = resolveApiBase();
 
 let token = localStorage.getItem('auth_token');
 

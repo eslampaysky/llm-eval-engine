@@ -3,6 +3,18 @@ import { api as legacyApi, getApiKey, ls, pollActive, pollStart, pollSub, setApi
 import { api } from '../services/api';
 
 const AppShellContext = createContext(null);
+const ACTIVE_AUDIT_KEY = 'abl_active_audit';
+
+function readSavedAudit() {
+  try {
+    const raw = localStorage.getItem(ACTIVE_AUDIT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.auditId ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 export function AppShellProvider({ children }) {
   const [report, setReport] = useState(null);
@@ -18,42 +30,61 @@ export function AppShellProvider({ children }) {
   const [auditComplete, setAuditComplete] = useState(null);
   const auditPollRef = useRef(null);
 
+  const clearAuditPollingTimer = useCallback(() => {
+    if (auditPollRef.current) {
+      clearTimeout(auditPollRef.current);
+      auditPollRef.current = null;
+    }
+  }, []);
+
   const clearAuditComplete = useCallback(() => {
     setAuditComplete(null);
   }, []);
 
+  const clearActiveAudit = useCallback(() => {
+    clearAuditPollingTimer();
+    localStorage.removeItem(ACTIVE_AUDIT_KEY);
+    setActiveAudit(null);
+  }, [clearAuditPollingTimer]);
+
   // Start polling for an active agentic QA audit
   const startAuditPolling = useCallback((auditInfo) => {
-    // Clear any existing poll
-    if (auditPollRef.current) clearTimeout(auditPollRef.current);
+    clearAuditPollingTimer();
 
+    localStorage.setItem(ACTIVE_AUDIT_KEY, JSON.stringify(auditInfo));
+    setAuditComplete(null);
     setActiveAudit(auditInfo);
     let cancelled = false;
-    let pollCount = 0;
-    const MAX_POLLS = 20; // 60 seconds / 3s
 
     async function poll() {
       if (cancelled) return;
       try {
         const data = await api.getAgenticQAStatus(auditInfo.auditId);
         if (cancelled) return;
-        pollCount++;
+
+        setActiveAudit((prev) => ({
+          ...(prev || auditInfo),
+          ...auditInfo,
+          status: data.status,
+          score: data.score,
+          summary: data.summary,
+        }));
 
         if (data.status === 'done') {
-          localStorage.removeItem('abl_active_audit');
+          localStorage.removeItem(ACTIVE_AUDIT_KEY);
+          clearAuditPollingTimer();
           setActiveAudit(null);
           setAuditComplete(data);
           return;
-        } else if (data.status === 'failed') {
-          localStorage.removeItem('abl_active_audit');
+        }
+
+        if (data.status === 'failed') {
+          localStorage.removeItem(ACTIVE_AUDIT_KEY);
+          clearAuditPollingTimer();
           setActiveAudit(null);
-          return;
-        } else if (pollCount >= MAX_POLLS) {
-          localStorage.removeItem('abl_active_audit');
-          setActiveAudit(null);
-          setAuditComplete({ ...data, status: 'failed', error: 'Audit timed out after 1 minute of inactivity.' });
           return;
         }
+
         // Still processing — continue polling
         if (!cancelled) {
           auditPollRef.current = setTimeout(poll, 3000);
@@ -70,32 +101,29 @@ export function AppShellProvider({ children }) {
 
     return () => {
       cancelled = true;
-      if (auditPollRef.current) clearTimeout(auditPollRef.current);
+      clearAuditPollingTimer();
     };
-  }, []);
+  }, [clearAuditPollingTimer]);
+
+  const beginAudit = useCallback((auditInfo) => {
+    startAuditPolling(auditInfo);
+  }, [startAuditPolling]);
 
   // On mount, check localStorage for an active audit and resume polling
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('abl_active_audit');
-      if (!saved) return;
-      const auditInfo = JSON.parse(saved);
-      if (!auditInfo?.auditId) {
-        localStorage.removeItem('abl_active_audit');
-        return;
-      }
-      // Start polling
-      const cleanup = startAuditPolling(auditInfo);
-      return cleanup;
-    } catch {
-      localStorage.removeItem('abl_active_audit');
+    const auditInfo = readSavedAudit();
+    if (!auditInfo) {
+      localStorage.removeItem(ACTIVE_AUDIT_KEY);
+      return;
     }
+    const cleanup = startAuditPolling(auditInfo);
+    return cleanup;
   }, [startAuditPolling]);
 
   // Watch for new audits being saved to localStorage (from VibeCheckPage)
   useEffect(() => {
     function onStorage(e) {
-      if (e.key === 'abl_active_audit' && e.newValue) {
+      if (e.key === ACTIVE_AUDIT_KEY && e.newValue) {
         try {
           const auditInfo = JSON.parse(e.newValue);
           if (auditInfo?.auditId) {
@@ -103,10 +131,15 @@ export function AppShellProvider({ children }) {
           }
         } catch {}
       }
+
+      if (e.key === ACTIVE_AUDIT_KEY && !e.newValue) {
+        clearAuditPollingTimer();
+        setActiveAudit(null);
+      }
     }
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
-  }, [startAuditPolling]);
+  }, [clearAuditPollingTimer, startAuditPolling]);
 
   // ── Legacy LLM eval polling ────────────────────────────────────────────
   useEffect(() => {
@@ -196,9 +229,12 @@ export function AppShellProvider({ children }) {
     running,
     // Agentic QA audit state
     activeAudit,
+    beginAudit,
+    clearActiveAudit,
     auditComplete,
     clearAuditComplete,
-  }), [report, demoReport, compareFocus, persona, apiKey, groqApiKey, running, activeAudit, auditComplete, clearAuditComplete]);
+    hasActiveAudit: Boolean(activeAudit),
+  }), [report, demoReport, compareFocus, persona, apiKey, groqApiKey, running, activeAudit, beginAudit, clearActiveAudit, auditComplete, clearAuditComplete]);
 
   return <AppShellContext.Provider value={value}>{children}</AppShellContext.Provider>;
 }
