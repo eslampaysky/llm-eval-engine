@@ -4,6 +4,8 @@ import re
 
 import anthropic
 
+from core.models import to_dict
+
 _client = None
 
 
@@ -113,3 +115,56 @@ Analyze this data and return ONLY valid JSON matching this exact schema:
     if inferred_spec:
         verdict["inferred_spec"] = inferred_spec
     return verdict
+
+
+def build_journey_timeline(journey_results: list[dict] | None) -> list[dict]:
+    timeline: list[dict] = []
+    for journey in journey_results or []:
+        steps = journey.get("steps") or []
+        failed_step = next((step for step in steps if step.get("status") != "passed"), None)
+        timeline.append(
+            {
+                "journey": journey.get("journey") or journey.get("name") or "Unnamed Journey",
+                "status": journey.get("status") or (
+                    "FAILED" if failed_step else "PASSED"
+                ),
+                "failed_step": failed_step.get("step_name") if failed_step else None,
+                "reason": failed_step.get("error") or failed_step.get("failure_type") if failed_step else None,
+                "steps": [
+                    {
+                        "step": step.get("step_name") or step.get("goal") or "step",
+                        "status": step.get("status") or "unknown",
+                        "failure_type": step.get("failure_type"),
+                        "evidence_delta": step.get("evidence_delta") or [],
+                        "recovery_attempts": step.get("recovery_attempts") or [],
+                    }
+                    for step in steps
+                ],
+            }
+        )
+    return timeline
+
+
+def build_fix_prompt_context(
+    journey_results: list[dict] | None,
+    state_snapshot_summary: dict | None = None,
+) -> str:
+    lines: list[str] = []
+    if state_snapshot_summary:
+        lines.append(
+            "State context: " + json.dumps(to_dict(state_snapshot_summary), ensure_ascii=False)[:1200]
+        )
+
+    for journey in journey_results or []:
+        lines.append(f"Journey: {journey.get('journey') or journey.get('name') or 'Unnamed Journey'}")
+        for step in journey.get("steps") or []:
+            status = step.get("status") or "unknown"
+            reason = step.get("error") or step.get("failure_type") or ""
+            delta = ", ".join(step.get("evidence_delta") or [])
+            lines.append(
+                f"- Step {step.get('step_name') or step.get('goal') or 'step'}: {status}"
+                + (f" | reason: {reason}" if reason else "")
+                + (f" | delta: {delta}" if delta else "")
+            )
+
+    return "\n".join(lines).strip()

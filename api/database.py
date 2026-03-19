@@ -315,6 +315,7 @@ def init_db():
                 audit_id        TEXT PRIMARY KEY,
                 client_name     TEXT,
                 url             TEXT,
+                site_description TEXT,
                 tier            TEXT,
                 status          TEXT NOT NULL DEFAULT 'queued',
                 score           INTEGER,
@@ -322,6 +323,8 @@ def init_db():
                 findings_json   TEXT,
                 summary         TEXT,
                 bundled_fix     TEXT,
+                journey_timeline_json TEXT,
+                step_results_json TEXT,
                 video_path      TEXT,
                 desktop_ss_b64  TEXT,
                 mobile_ss_b64   TEXT,
@@ -389,6 +392,19 @@ def init_db():
             cur.execute("ALTER TABLE users ADD COLUMN gemini_api_key_enc TEXT")
         if "is_admin" not in existing_users:
             cur.execute("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE")
+
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'agentic_qa_reports'
+        """)
+        existing_agentic_qa = {row["column_name"] for row in cur.fetchall()}
+        if "site_description" not in existing_agentic_qa:
+            cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN site_description TEXT")
+        if "journey_timeline_json" not in existing_agentic_qa:
+            cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN journey_timeline_json TEXT")
+        if "step_results_json" not in existing_agentic_qa:
+            cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN step_results_json TEXT")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1759,6 +1775,7 @@ def insert_agentic_qa_report(
     audit_id: str,
     client_name: str | None,
     url: str,
+    site_description: str | None,
     tier: str,
     status: str = "queued",
 ) -> None:
@@ -1768,10 +1785,10 @@ def insert_agentic_qa_report(
         cur.execute(
             f"""
             INSERT INTO agentic_qa_reports(
-                audit_id, client_name, url, tier, status, created_at, updated_at
-            ) VALUES ({_ph(7)})
+                audit_id, client_name, url, site_description, tier, status, created_at, updated_at
+            ) VALUES ({_ph(8)})
             """,
-            (audit_id, client_name, url, tier, status, now, now),
+            (audit_id, client_name, url, site_description, tier, status, now, now),
         )
 
 
@@ -1796,6 +1813,8 @@ def finalize_agentic_qa_success(
     findings_json: str | None,
     summary: str | None,
     bundled_fix: str | None,
+    journey_timeline_json: str | None,
+    step_results_json: str | None,
     video_path: str | None,
     desktop_ss_b64: str | None,
     mobile_ss_b64: str | None,
@@ -1811,6 +1830,8 @@ def finalize_agentic_qa_success(
                    findings_json={_P},
                    summary={_P},
                    bundled_fix={_P},
+                   journey_timeline_json={_P},
+                   step_results_json={_P},
                    video_path={_P},
                    desktop_ss_b64={_P},
                    mobile_ss_b64={_P},
@@ -1818,7 +1839,8 @@ def finalize_agentic_qa_success(
              WHERE audit_id={_P}
             """,
             ("done", score, confidence, findings_json, summary,
-             bundled_fix, video_path, desktop_ss_b64, mobile_ss_b64,
+             bundled_fix, journey_timeline_json, step_results_json,
+             video_path, desktop_ss_b64, mobile_ss_b64,
              _utc_now(), audit_id),
         )
 

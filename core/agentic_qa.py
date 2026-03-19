@@ -18,7 +18,9 @@ import os
 from dataclasses import dataclass, field, asdict
 from typing import Any
 
-from core.web_agent import run_web_audit
+from core.models import JourneyPlan, JourneyStep, SuccessSignal, ActionCandidate, to_dict
+from core.report_builder import build_fix_prompt_context, build_journey_timeline, infer_spec
+from core.web_agent import run_structured_journeys, run_web_audit
 from core.gemini_judge import judge_visual
 
 _log = logging.getLogger(__name__)
@@ -49,6 +51,8 @@ class AgenticQAResult:
     desktop_screenshot_b64: str | None = None
     mobile_screenshot_b64: str | None = None
     journey_results: list[dict] | None = None
+    journey_timeline: list[dict] | None = None
+    step_results: list[dict] | None = None
     error: str | None = None
     analysis_limited: bool = False      # True when AI analysis was unavailable
     user_key_exhausted: bool = False     # True when user's own API key hit quota
@@ -98,6 +102,170 @@ def build_bundled_fix_prompt(findings: list[Finding], url: str) -> str:
         "desktop (1280px) and mobile (390px) viewports."
     )
     return "\n".join(lines)
+
+
+def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]:
+    text = " ".join(
+        [
+            crawl.get("title") or "",
+            crawl.get("text_snippet") or "",
+            " ".join(item.get("text", "") for item in (crawl.get("nav_links") or []) if isinstance(item, dict)),
+            " ".join(crawl.get("buttons") or []),
+            description or "",
+        ]
+    ).lower()
+
+    app_type = "generic"
+    features: list[str] = []
+    primary_goal = "explore site"
+
+    if any(token in text for token in ("cart", "checkout", "shop", "product", "add to cart")):
+        app_type = "ecommerce"
+        features = ["login", "search", "cart", "checkout"]
+        primary_goal = "purchase item"
+    elif any(token in text for token in ("dashboard", "workspace", "analytics", "sign in", "trial")):
+        app_type = "saas"
+        features = ["login", "dashboard", "navigation"]
+        primary_goal = "reach dashboard"
+    elif any(token in text for token in ("task", "board", "todo", "create", "edit")):
+        app_type = "crud"
+        features = ["create", "edit", "delete"]
+        primary_goal = "manage records"
+
+    inferred = {
+        "app_type": app_type,
+        "features": features,
+        "primary_goal": primary_goal,
+        "site_description": description,
+    }
+
+    anthropic_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
+    if anthropic_key:
+        try:
+            inferred_spec = infer_spec(crawl)
+            if inferred_spec.get("product_type"):
+                inferred["app_type"] = str(inferred_spec["product_type"]).lower()
+            if inferred_spec.get("critical_journeys"):
+                inferred["critical_journeys"] = inferred_spec["critical_journeys"]
+        except Exception:
+            pass
+
+    return inferred
+
+
+def _login_step() -> JourneyStep:
+    return JourneyStep(
+        goal="login",
+        intent="login or sign in",
+        action_candidates=[
+            ActionCandidate(type="fill", intent="email field", role="textbox", name="Email", value="state.generated_credentials.email"),
+            ActionCandidate(type="fill", intent="password field", role="textbox", name="Password", value="state.generated_credentials.password"),
+            ActionCandidate(type="click", intent="login button", role="button", name="Login", text="Login"),
+            ActionCandidate(type="click", intent="sign in button", role="button", name="Sign in", text="Sign in"),
+        ],
+        input_bindings={
+            "Email": "state.generated_credentials.email",
+            "Password": "state.generated_credentials.password",
+        },
+        success_signals=[
+            SuccessSignal(type="url_contains", value="/dashboard", priority="high"),
+            SuccessSignal(type="element_visible", value="Logout", priority="medium", required=False),
+            SuccessSignal(type="llm_fallback", value="Did login succeed based on this page?", priority="low", required=False),
+        ],
+        failure_hints=["Invalid credentials", "Incorrect password", "url still contains /login"],
+        expected_state_change={"is_logged_in": True},
+        allow_soft_recovery=True,
+    )
+
+
+def _cart_step() -> JourneyStep:
+    return JourneyStep(
+        goal="add_to_cart",
+        intent="add item to cart",
+        action_candidates=[
+            ActionCandidate(type="click", intent="add to cart", role="button", name="Add to cart", text="Add to cart"),
+            ActionCandidate(type="click", intent="buy now", role="button", name="Buy now", text="Buy now"),
+        ],
+        success_signals=[
+            SuccessSignal(type="text_present", value="cart", priority="medium", required=False),
+            SuccessSignal(type="url_contains", value="cart", priority="high", required=False),
+            SuccessSignal(type="state_assertion", value={"cart_has_items": True}, priority="medium", required=False),
+        ],
+        failure_hints=["Cart count did not change", "Item not added"],
+        expected_state_change={"cart_has_items": True},
+        allow_soft_recovery=True,
+    )
+
+
+def _dashboard_step() -> JourneyStep:
+    return JourneyStep(
+        goal="reach_dashboard",
+        intent="open dashboard",
+        action_candidates=[
+            ActionCandidate(type="click", intent="dashboard link", role="link", name="Dashboard", text="Dashboard"),
+            ActionCandidate(type="click", intent="get started", role="button", name="Get started", text="Get started"),
+        ],
+        success_signals=[
+            SuccessSignal(type="url_contains", value="dashboard", priority="high"),
+            SuccessSignal(type="text_present", value="dashboard", priority="medium", required=False),
+        ],
+        failure_hints=["Dashboard did not load"],
+        expected_state_change={},
+        allow_soft_recovery=True,
+    )
+
+
+def _crud_steps() -> list[JourneyStep]:
+    return [
+        JourneyStep(
+            goal="create_record",
+            intent="create a new record",
+            action_candidates=[
+                ActionCandidate(type="click", intent="new item button", role="button", name="New", text="New"),
+                ActionCandidate(type="click", intent="create button", role="button", name="Create", text="Create"),
+            ],
+            success_signals=[
+                SuccessSignal(type="text_present", value="created", priority="medium", required=False),
+                SuccessSignal(type="url_contains", value="new", priority="low", required=False),
+            ],
+            failure_hints=["Create dialog did not open"],
+            expected_state_change={"record_created": True},
+            allow_soft_recovery=True,
+        )
+    ]
+
+
+def plan_journeys(context: dict[str, Any]) -> list[JourneyPlan]:
+    app_type = str(context.get("app_type") or "generic").lower()
+    if "commerce" in app_type or app_type == "ecommerce":
+        return [
+            JourneyPlan(name="guest_checkout", app_type="ecommerce", steps=[_cart_step()]),
+            JourneyPlan(name="user_checkout", app_type="ecommerce", steps=[_login_step(), _cart_step()]),
+        ]
+    if "saas" in app_type or "dashboard" in app_type:
+        return [
+            JourneyPlan(name="register_login", app_type="saas", steps=[_login_step(), _dashboard_step()]),
+        ]
+    if app_type in {"crud", "task_manager", "task"}:
+        return [JourneyPlan(name="core_crud", app_type="crud", steps=_crud_steps())]
+    return [JourneyPlan(name="core_navigation", app_type="generic", steps=[_dashboard_step()])]
+
+
+def _coerce_structured_journeys(journeys: list[dict] | None, context: dict[str, Any]) -> tuple[list[JourneyPlan] | None, list[dict] | None]:
+    if not journeys:
+        return plan_journeys(context), None
+
+    first = journeys[0]
+    if isinstance(first, dict) and "action" in first:
+        return None, journeys
+
+    plans: list[JourneyPlan] = []
+    for item in journeys:
+        if isinstance(item, dict) and "steps" in item:
+            plans.append(JourneyPlan.from_dict(item))
+        elif isinstance(item, dict):
+            plans.append(JourneyPlan(name=item.get("goal") or "journey", app_type=context.get("app_type") or "generic", steps=[JourneyStep.from_dict(item)]))
+    return plans, None
 
 
 # ── Code-level analysis via Groq (Fix tier only) ─────────────────────────────
@@ -198,6 +366,7 @@ def run_agentic_qa(
     *,
     on_progress: callable | None = None,
     user_api_key: str | None = None,
+    site_description: str | None = None,
 ) -> AgenticQAResult:
     """
     Run an agentic QA audit against a URL.
@@ -223,13 +392,13 @@ def run_agentic_qa(
             except Exception:
                 pass
 
-    total_steps = {"vibe": 3, "deep": 5, "fix": 6}[tier]
+    total_steps = {"vibe": 4, "deep": 5, "fix": 6}[tier]
 
     # Step 1: Browser crawl
     _progress(1, total_steps, "Opening browser and crawling site...")
 
     # ── Tier-specific crawl parameters ────────────────────────────────────
-    record_video = tier in ("deep", "fix")
+    record_video = False
     run_journeys = journeys if tier in ("deep", "fix") else None
     max_pages = 3 if tier in ("deep", "fix") else 1
 
@@ -238,7 +407,7 @@ def run_agentic_qa(
             run_web_audit(
                 url,
                 record_video=record_video,
-                run_journeys=run_journeys,
+                run_journeys=run_journeys if journeys and isinstance(journeys[0], dict) and "action" in journeys[0] else None,
                 max_pages=max_pages,
             )
         )
@@ -278,8 +447,42 @@ def run_agentic_qa(
     else:
         _progress(2, total_steps, "Preparing analysis...")
 
+    structured_plans: list[JourneyPlan] | None = None
+    structured_journey_run: dict[str, Any] | None = None
+    journey_results: list[dict] | None = crawl.get("journey_results")
+    journey_timeline: list[dict] | None = None
+    step_results: list[dict] | None = None
+    discovery_context = discover_site(crawl, description=site_description)
+
+    if tier in ("deep", "fix"):
+        _progress(3, total_steps, "Planning and executing verified user journeys...")
+        structured_plans, legacy_journeys = _coerce_structured_journeys(journeys, discovery_context)
+        if structured_plans:
+            try:
+                structured_journey_run = asyncio.run(
+                    run_structured_journeys(
+                        url,
+                        structured_plans,
+                        record_video=True,
+                        base_context=discovery_context,
+                    )
+                )
+                journey_results = structured_journey_run.get("journey_results")
+            except Exception as exc:
+                _log.error("[AgenticQA] Structured journeys failed: %s", exc, exc_info=True)
+        elif legacy_journeys:
+            journey_results = crawl.get("journey_results")
+
+        if journey_results:
+            journey_timeline = build_journey_timeline(journey_results)
+            step_results = [
+                step
+                for journey in journey_results
+                for step in (journey.get("steps") or [])
+            ]
+
     # Step 3: Visual analysis via Gemini (with full fallback chain)
-    _progress(3, total_steps, "Running AI visual analysis...")
+    _progress(4 if tier in ("deep", "fix") else 3, total_steps, "Running AI visual analysis...")
 
     try:
         verdict = judge_visual(crawl, user_api_key=user_api_key)
@@ -330,12 +533,21 @@ def run_agentic_qa(
         confidence = verdict.get("confidence", 50)
 
     # Step 4: Build fix prompt bundle
-    _progress(4, total_steps, "Generating fix prompts...")
+    _progress(5 if tier in ("deep", "fix") else 4, total_steps, "Generating fix prompts...")
     bundled = build_bundled_fix_prompt(findings, url)
+    if journey_results:
+        extra_context = build_fix_prompt_context(
+            journey_results,
+            state_snapshot_summary=structured_journey_run.get("journey_results", [{}])[0].get("state_snapshot_summary")
+            if structured_journey_run and structured_journey_run.get("journey_results")
+            else discovery_context,
+        )
+        if extra_context:
+            bundled = (bundled + "\n\nJourney context:\n" + extra_context).strip()
 
     # Step 5 (fix tier only): Code-level analysis using actual page HTML
     if tier == "fix":
-        _progress(5, total_steps, "Running code-level analysis on page HTML...")
+        _progress(6, total_steps, "Running code-level analysis on page HTML...")
         code_fix = _run_code_analysis(findings, crawl)
         if code_fix:
             bundled = code_fix  # Replace basic bundle with enhanced HTML-aware version
@@ -352,7 +564,12 @@ def run_agentic_qa(
 
     # ── Determine what to include in result per tier ──────────────────────
     # Vibe: no video path (even if accidentally recorded)
-    video_path = crawl.get("video_path") if tier in ("deep", "fix") else None
+    video_path = None
+    if tier in ("deep", "fix"):
+        video_path = (
+            (structured_journey_run or {}).get("video_path")
+            or crawl.get("video_path")
+        )
 
     return AgenticQAResult(
         url=url,
@@ -365,7 +582,9 @@ def run_agentic_qa(
         video_path=video_path,
         desktop_screenshot_b64=crawl.get("desktop_screenshot_b64"),
         mobile_screenshot_b64=crawl.get("mobile_screenshot_b64"),
-        journey_results=crawl.get("journey_results"),
+        journey_results=journey_results,
+        journey_timeline=journey_timeline,
+        step_results=step_results,
         analysis_limited=analysis_limited,
         user_key_exhausted=user_key_exhausted,
     )

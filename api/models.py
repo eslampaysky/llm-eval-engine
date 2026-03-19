@@ -226,6 +226,10 @@ class AgenticQAStartRequest(BaseModel):
         default="vibe",
         description="vibe = quick visual scan, deep = full journey + video, fix = deep + code analysis",
     )
+    site_description: str | None = Field(
+        default=None,
+        description="Optional founder-provided description of what the site should do.",
+    )
     journeys: list[dict[str, Any]] | None = Field(
         default=None,
         description="Optional user journey steps for deep/fix tiers",
@@ -251,6 +255,8 @@ class AgenticQAResult(BaseModel):
     findings: list[AgenticQAFinding] | None = None
     summary: str | None = None
     bundled_fix_prompt: str | None = None
+    journey_timeline: list[dict[str, Any]] | None = None
+    step_results: list[dict[str, Any]] | None = None
     video_url: str | None = None
     desktop_screenshot_url: str | None = None
     mobile_screenshot_url: str | None = None

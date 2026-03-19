@@ -1,11 +1,61 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { RotateCcw, Share2, Download, Monitor, Smartphone, Check, Loader } from 'lucide-react';
+import { RotateCcw, Share2, Download, Monitor, Smartphone, Check, Loader, Shield, ChevronDown, AlertTriangle } from 'lucide-react';
 import { getAuthHeader } from '../../context/AuthContext.jsx';
 import { api } from '../../services/api';
 import ScoreRing from '../../components/ScoreRing.jsx';
 import FindingCard from '../../components/FindingCard.jsx';
 import CopyButton from '../../components/CopyButton.jsx';
+
+const STATUS_STYLES = {
+  passed: {
+    label: 'Passed',
+    background: 'rgba(52, 211, 153, 0.12)',
+    color: 'var(--green)',
+    border: '1px solid rgba(52, 211, 153, 0.24)',
+  },
+  failed: {
+    label: 'Failed',
+    background: 'rgba(255, 107, 107, 0.12)',
+    color: 'var(--red)',
+    border: '1px solid rgba(255, 107, 107, 0.24)',
+  },
+  blocked: {
+    label: 'Blocked',
+    background: 'rgba(251, 191, 36, 0.14)',
+    color: 'var(--amber)',
+    border: '1px solid rgba(251, 191, 36, 0.24)',
+  },
+  processing: {
+    label: 'Processing',
+    background: 'rgba(59, 180, 255, 0.12)',
+    color: 'var(--accent)',
+    border: '1px solid rgba(59, 180, 255, 0.24)',
+  },
+};
+
+function normalizeStatus(status) {
+  return String(status || 'failed').toLowerCase();
+}
+
+function getStatusStyle(status) {
+  return STATUS_STYLES[normalizeStatus(status)] || STATUS_STYLES.failed;
+}
+
+function formatStepTitle(value) {
+  return String(value || 'Step')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function formatRecoveryLabel(event) {
+  if (!event) return 'Recovery event';
+  const blocker = String(event.blocker_type || 'unknown_blocker').replace(/_/g, ' ');
+  const chokePoint = String(event.choke_point || 'before_action').replace(/_/g, ' ');
+  return `${blocker.replace(/^\w/, (c) => c.toUpperCase())} • ${chokePoint}`;
+}
 
 export default function AuditDetailPage() {
   const { auditId } = useParams();
@@ -140,6 +190,8 @@ export default function AuditDetailPage() {
   const score = report.score ?? 0;
   const findings = Array.isArray(report.findings) ? report.findings : [];
   const tier = (report.tier || 'vibe').replace(/^\w/, (c) => c.toUpperCase());
+  const journeyTimeline = Array.isArray(report.journey_timeline) ? report.journey_timeline : [];
+  const stepResults = Array.isArray(report.step_results) ? report.step_results : [];
 
   // Build screenshot URL from base64 or URL fields
   const screenshotUrl = viewport === 'desktop'
@@ -248,6 +300,250 @@ export default function AuditDetailPage() {
         <div className="card" style={{ padding: 20, marginBottom: 24 }}>
           <div className="card-label">Summary</div>
           <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{report.summary}</p>
+        </div>
+      )}
+
+      {/* Journey timeline */}
+      {journeyTimeline.length > 0 && (
+        <div className="card" style={{ padding: 20, marginBottom: 24 }}>
+          <div className="card-label" style={{ marginBottom: 16 }}>Journey Timeline</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {journeyTimeline.map((journey, index) => {
+              const journeyStatus = getStatusStyle(journey.status);
+              const { label: journeyLabel, ...journeyStyle } = journeyStatus;
+              return (
+                <div
+                  key={`${journey.journey || 'journey'}-${index}`}
+                  style={{
+                    border: '1px solid var(--line)',
+                    borderRadius: 'var(--radius-lg)',
+                    background: 'rgba(255,255,255,0.02)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div style={{ padding: 16, borderBottom: '1px solid var(--line)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {formatStepTitle(journey.journey)}
+                        </div>
+                        {journey.reason && (
+                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
+                            {journey.reason}
+                          </div>
+                        )}
+                      </div>
+                      <span style={{
+                        ...journeyStyle,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        borderRadius: 'var(--radius-full)',
+                        padding: '6px 10px',
+                      }}>
+                        {journeyLabel}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {(journey.steps || []).map((step, stepIndex) => {
+                      const stepStatus = getStatusStyle(step.status || step.failure_type);
+                      const { label: stepLabel, ...stepStyle } = stepStatus;
+                      const relatedStepResult = stepResults.find(
+                        (result) =>
+                          String(result.step_name || result.goal || '').toLowerCase() ===
+                          String(step.step || '').toLowerCase()
+                      );
+                      const recoveryEvents = Array.isArray(relatedStepResult?.recovery_attempts)
+                        ? relatedStepResult.recovery_attempts
+                        : Array.isArray(step.recovery_attempts)
+                          ? step.recovery_attempts
+                          : [];
+                      const notes = Array.isArray(relatedStepResult?.notes) ? relatedStepResult.notes : [];
+
+                      return (
+                        <details
+                          key={`${step.step || 'step'}-${stepIndex}`}
+                          style={{
+                            border: '1px solid rgba(255,255,255,0.06)',
+                            borderRadius: 'var(--radius-md)',
+                            background: 'var(--bg-elevated)',
+                          }}
+                        >
+                          <summary style={{
+                            listStyle: 'none',
+                            cursor: 'pointer',
+                            padding: 14,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: 12,
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                              <span style={{
+                                ...stepStyle,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                borderRadius: 'var(--radius-full)',
+                                padding: '4px 8px',
+                              }}>
+                                {stepLabel}
+                              </span>
+                              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {formatStepTitle(step.step)}
+                              </span>
+                              {recoveryEvents.length > 0 && (
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  padding: '4px 8px',
+                                  borderRadius: 'var(--radius-full)',
+                                  background: 'rgba(59, 180, 255, 0.12)',
+                                  color: 'var(--accent)',
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                }}>
+                                  <Shield size={12} />
+                                  Resilience
+                                </span>
+                              )}
+                            </div>
+                            <ChevronDown size={16} style={{ color: 'var(--text-dim)' }} />
+                          </summary>
+
+                          <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            {(notes.length > 0 || recoveryEvents.length > 0) && (
+                              <div style={{
+                                borderRadius: 'var(--radius-md)',
+                                background: 'rgba(59, 180, 255, 0.06)',
+                                border: '1px solid rgba(59, 180, 255, 0.16)',
+                                padding: 12,
+                              }}>
+                                <div className="card-label" style={{ color: 'var(--accent)', marginBottom: 8 }}>
+                                  Resilience Story
+                                </div>
+                                {notes.map((note, noteIndex) => (
+                                  <div key={noteIndex} style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                                    {note}
+                                  </div>
+                                ))}
+                                {recoveryEvents.map((event, eventIndex) => (
+                                  <details key={eventIndex} style={{ marginTop: 8 }}>
+                                    <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)' }}>
+                                      {event.notes || formatRecoveryLabel(event)}
+                                    </summary>
+                                    <div style={{
+                                      marginTop: 8,
+                                      padding: 10,
+                                      borderRadius: 'var(--radius-md)',
+                                      background: 'var(--bg-deepest)',
+                                      fontSize: 12,
+                                      color: 'var(--text-secondary)',
+                                      fontFamily: 'var(--font-mono)',
+                                      display: 'grid',
+                                      gap: 4,
+                                    }}>
+                                      <div>Type: {event.blocker_type || 'unknown_blocker'}</div>
+                                      <div>When: {event.choke_point || 'before_action'}</div>
+                                      <div>Action: {event.action_taken || 'unknown'}</div>
+                                      <div>Success: {String(event.success)}</div>
+                                      <div>Selector: {event.selector_used || '—'}</div>
+                                    </div>
+                                  </details>
+                                ))}
+                              </div>
+                            )}
+
+                            {(step.evidence_delta?.length > 0 || relatedStepResult?.evidence_delta?.length > 0) && (
+                              <div>
+                                <div className="card-label" style={{ marginBottom: 8 }}>Evidence</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                  {(relatedStepResult?.evidence_delta || step.evidence_delta || []).map((delta, deltaIndex) => (
+                                    <div
+                                      key={deltaIndex}
+                                      style={{
+                                        padding: '10px 12px',
+                                        borderRadius: 'var(--radius-md)',
+                                        background: 'rgba(255,255,255,0.03)',
+                                        border: '1px solid rgba(255,255,255,0.06)',
+                                        fontSize: 13,
+                                        color: 'var(--text-secondary)',
+                                      }}
+                                    >
+                                      {delta}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {(relatedStepResult?.before_snapshot || relatedStepResult?.after_snapshot) && (
+                              <div>
+                                <div className="card-label" style={{ marginBottom: 8 }}>Snapshot Proof</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                                  {relatedStepResult?.before_snapshot && (
+                                    <div style={{
+                                      borderRadius: 'var(--radius-md)',
+                                      border: '1px solid rgba(255,255,255,0.06)',
+                                      background: 'var(--bg-deepest)',
+                                      padding: 12,
+                                    }}>
+                                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>Before</div>
+                                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
+                                        {relatedStepResult.before_snapshot.url || '—'}
+                                      </div>
+                                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                                        {relatedStepResult.before_snapshot.text_snippet || 'No snapshot text'}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {relatedStepResult?.after_snapshot && (
+                                    <div style={{
+                                      borderRadius: 'var(--radius-md)',
+                                      border: '1px solid rgba(255,255,255,0.06)',
+                                      background: 'var(--bg-deepest)',
+                                      padding: 12,
+                                    }}>
+                                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>After</div>
+                                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
+                                        {relatedStepResult.after_snapshot.url || '—'}
+                                      </div>
+                                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                                        {relatedStepResult.after_snapshot.text_snippet || 'No snapshot text'}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {relatedStepResult?.failure_type === 'blocked_by_bot_protection' && (
+                              <div style={{
+                                display: 'flex',
+                                gap: 10,
+                                alignItems: 'flex-start',
+                                borderRadius: 'var(--radius-md)',
+                                background: 'rgba(251, 191, 36, 0.12)',
+                                border: '1px solid rgba(251, 191, 36, 0.22)',
+                                padding: 12,
+                                color: 'var(--amber)',
+                              }}>
+                                <AlertTriangle size={16} />
+                                <div style={{ fontSize: 13 }}>
+                                  Site blocked the agent with bot protection. This is a site configuration issue, not an AiBreaker execution failure.
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

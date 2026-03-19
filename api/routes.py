@@ -3276,12 +3276,13 @@ async def start_agentic_qa(
 ) -> dict:
     """Start an agentic QA audit. Poll GET /agentic-qa/status/{id}."""
     audit_id = str(uuid.uuid4())
-    total_steps = {"vibe": 3, "deep": 5, "fix": 6}.get(payload.tier, 3)
+    total_steps = {"vibe": 4, "deep": 5, "fix": 6}.get(payload.tier, 4)
     _init_progress(audit_id, total_steps)
     insert_agentic_qa_report(
         audit_id=audit_id,
         client_name=auth_ctx.get("client_name"),
         url=payload.url,
+        site_description=payload.site_description,
         tier=payload.tier,
         status="queued",
     )
@@ -3303,6 +3304,7 @@ async def start_agentic_qa(
         payload.url,
         payload.tier,
         payload.journeys,
+        payload.site_description,
         auth_ctx.get("client_name"),
         user_api_key,
         job_id=audit_id,
@@ -3332,6 +3334,18 @@ def get_agentic_qa_status(
             findings = json.loads(row["findings_json"])
         except json.JSONDecodeError:
             findings = None
+    journey_timeline = None
+    if row.get("journey_timeline_json"):
+        try:
+            journey_timeline = json.loads(row["journey_timeline_json"])
+        except json.JSONDecodeError:
+            journey_timeline = None
+    step_results = None
+    if row.get("step_results_json"):
+        try:
+            step_results = json.loads(row["step_results_json"])
+        except json.JSONDecodeError:
+            step_results = None
 
     # Detect analysis limitation from the stored result
     analysis_limited = row.get("confidence") is None and row.get("status") == "done"
@@ -3346,6 +3360,8 @@ def get_agentic_qa_status(
         "findings": findings,
         "summary": row.get("summary"),
         "bundled_fix_prompt": row.get("bundled_fix"),
+        "journey_timeline": journey_timeline,
+        "step_results": step_results,
         "analysis_limited": analysis_limited,
         "video_url": f"/agentic-qa/{audit_id}/video" if row.get("video_path") else None,
         "desktop_screenshot_url": f"/agentic-qa/{audit_id}/screenshot/desktop" if row.get("desktop_ss_b64") else None,
@@ -3415,7 +3431,7 @@ def get_agentic_qa_screenshot_mobile(
     )
 
 
-def _run_agentic_qa_job(audit_id, url, tier, journeys, client_name, user_api_key=None):
+def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, client_name, user_api_key=None):
     """Background job: run the agentic QA orchestrator."""
     from core.agentic_qa import run_agentic_qa, result_to_dict
     from dataclasses import asdict
@@ -3432,6 +3448,7 @@ def _run_agentic_qa_job(audit_id, url, tier, journeys, client_name, user_api_key
             journeys=journeys,
             on_progress=_on_progress,
             user_api_key=user_api_key,
+            site_description=site_description,
         )
 
         findings_dicts = [
@@ -3453,6 +3470,8 @@ def _run_agentic_qa_job(audit_id, url, tier, journeys, client_name, user_api_key
             findings_json=json.dumps(findings_dicts, ensure_ascii=False),
             summary=result.summary,
             bundled_fix=result.bundled_fix_prompt,
+            journey_timeline_json=json.dumps(result.journey_timeline, ensure_ascii=False) if result.journey_timeline is not None else None,
+            step_results_json=json.dumps(result.step_results, ensure_ascii=False) if result.step_results is not None else None,
             video_path=result.video_path,
             desktop_ss_b64=result.desktop_screenshot_b64,
             mobile_ss_b64=result.mobile_screenshot_b64,
