@@ -3305,6 +3305,7 @@ async def start_agentic_qa(
         payload.tier,
         payload.journeys,
         payload.site_description,
+        payload.credentials,
         auth_ctx.get("client_name"),
         user_api_key,
         job_id=audit_id,
@@ -3431,7 +3432,7 @@ def get_agentic_qa_screenshot_mobile(
     )
 
 
-def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, client_name, user_api_key=None):
+def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, credentials, client_name, user_api_key=None):
     """Background job: run the agentic QA orchestrator."""
     from core.agentic_qa import run_agentic_qa, result_to_dict
     from dataclasses import asdict
@@ -3449,6 +3450,7 @@ def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, client_
             on_progress=_on_progress,
             user_api_key=user_api_key,
             site_description=site_description,
+            credentials=credentials,
         )
 
         findings_dicts = [

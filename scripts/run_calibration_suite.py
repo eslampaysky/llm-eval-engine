@@ -25,6 +25,7 @@ class Target:
     expected_type: str
     tier: str
     site_description: str
+    credentials: dict[str, str] | None = None
 
 
 def _env(name: str, default: str | None = None) -> str:
@@ -148,6 +149,7 @@ def run_group(group: str, *, base_url: str, email: str, password: str, api_key: 
                 "url": target.url,
                 "tier": target.tier,
                 "site_description": target.site_description,
+                "credentials": target.credentials,
             },
         )
         audit_id = str(start["audit_id"])

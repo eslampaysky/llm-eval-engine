@@ -991,12 +991,21 @@ async def run_structured_journeys(
     *,
     record_video: bool = True,
     base_context: dict[str, Any] | None = None,
+    generated_credentials: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     video_dir = None
     if record_video:
         video_dir = VIDEO_DIR
         Path(video_dir).mkdir(parents=True, exist_ok=True)
+
+    credentials = {str(key): str(value) for key, value in (generated_credentials or {}).items() if value is not None}
+    username = credentials.get("username") or credentials.get("email")
+    email = credentials.get("email") or credentials.get("username")
+    if username and "username" not in credentials:
+        credentials["username"] = username
+    if email and "email" not in credentials:
+        credentials["email"] = email
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-gpu"])
@@ -1016,6 +1025,7 @@ async def run_structured_journeys(
             state = SessionState(
                 base_url=url,
                 current_url=url,
+                generated_credentials=credentials,
                 inferred_context=base_context or {},
             )
             results.append(await _run_structured_journey(page, plan, state))

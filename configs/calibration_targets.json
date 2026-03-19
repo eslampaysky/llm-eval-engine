@@ -43,35 +43,44 @@
         "url": "https://the-internet.herokuapp.com/login",
         "expected_type": "saas_auth",
         "tier": "deep",
-        "site_description": "Simple login flow demo"
+        "site_description": "Simple login page with known credentials",
+        "credentials": {
+          "username": "tomsmith",
+          "password": "SuperSecretPassword!"
+        }
       },
       {
         "name": "Practice Test Automation Login",
         "url": "https://practicetestautomation.com/practice-test-login/",
         "expected_type": "saas_auth",
         "tier": "deep",
-        "site_description": "Practice login page with dashboard redirect"
+        "site_description": "Practice login page for automation testing",
+        "credentials": {
+          "username": "student",
+          "password": "Password123"
+        }
       },
       {
         "name": "OrangeHRM Demo",
         "url": "https://opensource-demo.orangehrmlive.com/",
         "expected_type": "saas_auth",
         "tier": "deep",
-        "site_description": "HR SaaS demo with login and dashboard"
+        "site_description": "HR management SaaS demo with dashboard",
+        "credentials": {
+          "username": "Admin",
+          "password": "admin123"
+        }
       },
       {
         "name": "Applitools Demo",
         "url": "https://demo.applitools.com/",
         "expected_type": "saas_auth",
         "tier": "deep",
-        "site_description": "Visual dashboard login demo"
-      },
-      {
-        "name": "ReqRes",
-        "url": "https://reqres.in/",
-        "expected_type": "marketing_site",
-        "tier": "deep",
-        "site_description": "API product marketing site with login references"
+        "site_description": "Visual testing demo app with login and dashboard",
+        "credentials": {
+          "username": "user",
+          "password": "password"
+        }
       }
     ],
     "crud": [

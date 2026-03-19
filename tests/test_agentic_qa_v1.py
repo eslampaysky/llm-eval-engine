@@ -94,6 +94,7 @@ def test_routes_include_site_description_wiring() -> None:
 
     assert "site_description=payload.site_description" in route_text
     assert "payload.site_description" in route_text
+    assert "payload.credentials" in route_text
 
 
 def test_routes_include_optional_timeline_fields() -> None:
@@ -237,3 +238,13 @@ def test_real_task_app_still_classifies_as_task_manager() -> None:
     context = discover_site(crawl, description="Task management app")
 
     assert context["app_type"] == AppType.TASK_MANAGER.value
+
+
+def test_calibration_manifest_has_four_saas_targets_with_credentials() -> None:
+    manifest_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "configs", "calibration_targets.json"))
+    with open(manifest_path, encoding="utf-8") as fh:
+        manifest = json.load(fh)
+
+    saas_targets = manifest["groups"]["saas_auth"]
+    assert len(saas_targets) == 4
+    assert all(target.get("credentials", {}).get("password") for target in saas_targets)

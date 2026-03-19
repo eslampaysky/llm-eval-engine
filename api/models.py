@@ -234,6 +234,10 @@ class AgenticQAStartRequest(BaseModel):
         default=None,
         description="Optional user journey steps for deep/fix tiers",
     )
+    credentials: dict[str, str] | None = Field(
+        default=None,
+        description="Optional known credentials for auth journeys, e.g. username/email and password.",
+    )
 
 
 class AgenticQAFinding(BaseModel):

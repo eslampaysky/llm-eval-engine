@@ -308,13 +308,69 @@ def _login_step() -> JourneyStep:
         goal="login",
         intent="login or sign in",
         action_candidates=[
-            ActionCandidate(type="fill", intent="email field", role="textbox", name="Email", value="state.generated_credentials.email"),
-            ActionCandidate(type="fill", intent="password field", role="textbox", name="Password", value="state.generated_credentials.password"),
-            ActionCandidate(type="click", intent="login button", role="button", name="Login", text="Login"),
-            ActionCandidate(type="click", intent="sign in button", role="button", name="Sign in", text="Sign in"),
+            ActionCandidate(
+                type="fill",
+                intent="username or email field",
+                selectors=[
+                    "input[name='username']",
+                    "input[id='username']",
+                    "input[name*='user' i]",
+                    "input[id*='user' i]",
+                    "input[name='email']",
+                    "input[id='email']",
+                    "input[name*='email' i]",
+                    "input[id*='email' i]",
+                    "input[type='email']",
+                    "input[type='text']",
+                ],
+                role="textbox",
+                name="Username",
+                value="state.generated_credentials.username",
+            ),
+            ActionCandidate(
+                type="fill",
+                intent="password field",
+                selectors=[
+                    "input[type='password']",
+                    "input[name='password']",
+                    "input[id='password']",
+                    "input[name*='pass' i]",
+                    "input[id*='pass' i]",
+                ],
+                role="textbox",
+                name="Password",
+                value="state.generated_credentials.password",
+            ),
+            ActionCandidate(
+                type="click",
+                intent="login button",
+                selectors=[
+                    "button[type='submit']",
+                    "input[type='submit']",
+                    "button:has-text('Login')",
+                    "button:has-text('Log in')",
+                    "button:has-text('Sign in')",
+                    "button:has-text('Submit')",
+                ],
+                role="button",
+                name="Login",
+                text="Login",
+            ),
+            ActionCandidate(
+                type="click",
+                intent="sign in button",
+                selectors=[
+                    "button:has-text('Sign in')",
+                    "button:has-text('Log in')",
+                    "button:has-text('Login')",
+                ],
+                role="button",
+                name="Sign in",
+                text="Sign in",
+            ),
         ],
         input_bindings={
-            "Email": "state.generated_credentials.email",
+            "Username": "state.generated_credentials.username",
             "Password": "state.generated_credentials.password",
         },
         success_signals=[
@@ -600,6 +656,7 @@ def run_agentic_qa(
     on_progress: callable | None = None,
     user_api_key: str | None = None,
     site_description: str | None = None,
+    credentials: dict[str, str] | None = None,
 ) -> AgenticQAResult:
     """
     Run an agentic QA audit against a URL.
@@ -698,6 +755,7 @@ def run_agentic_qa(
                         structured_plans,
                         record_video=True,
                         base_context=discovery_context,
+                        generated_credentials=credentials,
                     )
                 )
                 journey_results = structured_journey_run.get("journey_results")
