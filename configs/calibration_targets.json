@@ -1,0 +1,168 @@
+{
+  "groups": {
+    "marketing": [
+      {
+        "name": "Cookiebot",
+        "url": "https://www.cookiebot.com/en/",
+        "expected_type": "marketing_site",
+        "tier": "deep",
+        "site_description": "Cookie consent management platform"
+      },
+      {
+        "name": "Stripe",
+        "url": "https://stripe.com/",
+        "expected_type": "marketing_site",
+        "tier": "deep",
+        "site_description": "Payments infrastructure marketing site"
+      },
+      {
+        "name": "Linear",
+        "url": "https://linear.app/",
+        "expected_type": "marketing_site",
+        "tier": "deep",
+        "site_description": "Project management SaaS marketing site"
+      },
+      {
+        "name": "Notion",
+        "url": "https://www.notion.so/",
+        "expected_type": "marketing_site",
+        "tier": "deep",
+        "site_description": "Workspace SaaS marketing site"
+      },
+      {
+        "name": "Vercel",
+        "url": "https://vercel.com/",
+        "expected_type": "marketing_site",
+        "tier": "deep",
+        "site_description": "Developer platform marketing site"
+      }
+    ],
+    "saas_auth": [
+      {
+        "name": "The Internet Login",
+        "url": "https://the-internet.herokuapp.com/login",
+        "expected_type": "saas_auth",
+        "tier": "deep",
+        "site_description": "Simple login flow demo"
+      },
+      {
+        "name": "Practice Test Automation Login",
+        "url": "https://practicetestautomation.com/practice-test-login/",
+        "expected_type": "saas_auth",
+        "tier": "deep",
+        "site_description": "Practice login page with dashboard redirect"
+      },
+      {
+        "name": "OrangeHRM Demo",
+        "url": "https://opensource-demo.orangehrmlive.com/",
+        "expected_type": "saas_auth",
+        "tier": "deep",
+        "site_description": "HR SaaS demo with login and dashboard"
+      },
+      {
+        "name": "Applitools Demo",
+        "url": "https://demo.applitools.com/",
+        "expected_type": "saas_auth",
+        "tier": "deep",
+        "site_description": "Visual dashboard login demo"
+      },
+      {
+        "name": "ReqRes",
+        "url": "https://reqres.in/",
+        "expected_type": "marketing_site",
+        "tier": "deep",
+        "site_description": "API product marketing site with login references"
+      }
+    ],
+    "crud": [
+      {
+        "name": "TodoMVC React",
+        "url": "https://todomvc.com/examples/react/dist/",
+        "expected_type": "task_manager",
+        "tier": "deep",
+        "site_description": "React todo app for task management"
+      },
+      {
+        "name": "TodoMVC Vue",
+        "url": "https://todomvc.com/examples/vue/",
+        "expected_type": "task_manager",
+        "tier": "deep",
+        "site_description": "Vue todo app for task management"
+      },
+      {
+        "name": "Add Remove Elements",
+        "url": "https://the-internet.herokuapp.com/add_remove_elements/",
+        "expected_type": "task_manager",
+        "tier": "deep",
+        "site_description": "Simple create and remove DOM elements flow"
+      },
+      {
+        "name": "Books to Scrape",
+        "url": "https://books.toscrape.com/",
+        "expected_type": "ecommerce",
+        "tier": "deep",
+        "site_description": "Static book catalog ecommerce site"
+      }
+    ],
+    "ecommerce": [
+      {
+        "name": "OpenCart Demo",
+        "url": "https://demo.opencart.com/",
+        "expected_type": "ecommerce",
+        "tier": "deep",
+        "site_description": "OpenCart demo store with catalog and checkout"
+      },
+      {
+        "name": "SauceDemo",
+        "url": "https://www.saucedemo.com/",
+        "expected_type": "ecommerce",
+        "tier": "deep",
+        "site_description": "Demo ecommerce store with auth and checkout"
+      },
+      {
+        "name": "Magento Demo",
+        "url": "https://magento.softwaretestingboard.com/",
+        "expected_type": "ecommerce",
+        "tier": "deep",
+        "site_description": "Magento demo store with product catalog"
+      },
+      {
+        "name": "Automation Exercise",
+        "url": "https://automationexercise.com/",
+        "expected_type": "ecommerce",
+        "tier": "deep",
+        "site_description": "Ecommerce demo site with overlays and cart flow"
+      },
+      {
+        "name": "Demoblaze",
+        "url": "https://www.demoblaze.com/",
+        "expected_type": "ecommerce",
+        "tier": "deep",
+        "site_description": "Minimal JS ecommerce store"
+      }
+    ],
+    "edge_cases": [
+      {
+        "name": "Dynamic Loading",
+        "url": "https://the-internet.herokuapp.com/dynamic_loading/2",
+        "expected_type": "generic",
+        "tier": "deep",
+        "site_description": "Dynamic content loading demo"
+      },
+      {
+        "name": "Frames",
+        "url": "https://the-internet.herokuapp.com/frames",
+        "expected_type": "generic",
+        "tier": "deep",
+        "site_description": "Iframe-heavy page"
+      },
+      {
+        "name": "AutoTrader",
+        "url": "https://www.autotrader.co.uk/",
+        "expected_type": "blocked_by_bot_protection",
+        "tier": "deep",
+        "site_description": "Known Cloudflare-protected automotive marketplace"
+      }
+    ]
+  }
+}
