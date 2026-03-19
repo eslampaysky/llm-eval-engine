@@ -154,3 +154,60 @@ def test_marketing_site_with_login_cta_but_no_auth_form_stays_marketing() -> Non
     context = discover_site(crawl, description="Marketing homepage with pricing and contact links")
 
     assert context["app_type"] == AppType.MARKETING.value
+
+
+def test_stripe_like_marketing_site_is_not_misclassified_as_ecommerce() -> None:
+    crawl = {
+        "title": "Stripe payments infrastructure for the internet",
+        "text_snippet": "Pricing plans enterprise contact sales trusted by millions of businesses",
+        "nav_links": [
+            {"text": "Pricing", "href": "https://example.com/pricing"},
+            {"text": "Enterprise", "href": "https://example.com/enterprise"},
+            {"text": "Docs", "href": "https://example.com/docs"},
+        ],
+        "buttons": ["Contact sales", "Start now"],
+        "forms": [],
+        "page_html": "<main><section><h1>Payments infrastructure</h1></section></main>",
+    }
+
+    context = discover_site(crawl, description="Payments infrastructure marketing site")
+
+    assert context["app_type"] == AppType.MARKETING.value
+
+
+def test_linear_like_marketing_site_is_not_misclassified_as_task_manager() -> None:
+    crawl = {
+        "title": "Linear",
+        "text_snippet": "Features pricing changelog request demo get started roadmap for product teams",
+        "nav_links": [
+            {"text": "Features", "href": "https://example.com/features"},
+            {"text": "Pricing", "href": "https://example.com/pricing"},
+            {"text": "Changelog", "href": "https://example.com/changelog"},
+        ],
+        "buttons": ["Request demo", "Get started"],
+        "forms": [],
+        "page_html": "<main><section><h2>Changelog</h2></section></main>",
+    }
+
+    context = discover_site(crawl, description="Project management marketing site")
+
+    assert context["app_type"] == AppType.MARKETING.value
+
+
+def test_notion_like_marketing_site_is_not_misclassified_as_task_manager() -> None:
+    crawl = {
+        "title": "Notion",
+        "text_snippet": "Get Notion free templates pricing enterprise docs workspace for every team",
+        "nav_links": [
+            {"text": "Pricing", "href": "https://example.com/pricing"},
+            {"text": "Enterprise", "href": "https://example.com/enterprise"},
+            {"text": "Docs", "href": "https://example.com/docs"},
+        ],
+        "buttons": ["Get Notion free", "Request a demo"],
+        "forms": [],
+        "page_html": "<main><section><h2>Templates</h2></section></main>",
+    }
+
+    context = discover_site(crawl, description="Workspace collaboration marketing site")
+
+    assert context["app_type"] == AppType.MARKETING.value

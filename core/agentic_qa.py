@@ -135,6 +135,26 @@ def _nav_texts(crawl: dict[str, Any]) -> list[str]:
     ]
 
 
+def _combined_text(crawl: dict[str, Any], description: str | None = None) -> str:
+    nav_links = crawl.get("nav_links") or []
+    nav_texts = _nav_texts(crawl)
+    nav_hrefs = " ".join(
+        str(item.get("href") or "").lower()
+        for item in nav_links
+        if isinstance(item, dict)
+    )
+    return " ".join(
+        [
+            crawl.get("title") or "",
+            crawl.get("text_snippet") or "",
+            " ".join(nav_texts),
+            nav_hrefs,
+            " ".join(crawl.get("buttons") or []),
+            description or "",
+        ]
+    ).lower()
+
+
 def _has_auth_form(crawl: dict[str, Any], text: str) -> bool:
     page_html = str(crawl.get("page_html") or "").lower()
     forms = crawl.get("forms") or []
@@ -151,45 +171,58 @@ def _has_auth_form(crawl: dict[str, Any], text: str) -> bool:
     return has_auth_text and (has_auth_form_fields or has_auth_action)
 
 
-def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]:
-    nav_links = crawl.get("nav_links") or []
-    nav_texts = _nav_texts(crawl)
-    nav_hrefs = " ".join(
-        str(item.get("href") or "").lower()
-        for item in nav_links
-        if isinstance(item, dict)
+def _has_product_catalog(text: str) -> bool:
+    return any(token in text for token in ("product", "shop", "collections", "buy now", "catalog", "store"))
+
+
+def _has_cart_or_checkout(text: str) -> bool:
+    return any(token in text for token in ("cart", "checkout", "add to cart", "basket"))
+
+
+def _has_task_list_patterns(text: str) -> bool:
+    return any(token in text for token in ("task", "board", "todo", "kanban", "project", "roadmap", "changelog"))
+
+
+def _has_create_edit_delete(crawl: dict[str, Any], text: str) -> bool:
+    page_html = str(crawl.get("page_html") or "").lower()
+    buttons = " ".join(str(button).lower() for button in (crawl.get("buttons") or []))
+    interactive_text = " ".join([text, buttons, page_html])
+    return any(
+        token in interactive_text
+        for token in ("create", "add item", "new task", "edit", "delete", "remove", "new-todo", "input.new-todo")
     )
-    text = " ".join(
-        [
-            crawl.get("title") or "",
-            crawl.get("text_snippet") or "",
-            " ".join(nav_texts),
-            nav_hrefs,
-            " ".join(crawl.get("buttons") or []),
-            description or "",
-        ]
-    ).lower()
+
+
+def _has_marketing_signals(text: str, nav_texts: list[str], has_real_cart: bool, has_real_crud: bool) -> bool:
+    positive = any(signal in text for signal in MARKETING_SIGNALS) or any(
+        token in nav_texts for token in ("pricing", "features", "product", "contact", "about", "resources")
+    )
+    return positive and not has_real_cart and not has_real_crud
+
+
+def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]:
+    nav_texts = _nav_texts(crawl)
+    text = _combined_text(crawl, description)
 
     app_type = AppType.GENERIC.value
     features: list[str] = []
     primary_goal = "explore site"
 
-    has_cart = any(token in text for token in ("cart", "checkout", "add to cart"))
-    has_product_catalog = any(token in text for token in ("product", "shop", "collections", "buy now"))
-    has_task_patterns = any(token in text for token in ("task", "board", "todo", "kanban"))
-    has_create_patterns = any(token in text for token in ("create", "add item", "new task", "edit"))
+    has_catalog = _has_product_catalog(text)
+    has_cart_or_checkout = _has_cart_or_checkout(text)
+    has_task_patterns = _has_task_list_patterns(text)
+    has_crud_interactions = _has_create_edit_delete(crawl, text)
     has_login_form = _has_auth_form(crawl, text)
     has_dashboard_link = any(token in text for token in ("dashboard", "workspace", "analytics", "projects"))
-    has_marketing_signals = any(signal in text for signal in MARKETING_SIGNALS)
-    has_marketing_nav = any(
-        token in nav_texts for token in ("pricing", "features", "product", "contact", "about", "resources")
-    )
+    has_real_cart = has_catalog and has_cart_or_checkout
+    has_real_crud = has_task_patterns and has_crud_interactions
+    has_marketing_signals = _has_marketing_signals(text, nav_texts, has_real_cart, has_real_crud)
 
-    if has_product_catalog and has_cart:
+    if has_real_cart:
         app_type = AppType.ECOMMERCE.value
         features = ["login", "search", "cart", "checkout"]
         primary_goal = "purchase item"
-    elif has_task_patterns or has_create_patterns:
+    elif has_real_crud:
         app_type = AppType.TASK_MANAGER.value
         features = ["create", "edit", "delete"]
         primary_goal = "manage records"
@@ -197,7 +230,7 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
         app_type = AppType.SAAS_AUTH.value
         features = ["login", "dashboard", "navigation"]
         primary_goal = "reach dashboard"
-    elif has_marketing_signals or (has_marketing_nav and not has_cart and not has_login_form):
+    elif has_marketing_signals:
         app_type = AppType.MARKETING.value
         features = ["pricing", "features", "contact"]
         primary_goal = "explore marketing paths"
