@@ -155,6 +155,40 @@ def _combined_text(crawl: dict[str, Any], description: str | None = None) -> str
     ).lower()
 
 
+def _page_html(crawl: dict[str, Any]) -> str:
+    return str(crawl.get("page_html") or "").lower()
+
+
+def _structural_counts(crawl: dict[str, Any]) -> dict[str, int]:
+    html = _page_html(crawl)
+    text = _combined_text(crawl)
+    nav_texts = _nav_texts(crawl)
+
+    product_item_count = sum(
+        html.count(token)
+        for token in ('class="product', "class='product", "product-card", "data-product-id", "item-card")
+    )
+    product_detail_links = sum(
+        html.count(token)
+        for token in ("/product/", "/item/", "/shop/", "product-card")
+    )
+    rendered_list_item_count = sum(
+        html.count(token)
+        for token in ('class="task', "class='task", "todo-item", "data-task-id", "role=\"checkbox\"", "type=\"checkbox\"")
+    )
+
+    return {
+        "has_add_to_cart_button": int(any(token in text for token in ("add to cart", "buy now", "add to bag"))),
+        "has_product_detail_links": int(product_detail_links > 2),
+        "product_item_count": product_item_count,
+        "has_checkboxes": int(any(token in html for token in ('type="checkbox"', "role=\"checkbox\"", "todo-checkbox"))),
+        "has_draggable_list_items": int(any(token in html for token in ('draggable="true"', "sortable-item", "data-drag-handle"))),
+        "rendered_list_item_count": rendered_list_item_count,
+        "has_inline_edit_interaction": int(any(token in html for token in ('contenteditable="true"', "editable-field", "inline-edit"))),
+        "has_marketing_nav": int(any(token in nav_texts for token in ("pricing", "features", "product", "contact", "about", "resources", "enterprise"))),
+    }
+
+
 def _has_auth_form(crawl: dict[str, Any], text: str) -> bool:
     page_html = str(crawl.get("page_html") or "").lower()
     forms = crawl.get("forms") or []
@@ -193,9 +227,11 @@ def _has_create_edit_delete(crawl: dict[str, Any], text: str) -> bool:
     )
 
 
-def _has_marketing_signals(text: str, nav_texts: list[str], has_real_cart: bool, has_real_crud: bool) -> bool:
-    positive = any(signal in text for signal in MARKETING_SIGNALS) or any(
-        token in nav_texts for token in ("pricing", "features", "product", "contact", "about", "resources")
+def _has_marketing_signals(text: str, nav_texts: list[str], has_real_cart: bool, has_real_crud: bool, structural: dict[str, int]) -> bool:
+    positive = (
+        any(signal in text for signal in MARKETING_SIGNALS)
+        or any(token in nav_texts for token in ("pricing", "features", "product", "contact", "about", "resources"))
+        or bool(structural.get("has_marketing_nav"))
     )
     return positive and not has_real_cart and not has_real_crud
 
@@ -203,20 +239,31 @@ def _has_marketing_signals(text: str, nav_texts: list[str], has_real_cart: bool,
 def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]:
     nav_texts = _nav_texts(crawl)
     text = _combined_text(crawl, description)
+    structural = _structural_counts(crawl)
 
     app_type = AppType.GENERIC.value
     features: list[str] = []
     primary_goal = "explore site"
 
-    has_catalog = _has_product_catalog(text)
-    has_cart_or_checkout = _has_cart_or_checkout(text)
-    has_task_patterns = _has_task_list_patterns(text)
-    has_crud_interactions = _has_create_edit_delete(crawl, text)
+    has_catalog = _has_product_catalog(text) and (
+        structural["has_product_detail_links"] or structural["product_item_count"] > 3
+    )
+    has_cart_or_checkout = _has_cart_or_checkout(text) or bool(structural["has_add_to_cart_button"])
+    has_task_patterns = _has_task_list_patterns(text) and (
+        structural["has_checkboxes"]
+        or structural["has_draggable_list_items"]
+        or structural["rendered_list_item_count"] > 2
+    )
+    has_crud_interactions = _has_create_edit_delete(crawl, text) and (
+        structural["has_checkboxes"]
+        or structural["has_inline_edit_interaction"]
+        or structural["rendered_list_item_count"] > 2
+    )
     has_login_form = _has_auth_form(crawl, text)
     has_dashboard_link = any(token in text for token in ("dashboard", "workspace", "analytics", "projects"))
     has_real_cart = has_catalog and has_cart_or_checkout
     has_real_crud = has_task_patterns and has_crud_interactions
-    has_marketing_signals = _has_marketing_signals(text, nav_texts, has_real_cart, has_real_crud)
+    has_marketing_signals = _has_marketing_signals(text, nav_texts, has_real_cart, has_real_crud, structural)
 
     if has_real_cart:
         app_type = AppType.ECOMMERCE.value

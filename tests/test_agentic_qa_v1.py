@@ -167,7 +167,7 @@ def test_stripe_like_marketing_site_is_not_misclassified_as_ecommerce() -> None:
         ],
         "buttons": ["Contact sales", "Start now"],
         "forms": [],
-        "page_html": "<main><section><h1>Payments infrastructure</h1></section></main>",
+        "page_html": "<main><section><h1>Payments infrastructure</h1><a href='/pricing'>Pricing</a></section></main>",
     }
 
     context = discover_site(crawl, description="Payments infrastructure marketing site")
@@ -186,7 +186,7 @@ def test_linear_like_marketing_site_is_not_misclassified_as_task_manager() -> No
         ],
         "buttons": ["Request demo", "Get started"],
         "forms": [],
-        "page_html": "<main><section><h2>Changelog</h2></section></main>",
+        "page_html": "<main><section><h2>Changelog</h2><a href='/features'>Features</a></section></main>",
     }
 
     context = discover_site(crawl, description="Project management marketing site")
@@ -205,9 +205,35 @@ def test_notion_like_marketing_site_is_not_misclassified_as_task_manager() -> No
         ],
         "buttons": ["Get Notion free", "Request a demo"],
         "forms": [],
-        "page_html": "<main><section><h2>Templates</h2></section></main>",
+        "page_html": "<main><section><h2>Templates</h2><a href='/pricing'>Pricing</a></section></main>",
     }
 
     context = discover_site(crawl, description="Workspace collaboration marketing site")
 
     assert context["app_type"] == AppType.MARKETING.value
+
+
+def test_real_task_app_still_classifies_as_task_manager() -> None:
+    crawl = {
+        "title": "Todo App",
+        "text_snippet": "todos add new task complete delete",
+        "nav_links": [],
+        "buttons": ["Create", "Delete"],
+        "forms": [{"id": "todo-form", "action": "/todos", "fields": 1}],
+        "page_html": """
+            <main>
+              <input class="new-todo" />
+              <input type="checkbox" />
+              <input type="checkbox" />
+              <input type="checkbox" />
+              <div contenteditable="true"></div>
+              <li class="todo-item"></li>
+              <li class="todo-item"></li>
+              <li class="todo-item"></li>
+            </main>
+        """,
+    }
+
+    context = discover_site(crawl, description="Task management app")
+
+    assert context["app_type"] == AppType.TASK_MANAGER.value
