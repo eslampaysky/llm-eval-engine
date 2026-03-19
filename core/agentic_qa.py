@@ -164,6 +164,7 @@ def _structural_counts(crawl: dict[str, Any]) -> dict[str, int]:
     text = _combined_text(crawl)
     nav_texts = _nav_texts(crawl)
     buttons = " ".join(str(button).lower() for button in (crawl.get("buttons") or []))
+    crawl_signals = crawl.get("structural_signals") or {}
 
     product_item_count = sum(
         html.count(token)
@@ -178,7 +179,7 @@ def _structural_counts(crawl: dict[str, Any]) -> dict[str, int]:
         for token in ('class="task', "class='task", "todo-item", "data-task-id", "role=\"checkbox\"", "role='checkbox'", "type=\"checkbox\"", "type='checkbox'")
     )
 
-    return {
+    counts = {
         "has_add_to_cart_button": int(any(token in text for token in ("add to cart", "buy now", "add to bag"))),
         "has_product_detail_links": int(product_detail_links > 2),
         "product_item_count": product_item_count,
@@ -197,6 +198,9 @@ def _structural_counts(crawl: dict[str, Any]) -> dict[str, int]:
             and ('type="password"' in html or "password" in text)
         ),
     }
+    if "auth_form_is_visible" in crawl_signals:
+        counts["auth_form_is_visible"] = int(bool(crawl_signals["auth_form_is_visible"]))
+    return counts
 
 
 def _has_auth_form(crawl: dict[str, Any], text: str) -> bool:

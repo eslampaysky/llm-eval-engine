@@ -93,10 +93,10 @@
       },
       {
         "name": "TodoMVC Vue",
-        "url": "https://todomvc.com/examples/vue/",
+        "url": "https://todomvc.com/examples/vue3/dist/",
         "expected_type": "task_manager",
         "tier": "deep",
-        "site_description": "Vue todo app for task management"
+        "site_description": "Vue 3 todo app for task management"
       },
       {
         "name": "Add Remove Elements",

@@ -1106,6 +1106,7 @@ async def run_web_audit(
         "journey_results": None,
         "page_html": None,
         "extra_pages": [],
+        "structural_signals": {},
     }
 
     video_dir = None
@@ -1203,6 +1204,29 @@ async def run_web_audit(
                 result["page_html"] = raw_html[:30000]  # truncate for Groq context
             except Exception:
                 result["page_html"] = None
+
+            try:
+                result["structural_signals"] = await page.evaluate(
+                    """() => {
+                        const passwordInputs = Array.from(document.querySelectorAll('input[type="password"]'));
+                        const authFormIsVisible = passwordInputs.some((input) => {
+                            const rect = input.getBoundingClientRect();
+                            const style = window.getComputedStyle(input);
+                            return (
+                                rect.width > 0 &&
+                                rect.height > 0 &&
+                                rect.bottom > 0 &&
+                                rect.top < window.innerHeight &&
+                                style.opacity !== '0' &&
+                                style.display !== 'none' &&
+                                style.visibility !== 'hidden'
+                            );
+                        });
+                        return { auth_form_is_visible: authFormIsVisible };
+                    }"""
+                )
+            except Exception:
+                result["structural_signals"] = {}
 
             # ── Multi-page crawl (deep/fix tiers) ─────────────────────────
             if max_pages > 1 and result["nav_links"]:

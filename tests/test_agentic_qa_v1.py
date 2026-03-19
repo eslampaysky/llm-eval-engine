@@ -317,11 +317,28 @@ def test_visible_auth_form_still_classifies_as_saas_auth() -> None:
         "buttons": ["Sign in"],
         "forms": [{"id": "login", "action": "/login", "fields": 2}],
         "page_html": "<form action='/login'><input type='text' name='username'><input type='password' name='password'></form>",
+        "structural_signals": {"auth_form_is_visible": True},
     }
 
     context = discover_site(crawl, description="Visible auth form")
 
     assert context["app_type"] == AppType.SAAS_AUTH.value
+
+
+def test_advantage_pattern_hidden_modal_does_not_trigger_saas_auth() -> None:
+    crawl = {
+        "title": "Advantage Shopping",
+        "text_snippet": "shop products add to cart checkout login",
+        "nav_links": [{"text": "Shop", "href": "https://example.com/shop"}],
+        "buttons": ["Add to cart"],
+        "forms": [{"id": "loginModal", "action": "/login", "fields": 2}],
+        "page_html": "<main><div class='product-card'></div><div class='product-card'></div><div class='product-card'></div><div class='product-card'></div><a href='/product/1'></a><a href='/product/2'></a><a href='/product/3'></a><input type='password'></main>",
+        "structural_signals": {"auth_form_is_visible": False},
+    }
+
+    context = discover_site(crawl, description="Shopping app with hidden auth modal")
+
+    assert context["app_type"] == AppType.ECOMMERCE.value
 
 
 def test_calibration_manifest_has_four_saas_targets_with_credentials() -> None:
