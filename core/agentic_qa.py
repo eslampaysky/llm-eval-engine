@@ -168,11 +168,21 @@ def _structural_counts(crawl: dict[str, Any]) -> dict[str, int]:
 
     product_item_count = sum(
         html.count(token)
-        for token in ('class="product', "class='product", "product-card", "data-product-id", "item-card")
+        for token in (
+            'class="product',
+            "class='product",
+            "product-card",
+            "data-product-id",
+            "item-card",
+            "categorycell",
+            "shop_now",
+            "popularitem",
+            "view details",
+        )
     )
     product_detail_links = sum(
         html.count(token)
-        for token in ("/product/", "/item/", "/shop/", "product-card")
+        for token in ("/product/", "#/product/", "/item/", "/shop/", "product-card", "view details")
     )
     rendered_list_item_count = sum(
         html.count(token)
