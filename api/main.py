@@ -83,6 +83,19 @@ def _recover_stuck_reports() -> int:
     return recovered
 
 
+def _build_metadata() -> dict[str, str]:
+    commit = (
+        os.getenv("RAILWAY_GIT_COMMIT_SHA")
+        or os.getenv("GIT_COMMIT")
+        or "unknown"
+    )
+    return {
+        "commit": commit[:7] if commit != "unknown" else commit,
+        "branch": os.getenv("RAILWAY_GIT_BRANCH") or os.getenv("GIT_BRANCH") or "unknown",
+        "deployment_id": os.getenv("RAILWAY_DEPLOYMENT_ID", "unknown"),
+    }
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── Startup ──────────────────────────────────────────────────────────────
@@ -166,7 +179,11 @@ app.include_router(auth_router)
 @app.get("/health")
 def health():
     # Must remain stable for Railway healthchecks.
-    return {"status": "ok", "version": APP_VERSION}
+    return {
+        "status": "ok",
+        "version": APP_VERSION,
+        **_build_metadata(),
+    }
 
 
 @app.get("/health/details")
