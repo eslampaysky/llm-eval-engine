@@ -16,6 +16,7 @@ class AppType(StrEnum):
     ECOMMERCE = "ecommerce"
     TASK_MANAGER = "task_manager"
     SAAS_AUTH = "saas_auth"
+    DOM_MUTATION = "dom_mutation"
     MARKETING = "marketing_site"
     GENERIC = "generic"
 

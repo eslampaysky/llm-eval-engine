@@ -101,16 +101,16 @@
       {
         "name": "Add Remove Elements",
         "url": "https://the-internet.herokuapp.com/add_remove_elements/",
-        "expected_type": "task_manager",
+        "expected_type": "generic",
         "tier": "deep",
-        "site_description": "Simple create and remove DOM elements flow"
+        "site_description": "Simple add and remove DOM elements page"
       },
       {
-        "name": "Books to Scrape",
-        "url": "https://books.toscrape.com/",
+        "name": "Advantage Online Shopping",
+        "url": "https://www.advantageonlineshopping.com",
         "expected_type": "ecommerce",
         "tier": "deep",
-        "site_description": "Static book catalog ecommerce site"
+        "site_description": "Shopping app with wishlist and saved items"
       }
     ],
     "ecommerce": [

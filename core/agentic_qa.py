@@ -163,6 +163,7 @@ def _structural_counts(crawl: dict[str, Any]) -> dict[str, int]:
     html = _page_html(crawl)
     text = _combined_text(crawl)
     nav_texts = _nav_texts(crawl)
+    buttons = " ".join(str(button).lower() for button in (crawl.get("buttons") or []))
 
     product_item_count = sum(
         html.count(token)
@@ -174,18 +175,27 @@ def _structural_counts(crawl: dict[str, Any]) -> dict[str, int]:
     )
     rendered_list_item_count = sum(
         html.count(token)
-        for token in ('class="task', "class='task", "todo-item", "data-task-id", "role=\"checkbox\"", "type=\"checkbox\"")
+        for token in ('class="task', "class='task", "todo-item", "data-task-id", "role=\"checkbox\"", "role='checkbox'", "type=\"checkbox\"", "type='checkbox'")
     )
 
     return {
         "has_add_to_cart_button": int(any(token in text for token in ("add to cart", "buy now", "add to bag"))),
         "has_product_detail_links": int(product_detail_links > 2),
         "product_item_count": product_item_count,
-        "has_checkboxes": int(any(token in html for token in ('type="checkbox"', "role=\"checkbox\"", "todo-checkbox"))),
+        "has_checkboxes": int(any(token in html for token in ('type="checkbox"', "type='checkbox'", "role=\"checkbox\"", "role='checkbox'", "todo-checkbox"))),
         "has_draggable_list_items": int(any(token in html for token in ('draggable="true"', "sortable-item", "data-drag-handle"))),
         "rendered_list_item_count": rendered_list_item_count,
         "has_inline_edit_interaction": int(any(token in html for token in ('contenteditable="true"', "editable-field", "inline-edit"))),
         "has_marketing_nav": int(any(token in nav_texts for token in ("pricing", "features", "product", "contact", "about", "resources", "enterprise"))),
+        "has_todo_create_input": int(any(token in html for token in ("input.new-todo", "class='new-todo'", "class=\"new-todo\"", "placeholder=\"what needs", "placeholder='what needs"))),
+        "placeholder_contains_todo": int(any(token in html for token in ("placeholder=\"todo", "placeholder='todo"))),
+        "placeholder_contains_add_task": int(any(token in html for token in ("placeholder=\"add task", "placeholder='add task", "placeholder=\"new task", "placeholder='new task"))),
+        "has_add_button": int(any(token in buttons for token in ("add element", "add", "create"))),
+        "has_delete_or_remove_button": int(any(token in buttons for token in ("delete", "remove"))),
+        "auth_form_is_visible": int(
+            any(token in text for token in ("password", "sign in", "log in", "login", "username"))
+            and ('type="password"' in html or "password" in text)
+        ),
     }
 
 
@@ -236,6 +246,14 @@ def _has_marketing_signals(text: str, nav_texts: list[str], has_real_cart: bool,
     return positive and not has_real_cart and not has_real_crud
 
 
+def _has_dom_mutation_patterns(structural: dict[str, int], has_task_patterns: bool, has_catalog: bool) -> bool:
+    return bool(
+        structural.get("has_add_button")
+        and not has_task_patterns
+        and not has_catalog
+    )
+
+
 def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]:
     nav_texts = _nav_texts(crawl)
     text = _combined_text(crawl, description)
@@ -254,14 +272,25 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
         or structural["has_draggable_list_items"]
         or structural["rendered_list_item_count"] > 2
     )
+    has_empty_state_task_affordance = bool(
+        structural["has_todo_create_input"]
+        or structural["placeholder_contains_todo"]
+        or structural["placeholder_contains_add_task"]
+    )
+    if has_empty_state_task_affordance:
+        has_task_patterns = True
     has_crud_interactions = _has_create_edit_delete(crawl, text) and (
         structural["has_checkboxes"]
         or structural["has_inline_edit_interaction"]
         or structural["rendered_list_item_count"] > 2
     )
+    if has_empty_state_task_affordance:
+        has_crud_interactions = True
     has_login_form = _has_auth_form(crawl, text)
+    has_visible_auth_form = has_login_form and bool(structural["auth_form_is_visible"])
     has_real_cart = has_catalog and has_cart_or_checkout
     has_real_crud = has_task_patterns and has_crud_interactions
+    has_dom_mutation = _has_dom_mutation_patterns(structural, has_task_patterns, has_catalog)
     has_marketing_signals = _has_marketing_signals(text, nav_texts, has_real_cart, has_real_crud, structural)
 
     if has_real_cart:
@@ -272,7 +301,11 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
         app_type = AppType.TASK_MANAGER.value
         features = ["create", "edit", "delete"]
         primary_goal = "manage records"
-    elif has_login_form:
+    elif has_dom_mutation:
+        app_type = AppType.DOM_MUTATION.value
+        features = ["add", "remove"]
+        primary_goal = "mutate DOM elements"
+    elif has_visible_auth_form:
         app_type = AppType.SAAS_AUTH.value
         features = ["login", "dashboard", "navigation"]
         primary_goal = "reach dashboard"
@@ -544,6 +577,40 @@ def _crud_steps() -> list[JourneyStep]:
     ]
 
 
+def _dom_mutation_steps() -> list[JourneyStep]:
+    return [
+        JourneyStep(
+            goal="add_element",
+            intent="add or create button",
+            step_type=StepType.CLICK.value,
+            action_candidates=[
+                ActionCandidate(type="click", intent="add element button", selectors=["button:has-text('Add Element')", "button:has-text('Add')", "button[id*='add' i]"], role="button", name="Add Element", text="Add Element"),
+            ],
+            success_signals=[
+                SuccessSignal(type="element_visible", value="Delete", priority="high", required=False),
+                SuccessSignal(type="element_visible", value="Remove", priority="high", required=False),
+                SuccessSignal(type="text_present", value="Delete", priority="medium", required=False),
+            ],
+            failure_hints=["no new element appeared"],
+            allow_soft_recovery=False,
+        ),
+        JourneyStep(
+            goal="remove_element",
+            intent="delete or remove button",
+            step_type=StepType.CLICK.value,
+            action_candidates=[
+                ActionCandidate(type="click", intent="delete button", selectors=["button:has-text('Delete')", "button:has-text('Remove')", "button[id*='delete' i]", "button[id*='remove' i]"], role="button", name="Delete", text="Delete"),
+            ],
+            success_signals=[
+                SuccessSignal(type="text_absent", value="Delete", priority="high", required=False),
+                SuccessSignal(type="element_visible", value="Add Element", priority="medium", required=False),
+            ],
+            failure_hints=["element still present after delete"],
+            allow_soft_recovery=False,
+        ),
+    ]
+
+
 def plan_journeys(context: dict[str, Any]) -> list[JourneyPlan]:
     app_type = str(context.get("app_type") or "generic").lower()
     if "commerce" in app_type or app_type == AppType.ECOMMERCE.value:
@@ -557,6 +624,8 @@ def plan_journeys(context: dict[str, Any]) -> list[JourneyPlan]:
         ]
     if app_type in {AppType.TASK_MANAGER.value, "crud", "task"}:
         return [JourneyPlan(name="core_crud", app_type="crud", steps=_crud_steps())]
+    if app_type == AppType.DOM_MUTATION.value:
+        return [JourneyPlan(name="dom_mutation_basic", app_type=AppType.DOM_MUTATION.value, steps=_dom_mutation_steps())]
     if app_type == AppType.MARKETING.value:
         return [
             JourneyPlan(name="pricing_navigation", app_type=AppType.MARKETING.value, steps=[_marketing_pricing_step()]),

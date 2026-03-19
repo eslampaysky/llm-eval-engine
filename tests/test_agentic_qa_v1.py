@@ -241,6 +241,89 @@ def test_real_task_app_still_classifies_as_task_manager() -> None:
     assert context["app_type"] == AppType.TASK_MANAGER.value
 
 
+def test_todomvc_empty_state_classifies_as_task_manager() -> None:
+    crawl = {
+        "title": "TodoMVC: React",
+        "text_snippet": "todos what needs to be done",
+        "nav_links": [],
+        "buttons": [],
+        "forms": [],
+        "page_html": "<main><input class='new-todo' placeholder='What needs to be done?' /></main>",
+    }
+
+    context = discover_site(crawl, description="Todo app with empty list state")
+
+    assert context["app_type"] == AppType.TASK_MANAGER.value
+
+
+def test_task_manager_with_items_still_classifies_correctly() -> None:
+    crawl = {
+        "title": "Todo App",
+        "text_snippet": "todos buy milk walk dog",
+        "nav_links": [],
+        "buttons": ["Delete"],
+        "forms": [],
+        "page_html": "<main><input class='new-todo'/><input type='checkbox'/><input type='checkbox'/><input type='checkbox'/></main>",
+    }
+
+    context = discover_site(crawl, description="Task app with existing items")
+
+    assert context["app_type"] == AppType.TASK_MANAGER.value
+
+
+def test_add_remove_page_classifies_as_dom_mutation() -> None:
+    crawl = {
+        "title": "Add Remove Elements",
+        "text_snippet": "Add Remove Elements",
+        "nav_links": [],
+        "buttons": ["Add Element", "Delete"],
+        "forms": [],
+        "page_html": "<main><button>Add Element</button><button>Delete</button></main>",
+    }
+
+    context = discover_site(crawl, description="Simple DOM mutation page")
+
+    assert context["app_type"] == AppType.DOM_MUTATION.value
+
+
+def test_dom_mutation_plan_uses_add_remove_steps() -> None:
+    journeys = plan_journeys({"app_type": AppType.DOM_MUTATION.value})
+
+    assert len(journeys) == 1
+    assert journeys[0].name == "dom_mutation_basic"
+    assert [step.goal for step in journeys[0].steps] == ["add_element", "remove_element"]
+
+
+def test_commerce_with_hidden_auth_modal_classifies_as_ecommerce() -> None:
+    crawl = {
+        "title": "Advantage Shopping",
+        "text_snippet": "shop products add to cart checkout",
+        "nav_links": [{"text": "Shop", "href": "https://example.com/shop"}],
+        "buttons": ["Add to cart"],
+        "forms": [{"id": "loginModal", "action": "/login", "fields": 2}],
+        "page_html": "<main><div class='product-card'></div><div class='product-card'></div><div class='product-card'></div><div class='product-card'></div><a href='/product/1'></a><a href='/product/2'></a><a href='/product/3'></a><input type='password' style='display:none'></main>",
+    }
+
+    context = discover_site(crawl, description="Shopping app with hidden login modal")
+
+    assert context["app_type"] == AppType.ECOMMERCE.value
+
+
+def test_visible_auth_form_still_classifies_as_saas_auth() -> None:
+    crawl = {
+        "title": "Login",
+        "text_snippet": "login username password sign in",
+        "nav_links": [],
+        "buttons": ["Sign in"],
+        "forms": [{"id": "login", "action": "/login", "fields": 2}],
+        "page_html": "<form action='/login'><input type='text' name='username'><input type='password' name='password'></form>",
+    }
+
+    context = discover_site(crawl, description="Visible auth form")
+
+    assert context["app_type"] == AppType.SAAS_AUTH.value
+
+
 def test_calibration_manifest_has_four_saas_targets_with_credentials() -> None:
     manifest_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "configs", "calibration_targets.json"))
     with open(manifest_path, encoding="utf-8") as fh:
