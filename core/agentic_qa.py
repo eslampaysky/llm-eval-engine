@@ -18,7 +18,7 @@ import os
 from dataclasses import dataclass, field, asdict
 from typing import Any
 
-from core.models import JourneyPlan, JourneyStep, SuccessSignal, ActionCandidate, to_dict
+from core.models import JourneyPlan, JourneyStep, SuccessSignal, ActionCandidate, StepType, to_dict
 from core.report_builder import build_fix_prompt_context, build_journey_timeline, infer_spec
 from core.web_agent import run_structured_journeys, run_web_audit
 from core.gemini_judge import judge_visual
@@ -219,18 +219,36 @@ def _crud_steps() -> list[JourneyStep]:
     return [
         JourneyStep(
             goal="create_record",
-            intent="create a new record",
+            intent="new item input field",
+            step_type=StepType.FILL_SUBMIT.value,
             action_candidates=[
-                ActionCandidate(type="click", intent="new item button", role="button", name="New", text="New"),
-                ActionCandidate(type="click", intent="create button", role="button", name="Create", text="Create"),
+                ActionCandidate(
+                    type="fill",
+                    intent="todo input field",
+                    selectors=[
+                        "input.new-todo",
+                        "input[placeholder*='todo' i]",
+                        "input[placeholder*='add' i]",
+                        "input[type='text']",
+                    ],
+                    role="textbox",
+                    name="What needs to be done?",
+                    value="Buy milk",
+                ),
+                ActionCandidate(
+                    type="submit",
+                    intent="submit new item",
+                    fallback_value="Enter",
+                ),
             ],
+            input_bindings={"value": "Buy milk"},
             success_signals=[
-                SuccessSignal(type="text_present", value="created", priority="medium", required=False),
-                SuccessSignal(type="url_contains", value="new", priority="low", required=False),
+                SuccessSignal(type="text_present", value="Buy milk", priority="high"),
+                SuccessSignal(type="text_present", value="1 item left", priority="medium", required=False),
             ],
-            failure_hints=["Create dialog did not open"],
+            failure_hints=["input not found", "text did not appear"],
             expected_state_change={"record_created": True},
-            allow_soft_recovery=True,
+            allow_soft_recovery=False,
         )
     ]
 

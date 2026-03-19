@@ -28,6 +28,7 @@ from core.models import (
     JourneyStep,
     RecoveryEvent,
     SessionState,
+    StepType,
     StepResult,
     SuccessSignal,
     VerificationResult,
@@ -516,6 +517,23 @@ async def _resolve_locator(page, candidate: ActionCandidate):
     return None
 
 
+def _ordered_candidates_for_step(step: JourneyStep) -> list[ActionCandidate]:
+    candidates = [_as_action_candidate(candidate) for candidate in (step.action_candidates or [])]
+    if step.step_type != StepType.FILL_SUBMIT.value:
+        return candidates
+
+    fill_candidates = [candidate for candidate in candidates if candidate.type == "fill"]
+    submit_candidates = [candidate for candidate in candidates if candidate.type == "submit"]
+    other_candidates = [
+        candidate for candidate in candidates if candidate.type not in {"fill", "submit"}
+    ]
+    if not submit_candidates:
+        submit_candidates.append(
+            ActionCandidate(type="submit", intent="submit filled input", fallback_value="Enter")
+        )
+    return fill_candidates + submit_candidates + other_candidates
+
+
 async def _execute_candidate(
     page,
     candidate: ActionCandidate,
@@ -655,6 +673,11 @@ async def verify_action_success(
     if step.goal == "login":
         if "/secure" in after_url or "logout" in after_text or "secure area" in after_text:
             derived_state["is_logged_in"] = True
+    if step.goal == "create_record":
+        expected_text = _resolve_state_reference(step.input_bindings.get("value"), state) or step.input_bindings.get("value")
+        if expected_text and str(expected_text).lower() in after_text:
+            derived_state["record_created"] = True
+            derived_state["last_created_record"] = str(expected_text)
 
     for key, expected in step.expected_state_change.items():
         actual = derived_state.get(key)
@@ -695,6 +718,11 @@ def _update_state_after_step(state: SessionState, step: JourneyStep, page_url: s
     )
     if step.goal == "login" and verification.success:
         state.auth["is_logged_in"] = True
+    if step.goal == "create_record" and verification.success:
+        created_value = _resolve_state_reference(step.input_bindings.get("value"), state) or step.input_bindings.get("value")
+        state.items["record_created"] = True
+        if created_value:
+            state.items["last_created_record"] = created_value
     for key, value in step.expected_state_change.items():
         if key in {"is_logged_in", "logged_in"}:
             state.auth["is_logged_in"] = value
@@ -805,7 +833,7 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState) 
 
         for attempt in range(MAX_RETRIES_PER_STEP):
             action_trace: list[dict[str, Any]] = []
-            candidates = step.action_candidates or []
+            candidates = _ordered_candidates_for_step(step)
             if not candidates:
                 error_text = f"No action candidates available for step {step.goal}"
                 verification_result = VerificationResult(success=False, failure_type="action_resolution_failed")

@@ -7,7 +7,7 @@ from dataclasses import asdict
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from core.models import ActionCandidate, JourneyPlan, JourneyStep, RecoveryEvent, SessionState, StepResult, SuccessSignal
+from core.models import ActionCandidate, JourneyPlan, JourneyStep, RecoveryEvent, SessionState, StepResult, StepType, SuccessSignal
 from core.report_builder import build_journey_timeline
 
 
@@ -19,6 +19,7 @@ def test_structured_models_are_json_serializable() -> None:
             JourneyStep(
                 goal="login",
                 intent="login",
+                step_type=StepType.CLICK.value,
                 action_candidates=[
                     ActionCandidate(type="click", intent="login button", role="button", name="Login")
                 ],
@@ -58,6 +59,7 @@ def test_structured_models_are_json_serializable() -> None:
     assert "user_checkout" in encoded
     assert "is_logged_in" in encoded
     assert "cookie_consent" in encoded
+    assert StepType.CLICK.value in encoded
 
 
 def test_build_journey_timeline_includes_failure_reason() -> None:

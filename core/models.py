@@ -5,6 +5,13 @@ from enum import StrEnum
 from typing import Any
 
 
+class StepType(StrEnum):
+    CLICK = "click"
+    FILL_SUBMIT = "fill_submit"
+    NAVIGATE = "navigate"
+    VERIFY_ONLY = "verify_only"
+
+
 class FailureType(StrEnum):
     NONE = "none"
     ACTION_RESOLUTION_FAILED = "action_resolution_failed"
@@ -75,6 +82,7 @@ class SuccessSignal:
 class JourneyStep:
     goal: str
     intent: str
+    step_type: str = StepType.CLICK.value
     action_candidates: list[ActionCandidate] = field(default_factory=list)
     input_bindings: dict[str, str] = field(default_factory=dict)
     success_signals: list[SuccessSignal] = field(default_factory=list)
@@ -87,6 +95,7 @@ class JourneyStep:
         return cls(
             goal=str(data.get("goal") or "").strip(),
             intent=str(data.get("intent") or data.get("goal") or "").strip(),
+            step_type=str(data.get("step_type") or StepType.CLICK.value).strip().lower(),
             action_candidates=[
                 ActionCandidate.from_dict(item)
                 for item in (data.get("action_candidates") or [])
