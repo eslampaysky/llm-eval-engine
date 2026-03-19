@@ -306,3 +306,10 @@ def test_applitools_app_html_matches_auth_success_signals() -> None:
     ]
 
     assert matching_signals
+
+
+def test_saas_auth_plan_is_login_only() -> None:
+    journeys = plan_journeys({"app_type": AppType.SAAS_AUTH.value})
+
+    assert len(journeys) == 1
+    assert [step.goal for step in journeys[0].steps] == ["login"]

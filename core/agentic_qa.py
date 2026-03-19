@@ -387,7 +387,7 @@ def _login_step() -> JourneyStep:
             "Password": "state.generated_credentials.password",
         },
         success_signals=[
-            SuccessSignal(type="url_contains", value="/dashboard", priority="high"),
+            SuccessSignal(type="url_contains", value="/dashboard", priority="high", required=False),
             SuccessSignal(type="url_contains", value="/account", priority="high", required=False),
             SuccessSignal(type="url_contains", value="/home", priority="high", required=False),
             SuccessSignal(type="url_contains", value="/app", priority="high", required=False),
@@ -553,7 +553,7 @@ def plan_journeys(context: dict[str, Any]) -> list[JourneyPlan]:
         ]
     if app_type in {AppType.SAAS_AUTH.value, "saas"} or "dashboard" in app_type:
         return [
-            JourneyPlan(name="register_login", app_type="saas", steps=[_login_step(), _dashboard_step()]),
+            JourneyPlan(name="register_login", app_type="saas", steps=[_login_step()]),
         ]
     if app_type in {AppType.TASK_MANAGER.value, "crud", "task"}:
         return [JourneyPlan(name="core_crud", app_type="crud", steps=_crud_steps())]
