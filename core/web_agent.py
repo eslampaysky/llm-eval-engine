@@ -393,14 +393,15 @@ async def run_web_audit(
         except Exception as e:
             result["error"] = str(e)[:500]
         finally:
+            video = page.video
+            await context.close()
             video_path = None
-            if page.video:
+            if video:
                 try:
-                    video_path = await page.video.path()
+                    video_path = await video.path()
                 except Exception:
                     pass
             result["video_path"] = str(video_path) if video_path else None
-            await context.close()
             await browser.close()
 
     return result

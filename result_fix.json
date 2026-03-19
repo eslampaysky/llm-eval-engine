@@ -1,0 +1,16 @@
+{
+  "audit_id": "920b3f8a-7f2a-40dc-88d8-1acc91aefbd1",
+  "status": "done",
+  "url": "https://example.com",
+  "tier": "fix",
+  "score": 100,
+  "confidence": 100,
+  "findings": [],
+  "summary": "The webpage appears to be visually correct and functional, with no obvious issues found. The page loads properly on both desktop and mobile devices, displaying the expected content without any errors.",
+  "bundled_fix_prompt": "Fix the web app by making the following changes: update the HTML structure to include navigation links, buttons, and forms, and modify the CSS to improve responsiveness. Specifically, add a nav element with an ID of \"nav-links\" below the h1 element, and include an unordered list with links to relevant pages. Add a button element with a class of \"learn-more\" below the paragraph with the link to \"https://iana.org/domains/example\". Create a form element with an ID of \"contact-form\" at the bottom of the body, containing input fields for name and email, and a submit button. Update the CSS to make the body width 100% on mobile devices (max-width: 390px) and 60vw on desktop devices (min-width: 1280px), and adjust the font size of the h1 element to 1.2em on mobile devices. Ensure the div element with the opacity of 0.8 has a clear background color to improve text readability. Make these changes to the provided HTML and CSS code to fix the identified issues and improve the overall user experience.",
+  "analysis_limited": false,
+  "video_url": "/agentic-qa/920b3f8a-7f2a-40dc-88d8-1acc91aefbd1/video",
+  "desktop_screenshot_url": "/agentic-qa/920b3f8a-7f2a-40dc-88d8-1acc91aefbd1/screenshot/desktop",
+  "mobile_screenshot_url": "/agentic-qa/920b3f8a-7f2a-40dc-88d8-1acc91aefbd1/screenshot/mobile",
+  "created_at": "2026-03-18T20:28:42.966969+00:00"
+}

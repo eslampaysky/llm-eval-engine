@@ -36,20 +36,34 @@ export default function AuditDetailPage() {
       return;
     }
     let active = true;
+    let pollCount = 0;
+    const MAX_POLLS = 20; // 60 seconds / 3s
     async function poll() {
       try {
         const data = await api.getAgenticQAStatus(auditId);
         if (!active) return;
+        pollCount++;
+        
         if (data.status === 'done' || data.status === 'failed') {
           setReport(data);
           setProgress(null);
+          active = false;
+        } else if (pollCount >= MAX_POLLS) {
+          setReport((prev) => ({ 
+            ...data, 
+            status: 'failed', 
+            error: 'Audit timed out after 1 minute of inactivity.', 
+            summary: 'The audit took too long and was aborted. Please try again later.' 
+          }));
+          setProgress(null);
+          active = false;
         } else {
           setProgress({ current_step: `Status: ${data.status}`, progress_pct: 50 });
         }
       } catch {}
     }
     poll();
-    const timer = setInterval(poll, 3000);
+    const timer = setInterval(() => { if (active) poll(); else clearInterval(timer); }, 3000);
     return () => { active = false; clearInterval(timer); };
   }, [report?.status, auditId]);
 

@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 NUM_WORKERS   = int(os.getenv("JOB_WORKERS", "4"))
 MAX_QUEUE_SIZE = int(os.getenv("JOB_QUEUE_SIZE", "100"))
-JOB_TIMEOUT   = int(os.getenv("JOB_TIMEOUT_SECONDS", "600"))  # 10 min max per job
+JOB_TIMEOUT   = int(os.getenv("JOB_TIMEOUT_SECONDS", "150"))  # 2.5 min max per job
 
 
 async def _keep_alive_loop(interval: int = 55) -> None:

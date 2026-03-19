@@ -1,0 +1,16 @@
+{
+  "audit_id": "32e7be7c-c336-49d9-b8c7-312fa86fa8b6",
+  "status": "done",
+  "url": "https://ai-breaker-labs.vercel.app",
+  "tier": "fix",
+  "score": 100,
+  "confidence": 100,
+  "findings": [],
+  "summary": "The website appears to be visually reliable and well-structured, with no issues found on the desktop view.",
+  "bundled_fix_prompt": "Fix the layout and styling issues on the AiBreaker website by making the following changes: \n\nOn the homepage, update the `header` element with the ID `root` to use a responsive design that works on both desktop (1280px) and mobile (390px) devices. \n\nSpecifically, modify the `nav` element with the class `hide-mobile-nav` to display as `flex` on desktop and `none` on mobile, and update the `button` element with the class `show-mobile-nav` to display as `none` on desktop and `flex` on mobile. \n\nAlso, adjust the `main` element's `flex` property to ensure proper rendering on both devices. \n\nOn the demo page, update the `card` element to use a consistent padding and margin, and ensure the `btn btn-primary-lg` button is centered on both desktop and mobile. \n\nOn the pricing page, modify the grid layout to use `repeat(auto-fit, minmax(280px, 1fr))` to ensure proper rendering of the pricing cards on both desktop and mobile. \n\nAdditionally, update the CSS to use consistent spacing and sizing throughout the website, and ensure that all interactive elements (such as buttons and links) have a consistent cursor pointer. \n\nFinally, test the website on both desktop and mobile devices to ensure all fixes have been applied correctly and the website is fully functional.",
+  "analysis_limited": false,
+  "video_url": "/agentic-qa/32e7be7c-c336-49d9-b8c7-312fa86fa8b6/video",
+  "desktop_screenshot_url": "/agentic-qa/32e7be7c-c336-49d9-b8c7-312fa86fa8b6/screenshot/desktop",
+  "mobile_screenshot_url": "/agentic-qa/32e7be7c-c336-49d9-b8c7-312fa86fa8b6/screenshot/mobile",
+  "created_at": "2026-03-18T20:35:36.517919+00:00"
+}

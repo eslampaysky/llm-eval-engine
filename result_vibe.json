@@ -1,0 +1,16 @@
+{
+  "audit_id": "3e7f7024-06f7-421b-9387-3e88fb8d40d4",
+  "status": "done",
+  "url": "https://example.com",
+  "tier": "vibe",
+  "score": 100,
+  "confidence": 100,
+  "findings": [],
+  "summary": "The webpage appears to be visually correct and functional, with no obvious issues found. The page loads properly on both desktop and mobile devices, displaying the expected content without any errors.",
+  "bundled_fix_prompt": null,
+  "analysis_limited": false,
+  "video_url": null,
+  "desktop_screenshot_url": "/agentic-qa/3e7f7024-06f7-421b-9387-3e88fb8d40d4/screenshot/desktop",
+  "mobile_screenshot_url": "/agentic-qa/3e7f7024-06f7-421b-9387-3e88fb8d40d4/screenshot/mobile",
+  "created_at": "2026-03-18T20:27:28.605220+00:00"
+}
