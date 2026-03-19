@@ -135,3 +135,22 @@ def test_marketing_site_plan_uses_navigation_journeys() -> None:
     ]
     assert journeys[0].steps[0].goal == "reach_pricing"
     assert journeys[0].steps[0].step_type == StepType.CLICK.value
+
+
+def test_marketing_site_with_login_cta_but_no_auth_form_stays_marketing() -> None:
+    crawl = {
+        "title": "Cookiebot by Usercentrics",
+        "text_snippet": "LOG IN Pricing Contact Sales Start free trial",
+        "nav_links": [
+            {"text": "Pricing", "href": "https://example.com/pricing"},
+            {"text": "Contact", "href": "https://example.com/contact"},
+            {"text": "Log in", "href": "https://example.com/login"},
+        ],
+        "buttons": ["Start free trial", "Contact sales"],
+        "forms": [{"id": "search", "action": "/search", "fields": 1}],
+        "page_html": "<form action='/search'><input type='search' /></form>",
+    }
+
+    context = discover_site(crawl, description="Marketing homepage with pricing and contact links")
+
+    assert context["app_type"] == AppType.MARKETING.value

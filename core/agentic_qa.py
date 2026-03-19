@@ -135,6 +135,22 @@ def _nav_texts(crawl: dict[str, Any]) -> list[str]:
     ]
 
 
+def _has_auth_form(crawl: dict[str, Any], text: str) -> bool:
+    page_html = str(crawl.get("page_html") or "").lower()
+    forms = crawl.get("forms") or []
+    form_actions = " ".join(
+        str(item.get("action") or "").lower()
+        for item in forms
+        if isinstance(item, dict)
+    )
+    auth_keywords = ("login", "log in", "sign in", "password", "forgot password")
+    has_password_field = 'type="password"' in page_html or "password" in text
+    has_auth_action = any(keyword in form_actions for keyword in ("login", "signin", "sign-in", "auth"))
+    has_auth_form_fields = bool(forms) and has_password_field
+    has_auth_text = any(keyword in text for keyword in auth_keywords)
+    return has_auth_text and (has_auth_form_fields or has_auth_action)
+
+
 def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]:
     nav_links = crawl.get("nav_links") or []
     nav_texts = _nav_texts(crawl)
@@ -162,9 +178,7 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
     has_product_catalog = any(token in text for token in ("product", "shop", "collections", "buy now"))
     has_task_patterns = any(token in text for token in ("task", "board", "todo", "kanban"))
     has_create_patterns = any(token in text for token in ("create", "add item", "new task", "edit"))
-    has_login_form = bool(crawl.get("forms")) and any(
-        token in text for token in ("password", "log in", "login", "sign in", "email")
-    )
+    has_login_form = _has_auth_form(crawl, text)
     has_dashboard_link = any(token in text for token in ("dashboard", "workspace", "analytics", "projects"))
     has_marketing_signals = any(signal in text for signal in MARKETING_SIGNALS)
     has_marketing_nav = any(
