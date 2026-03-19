@@ -29,12 +29,15 @@ export function AppShellProvider({ children }) {
 
     setActiveAudit(auditInfo);
     let cancelled = false;
+    let pollCount = 0;
+    const MAX_POLLS = 20; // 60 seconds / 3s
 
     async function poll() {
       if (cancelled) return;
       try {
         const data = await api.getAgenticQAStatus(auditInfo.auditId);
         if (cancelled) return;
+        pollCount++;
 
         if (data.status === 'done') {
           localStorage.removeItem('abl_active_audit');
@@ -44,6 +47,11 @@ export function AppShellProvider({ children }) {
         } else if (data.status === 'failed') {
           localStorage.removeItem('abl_active_audit');
           setActiveAudit(null);
+          return;
+        } else if (pollCount >= MAX_POLLS) {
+          localStorage.removeItem('abl_active_audit');
+          setActiveAudit(null);
+          setAuditComplete({ ...data, status: 'failed', error: 'Audit timed out after 1 minute of inactivity.' });
           return;
         }
         // Still processing — continue polling
