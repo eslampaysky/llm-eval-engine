@@ -18,7 +18,7 @@ import os
 from dataclasses import dataclass, field, asdict
 from typing import Any
 
-from core.models import JourneyPlan, JourneyStep, SuccessSignal, ActionCandidate, StepType, to_dict
+from core.models import AppType, JourneyPlan, JourneyStep, SuccessSignal, ActionCandidate, StepType, to_dict
 from core.report_builder import build_fix_prompt_context, build_journey_timeline, infer_spec
 from core.web_agent import run_structured_journeys, run_web_audit
 from core.gemini_judge import judge_visual
@@ -104,33 +104,89 @@ def build_bundled_fix_prompt(findings: list[Finding], url: str) -> str:
     return "\n".join(lines)
 
 
+MARKETING_SIGNALS = (
+    "/pricing",
+    "/features",
+    "/about",
+    "/contact",
+    "/blog",
+    "/docs",
+    "/solutions",
+    "/enterprise",
+    "get started",
+    "start free trial",
+    "request demo",
+    "see pricing",
+    "contact sales",
+    "learn more",
+    "trusted by",
+    "customers",
+    "integrations",
+    "case studies",
+    "testimonials",
+)
+
+
+def _nav_texts(crawl: dict[str, Any]) -> list[str]:
+    return [
+        str(item.get("text") or "").strip().lower()
+        for item in (crawl.get("nav_links") or [])
+        if isinstance(item, dict) and str(item.get("text") or "").strip()
+    ]
+
+
 def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]:
+    nav_links = crawl.get("nav_links") or []
+    nav_texts = _nav_texts(crawl)
+    nav_hrefs = " ".join(
+        str(item.get("href") or "").lower()
+        for item in nav_links
+        if isinstance(item, dict)
+    )
     text = " ".join(
         [
             crawl.get("title") or "",
             crawl.get("text_snippet") or "",
-            " ".join(item.get("text", "") for item in (crawl.get("nav_links") or []) if isinstance(item, dict)),
+            " ".join(nav_texts),
+            nav_hrefs,
             " ".join(crawl.get("buttons") or []),
             description or "",
         ]
     ).lower()
 
-    app_type = "generic"
+    app_type = AppType.GENERIC.value
     features: list[str] = []
     primary_goal = "explore site"
 
-    if any(token in text for token in ("cart", "checkout", "shop", "product", "add to cart")):
-        app_type = "ecommerce"
+    has_cart = any(token in text for token in ("cart", "checkout", "add to cart"))
+    has_product_catalog = any(token in text for token in ("product", "shop", "collections", "buy now"))
+    has_task_patterns = any(token in text for token in ("task", "board", "todo", "kanban"))
+    has_create_patterns = any(token in text for token in ("create", "add item", "new task", "edit"))
+    has_login_form = bool(crawl.get("forms")) and any(
+        token in text for token in ("password", "log in", "login", "sign in", "email")
+    )
+    has_dashboard_link = any(token in text for token in ("dashboard", "workspace", "analytics", "projects"))
+    has_marketing_signals = any(signal in text for signal in MARKETING_SIGNALS)
+    has_marketing_nav = any(
+        token in nav_texts for token in ("pricing", "features", "product", "contact", "about", "resources")
+    )
+
+    if has_product_catalog and has_cart:
+        app_type = AppType.ECOMMERCE.value
         features = ["login", "search", "cart", "checkout"]
         primary_goal = "purchase item"
-    elif any(token in text for token in ("dashboard", "workspace", "analytics", "sign in", "trial")):
-        app_type = "saas"
-        features = ["login", "dashboard", "navigation"]
-        primary_goal = "reach dashboard"
-    elif any(token in text for token in ("task", "board", "todo", "create", "edit")):
-        app_type = "crud"
+    elif has_task_patterns or has_create_patterns:
+        app_type = AppType.TASK_MANAGER.value
         features = ["create", "edit", "delete"]
         primary_goal = "manage records"
+    elif has_login_form and has_dashboard_link:
+        app_type = AppType.SAAS_AUTH.value
+        features = ["login", "dashboard", "navigation"]
+        primary_goal = "reach dashboard"
+    elif has_marketing_signals or (has_marketing_nav and not has_cart and not has_login_form):
+        app_type = AppType.MARKETING.value
+        features = ["pricing", "features", "contact"]
+        primary_goal = "explore marketing paths"
 
     inferred = {
         "app_type": app_type,
@@ -215,6 +271,65 @@ def _dashboard_step() -> JourneyStep:
     )
 
 
+def _marketing_pricing_step() -> JourneyStep:
+    return JourneyStep(
+        goal="reach_pricing",
+        intent="pricing page link",
+        step_type=StepType.CLICK.value,
+        action_candidates=[
+            ActionCandidate(type="click", intent="pricing link", selectors=["a[href*='pricing']"], role="link", name="Pricing", text="Pricing"),
+            ActionCandidate(type="click", intent="see pricing link", selectors=["a:has-text('See pricing')"], role="link", name="See pricing", text="See pricing"),
+            ActionCandidate(type="click", intent="plans link", selectors=["a:has-text('Plans')"], role="link", name="Plans", text="Plans"),
+        ],
+        success_signals=[
+            SuccessSignal(type="url_contains", value="pricing", priority="high"),
+            SuccessSignal(type="text_present", value="pricing", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="plan", priority="medium", required=False),
+        ],
+        failure_hints=["pricing page not found", "link not reachable"],
+        allow_soft_recovery=True,
+    )
+
+
+def _marketing_features_step() -> JourneyStep:
+    return JourneyStep(
+        goal="reach_features",
+        intent="features or product page link",
+        step_type=StepType.CLICK.value,
+        action_candidates=[
+            ActionCandidate(type="click", intent="features link", selectors=["a[href*='features']", "nav a:has-text('Features')"], role="link", name="Features", text="Features"),
+            ActionCandidate(type="click", intent="product link", selectors=["a[href*='product']", "nav a:has-text('Product')"], role="link", name="Product", text="Product"),
+        ],
+        success_signals=[
+            SuccessSignal(type="url_contains", value="feature", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="product", priority="high", required=False),
+            SuccessSignal(type="text_present", value="feature", priority="medium", required=False),
+        ],
+        failure_hints=["features page not found"],
+        allow_soft_recovery=True,
+    )
+
+
+def _marketing_contact_step() -> JourneyStep:
+    return JourneyStep(
+        goal="reach_contact_or_demo",
+        intent="contact or request demo link",
+        step_type=StepType.CLICK.value,
+        action_candidates=[
+            ActionCandidate(type="click", intent="contact link", selectors=["a[href*='contact']", "a:has-text('Contact')"], role="link", name="Contact", text="Contact"),
+            ActionCandidate(type="click", intent="request demo link", selectors=["a[href*='demo']", "a:has-text('Request demo')", "a:has-text('Talk to sales')"], role="link", name="Request demo", text="Request demo"),
+        ],
+        success_signals=[
+            SuccessSignal(type="url_contains", value="contact", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="demo", priority="high", required=False),
+            SuccessSignal(type="text_present", value="contact", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value={"selector": "form"}, priority="medium", required=False),
+        ],
+        failure_hints=["contact page not found"],
+        allow_soft_recovery=True,
+    )
+
+
 def _crud_steps() -> list[JourneyStep]:
     return [
         JourneyStep(
@@ -255,17 +370,23 @@ def _crud_steps() -> list[JourneyStep]:
 
 def plan_journeys(context: dict[str, Any]) -> list[JourneyPlan]:
     app_type = str(context.get("app_type") or "generic").lower()
-    if "commerce" in app_type or app_type == "ecommerce":
+    if "commerce" in app_type or app_type == AppType.ECOMMERCE.value:
         return [
             JourneyPlan(name="guest_checkout", app_type="ecommerce", steps=[_cart_step()]),
             JourneyPlan(name="user_checkout", app_type="ecommerce", steps=[_login_step(), _cart_step()]),
         ]
-    if "saas" in app_type or "dashboard" in app_type:
+    if app_type in {AppType.SAAS_AUTH.value, "saas"} or "dashboard" in app_type:
         return [
             JourneyPlan(name="register_login", app_type="saas", steps=[_login_step(), _dashboard_step()]),
         ]
-    if app_type in {"crud", "task_manager", "task"}:
+    if app_type in {AppType.TASK_MANAGER.value, "crud", "task"}:
         return [JourneyPlan(name="core_crud", app_type="crud", steps=_crud_steps())]
+    if app_type == AppType.MARKETING.value:
+        return [
+            JourneyPlan(name="pricing_navigation", app_type=AppType.MARKETING.value, steps=[_marketing_pricing_step()]),
+            JourneyPlan(name="features_navigation", app_type=AppType.MARKETING.value, steps=[_marketing_features_step()]),
+            JourneyPlan(name="contact_navigation", app_type=AppType.MARKETING.value, steps=[_marketing_contact_step()]),
+        ]
     return [JourneyPlan(name="core_navigation", app_type="generic", steps=[_dashboard_step()])]
 
 

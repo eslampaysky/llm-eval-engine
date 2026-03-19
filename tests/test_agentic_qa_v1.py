@@ -7,7 +7,8 @@ from dataclasses import asdict
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from core.models import ActionCandidate, JourneyPlan, JourneyStep, RecoveryEvent, SessionState, StepResult, StepType, SuccessSignal
+from core.agentic_qa import discover_site, plan_journeys
+from core.models import ActionCandidate, AppType, JourneyPlan, JourneyStep, RecoveryEvent, SessionState, StepResult, StepType, SuccessSignal
 from core.report_builder import build_journey_timeline
 
 
@@ -102,3 +103,35 @@ def test_routes_include_optional_timeline_fields() -> None:
 
     assert '"journey_timeline": journey_timeline' in route_text
     assert '"step_results": step_results' in route_text
+
+
+def test_marketing_site_discovery_prefers_marketing_template_family() -> None:
+    crawl = {
+        "title": "Cookiebot Pricing and Features",
+        "text_snippet": "See pricing, request demo, contact sales, trusted by customers, integrations",
+        "nav_links": [
+            {"text": "Pricing", "href": "https://example.com/pricing"},
+            {"text": "Features", "href": "https://example.com/features"},
+            {"text": "Contact", "href": "https://example.com/contact"},
+        ],
+        "buttons": ["Request Demo", "Start free trial"],
+        "forms": [],
+    }
+
+    context = discover_site(crawl, description="Cookie consent marketing website")
+
+    assert context["app_type"] == AppType.MARKETING.value
+    assert context["primary_goal"] == "explore marketing paths"
+    assert "pricing" in context["features"]
+
+
+def test_marketing_site_plan_uses_navigation_journeys() -> None:
+    journeys = plan_journeys({"app_type": AppType.MARKETING.value})
+
+    assert [journey.name for journey in journeys] == [
+        "pricing_navigation",
+        "features_navigation",
+        "contact_navigation",
+    ]
+    assert journeys[0].steps[0].goal == "reach_pricing"
+    assert journeys[0].steps[0].step_type == StepType.CLICK.value

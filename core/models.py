@@ -12,6 +12,14 @@ class StepType(StrEnum):
     VERIFY_ONLY = "verify_only"
 
 
+class AppType(StrEnum):
+    ECOMMERCE = "ecommerce"
+    TASK_MANAGER = "task_manager"
+    SAAS_AUTH = "saas_auth"
+    MARKETING = "marketing_site"
+    GENERIC = "generic"
+
+
 class FailureType(StrEnum):
     NONE = "none"
     ACTION_RESOLUTION_FAILED = "action_resolution_failed"
