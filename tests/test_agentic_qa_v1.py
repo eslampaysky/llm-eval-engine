@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from dataclasses import asdict
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from core.agentic_qa import discover_site, plan_journeys
+from core.agentic_qa import _login_step, discover_site, plan_journeys
 from core.models import ActionCandidate, AppType, JourneyPlan, JourneyStep, RecoveryEvent, SessionState, StepResult, StepType, SuccessSignal
 from core.report_builder import build_journey_timeline
 
@@ -248,3 +249,60 @@ def test_calibration_manifest_has_four_saas_targets_with_credentials() -> None:
     saas_targets = manifest["groups"]["saas_auth"]
     assert len(saas_targets) == 4
     assert all(target.get("credentials", {}).get("password") for target in saas_targets)
+
+
+def test_login_page_classifies_as_saas_auth_not_generic() -> None:
+    crawl = {
+        "title": "Login",
+        "text_snippet": "login username password",
+        "nav_links": [],
+        "buttons": ["Login"],
+        "forms": [{"id": "login", "action": "/login", "fields": 2}],
+        "page_html": "<form action='/login'><input type='text' name='username'><input type='password' name='password'></form>",
+    }
+
+    context = discover_site(crawl, description="Simple auth page")
+
+    assert context["app_type"] == AppType.SAAS_AUTH.value
+
+
+def test_login_page_outranks_marketing_when_password_field_exists() -> None:
+    crawl = {
+        "title": "Get started and sign in",
+        "text_snippet": "get started pricing login password sign in",
+        "nav_links": [{"text": "Pricing", "href": "https://example.com/pricing"}],
+        "buttons": ["Get started", "Sign in"],
+        "forms": [{"id": "login", "action": "/signin", "fields": 2}],
+        "page_html": "<form action='/signin'><input type='email'><input type='password'></form>",
+    }
+
+    context = discover_site(crawl, description="Hybrid page with real auth form")
+
+    assert context["app_type"] == AppType.SAAS_AUTH.value
+
+
+def test_password_field_candidate_is_prioritized_for_login_step() -> None:
+    step = _login_step()
+    password_candidate = step.action_candidates[1]
+
+    assert password_candidate.selectors[0] == "input[type='password']"
+
+
+def test_orangehrm_dashboard_index_matches_auth_success_signals() -> None:
+    step = _login_step()
+    matching_signals = [
+        signal for signal in step.success_signals
+        if signal.type == "url_matches" and re.search(str(signal.value), "/dashboard/index")
+    ]
+
+    assert matching_signals
+
+
+def test_applitools_app_html_matches_auth_success_signals() -> None:
+    step = _login_step()
+    matching_signals = [
+        signal for signal in step.success_signals
+        if signal.type == "url_matches" and re.search(str(signal.value), "/app.html")
+    ]
+
+    assert matching_signals

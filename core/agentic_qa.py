@@ -202,7 +202,7 @@ def _has_auth_form(crawl: dict[str, Any], text: str) -> bool:
     has_auth_action = any(keyword in form_actions for keyword in ("login", "signin", "sign-in", "auth"))
     has_auth_form_fields = bool(forms) and has_password_field
     has_auth_text = any(keyword in text for keyword in auth_keywords)
-    return has_auth_text and (has_auth_form_fields or has_auth_action)
+    return has_password_field or has_auth_action or (has_auth_text and has_auth_form_fields)
 
 
 def _has_product_catalog(text: str) -> bool:
@@ -260,7 +260,6 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
         or structural["rendered_list_item_count"] > 2
     )
     has_login_form = _has_auth_form(crawl, text)
-    has_dashboard_link = any(token in text for token in ("dashboard", "workspace", "analytics", "projects"))
     has_real_cart = has_catalog and has_cart_or_checkout
     has_real_crud = has_task_patterns and has_crud_interactions
     has_marketing_signals = _has_marketing_signals(text, nav_texts, has_real_cart, has_real_crud, structural)
@@ -273,7 +272,7 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
         app_type = AppType.TASK_MANAGER.value
         features = ["create", "edit", "delete"]
         primary_goal = "manage records"
-    elif has_login_form and has_dashboard_link:
+    elif has_login_form:
         app_type = AppType.SAAS_AUTH.value
         features = ["login", "dashboard", "navigation"]
         primary_goal = "reach dashboard"
@@ -313,6 +312,8 @@ def _login_step() -> JourneyStep:
                 intent="username or email field",
                 selectors=[
                     "input[name='username']",
+                    "input[name='login']",
+                    "input[name='user']",
                     "input[id='username']",
                     "input[name*='user' i]",
                     "input[id*='user' i]",
@@ -320,7 +321,16 @@ def _login_step() -> JourneyStep:
                     "input[id='email']",
                     "input[name*='email' i]",
                     "input[id*='email' i]",
+                    "input[placeholder*='username' i]",
+                    "input[placeholder*='email' i]",
+                    "input[placeholder*='user' i]",
+                    "input[placeholder*='login' i]",
+                    "input[aria-label*='username' i]",
+                    "input[aria-label*='email' i]",
+                    "input[id*='email' i]",
+                    "input[id*='user' i]",
                     "input[type='email']",
+                    "form input:not([type='password']):not([type='hidden'])",
                     "input[type='text']",
                 ],
                 role="textbox",
@@ -333,8 +343,11 @@ def _login_step() -> JourneyStep:
                 selectors=[
                     "input[type='password']",
                     "input[name='password']",
+                    "input[name='pass']",
                     "input[id='password']",
                     "input[name*='pass' i]",
+                    "input[placeholder*='password' i]",
+                    "input[aria-label*='password' i]",
                     "input[id*='pass' i]",
                 ],
                 role="textbox",
@@ -375,7 +388,20 @@ def _login_step() -> JourneyStep:
         },
         success_signals=[
             SuccessSignal(type="url_contains", value="/dashboard", priority="high"),
+            SuccessSignal(type="url_contains", value="/account", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/home", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/app", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/secure", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/workspace", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/portal", priority="high", required=False),
+            SuccessSignal(type="url_matches", value=r"/app\.html", priority="high", required=False),
+            SuccessSignal(type="url_matches", value=r"/index", priority="high", required=False),
             SuccessSignal(type="element_visible", value="Logout", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="Log out", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="Sign out", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Welcome", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Dashboard", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="logged in", priority="medium", required=False),
             SuccessSignal(type="llm_fallback", value="Did login succeed based on this page?", priority="low", required=False),
         ],
         failure_hints=["Invalid credentials", "Incorrect password", "url still contains /login"],

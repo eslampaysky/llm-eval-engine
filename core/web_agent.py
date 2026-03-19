@@ -671,7 +671,27 @@ async def verify_action_success(
     after_url = after_snapshot.get("url") or ""
     after_text = (after_snapshot.get("text_snippet") or "").lower()
     if step.goal == "login":
-        if "/secure" in after_url or "logout" in after_text or "secure area" in after_text:
+        auth_success_markers = (
+            "/dashboard",
+            "/account",
+            "/home",
+            "/app",
+            "/secure",
+            "/workspace",
+            "/portal",
+            "/logged-in-successfully",
+            "/index",
+        )
+        auth_text_markers = (
+            "logout",
+            "log out",
+            "sign out",
+            "secure area",
+            "dashboard",
+            "welcome",
+            "logged in",
+        )
+        if any(marker in after_url for marker in auth_success_markers) or any(marker in after_text for marker in auth_text_markers):
             derived_state["is_logged_in"] = True
     if step.goal == "create_record":
         expected_text = _resolve_state_reference(step.input_bindings.get("value"), state) or step.input_bindings.get("value")
