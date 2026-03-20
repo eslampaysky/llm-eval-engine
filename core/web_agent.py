@@ -41,6 +41,16 @@ _log = logging.getLogger(__name__)
 
 DESKTOP_VIEWPORT = {"width": 1280, "height": 720}
 MOBILE_VIEWPORT = {"width": 390, "height": 844}
+CHROMIUM_LAUNCH_ARGS = [
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--single-process",
+    "--no-zygote",
+    "--disable-extensions",
+    "--disable-background-networking",
+    "--memory-pressure-off",
+]
 
 # Where to store video recordings
 VIDEO_DIR = os.getenv("VIDEO_DIR", "/tmp/aibreaker_videos/")
@@ -1083,7 +1093,7 @@ async def run_structured_journeys(
         credentials["email"] = email
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-gpu"])
+        browser = await p.chromium.launch(headless=True, args=CHROMIUM_LAUNCH_ARGS)
         ctx_kwargs: dict[str, Any] = {"viewport": DESKTOP_VIEWPORT}
         if video_dir:
             ctx_kwargs["record_video_dir"] = video_dir
@@ -1173,8 +1183,7 @@ async def run_web_audit(
         Path(video_dir).mkdir(parents=True, exist_ok=True)
 
     async with async_playwright() as p:
-        launch_args = ["--no-sandbox", "--disable-gpu"]
-        browser = await p.chromium.launch(headless=True, args=launch_args)
+        browser = await p.chromium.launch(headless=True, args=CHROMIUM_LAUNCH_ARGS)
 
         ctx_kwargs: dict = {"viewport": DESKTOP_VIEWPORT}
         if video_dir:

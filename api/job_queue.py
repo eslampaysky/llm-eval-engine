@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-NUM_WORKERS   = int(os.getenv("JOB_WORKERS", "4"))
+NUM_WORKERS   = int(os.getenv("JOB_WORKERS", "2"))
 MAX_QUEUE_SIZE = int(os.getenv("JOB_QUEUE_SIZE", "100"))
 JOB_TIMEOUT   = int(os.getenv("JOB_TIMEOUT_SECONDS", "150"))  # 2.5 min max per job
 

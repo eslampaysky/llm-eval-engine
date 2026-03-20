@@ -107,6 +107,24 @@ def test_routes_include_optional_timeline_fields() -> None:
     assert '"step_results": step_results' in route_text
 
 
+def test_job_queue_defaults_to_two_workers() -> None:
+    queue_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "job_queue.py"))
+    with open(queue_path, encoding="utf-8") as fh:
+        queue_text = fh.read()
+
+    assert 'JOB_WORKERS", "2"' in queue_text
+
+
+def test_web_agent_uses_container_safe_chromium_flags() -> None:
+    agent_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "core", "web_agent.py"))
+    with open(agent_path, encoding="utf-8") as fh:
+        agent_text = fh.read()
+
+    assert '"--disable-dev-shm-usage"' in agent_text
+    assert '"--single-process"' in agent_text
+    assert '"--no-zygote"' in agent_text
+
+
 def test_marketing_site_discovery_prefers_marketing_template_family() -> None:
     crawl = {
         "title": "Cookiebot Pricing and Features",
