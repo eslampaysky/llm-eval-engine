@@ -50,7 +50,6 @@ CHROMIUM_LAUNCH_ARGS = [
     "--disable-renderer-backgrounding",
     "--disable-backgrounding-occluded-windows",
     "--disable-features=site-per-process",
-    "--single-process",
     "--no-zygote",
     "--disable-extensions",
     "--disable-sync",
