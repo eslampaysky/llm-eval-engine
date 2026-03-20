@@ -683,3 +683,17 @@ def test_audit_detail_page_renders_stop_button_for_running_audits() -> None:
     assert "Stop Audit" in page_source
     assert "api.cancelAgenticQA(report.audit_id)" in page_source
     assert "data.status === 'canceled'" in page_source
+
+
+def test_web_audit_page_exposes_cancel_button_for_active_audit() -> None:
+    page_source = Path("dashboard/review-dashboard/src/pages/app/WebAuditPage.jsx").read_text(encoding="utf-8")
+
+    assert "Cancel Audit" in page_source
+    assert "api.cancelAgenticQA(activeAudit.auditId)" in page_source
+    assert "Open Audit" in page_source
+
+
+def test_app_shell_clears_active_audit_on_cancel() -> None:
+    shell_source = Path("dashboard/review-dashboard/src/context/AppShellContext.jsx").read_text(encoding="utf-8")
+
+    assert "data.status === 'failed' || data.status === 'canceled'" in shell_source

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, GripVertical, Trash2, ArrowRight, Loader } from 'lucide-react';
+import { Plus, GripVertical, Trash2, ArrowRight, Loader, Square } from 'lucide-react';
 import TierPill from '../../components/TierPill.jsx';
 import { useAppShell } from '../../context/AppShellContext.jsx';
 import { api } from '../../services/api';
@@ -12,11 +12,13 @@ export default function WebAuditPage() {
   const shell = useAppShell();
   const activeAudit = shell?.activeAudit ?? null;
   const beginAudit = shell?.beginAudit ?? (() => {});
+  const clearActiveAudit = shell?.clearActiveAudit ?? (() => {});
   const hasActiveAudit = shell?.hasActiveAudit ?? false;
   const [url, setUrl] = useState('');
   const [tier, setTier] = useState('deep');
   const [steps, setSteps] = useState([{ action: 'Click', selector: '', value: '' }]);
   const [loading, setLoading] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
   const [error, setError] = useState('');
 
   const addStep = () => setSteps(prev => [...prev, { action: 'Click', selector: '', value: '' }]);
@@ -26,7 +28,7 @@ export default function WebAuditPage() {
   async function startAudit() {
     if (!url.trim()) return;
     if (hasActiveAudit) {
-      setError('An audit is already running. Wait for it to finish before starting another.');
+      setError('An audit is already running. Stop it or open it before starting another.');
       return;
     }
     setLoading(true);
@@ -43,6 +45,20 @@ export default function WebAuditPage() {
     } catch (err) {
       setError(err.message || 'Failed to start audit');
       setLoading(false);
+    }
+  }
+
+  async function cancelActiveAudit() {
+    if (!activeAudit?.auditId || cancelBusy) return;
+    setCancelBusy(true);
+    setError('');
+    try {
+      await api.cancelAgenticQA(activeAudit.auditId);
+      clearActiveAudit();
+    } catch (err) {
+      setError(err.message || 'Failed to cancel the active audit.');
+    } finally {
+      setCancelBusy(false);
     }
   }
 
@@ -70,7 +86,25 @@ export default function WebAuditPage() {
           background: 'rgba(59, 180, 255, 0.08)', border: '1px solid rgba(59, 180, 255, 0.2)',
           color: 'var(--text-primary)', fontSize: 13, borderRadius: 'var(--radius-md)',
         }}>
-          An audit is already running for {activeAudit?.url || 'another URL'}. Finish it before starting a new Deep Dive.
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div>
+              An audit is already running for {activeAudit?.url || 'another URL'}. Finish it before starting a new Deep Dive.
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-ghost" onClick={() => navigate(`/app/audits/${activeAudit?.auditId}`)} disabled={!activeAudit?.auditId}>
+                Open Audit
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={cancelActiveAudit}
+                disabled={!activeAudit?.auditId || cancelBusy}
+                style={{ color: 'var(--red)', borderColor: 'rgba(255,107,107,0.2)' }}
+              >
+                <Square size={14} />
+                {cancelBusy ? 'Canceling...' : 'Cancel Audit'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

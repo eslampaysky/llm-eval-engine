@@ -78,7 +78,7 @@ export function AppShellProvider({ children }) {
           return;
         }
 
-        if (data.status === 'failed') {
+        if (data.status === 'failed' || data.status === 'canceled') {
           localStorage.removeItem(ACTIVE_AUDIT_KEY);
           clearAuditPollingTimer();
           setActiveAudit(null);
