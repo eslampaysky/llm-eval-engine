@@ -68,6 +68,7 @@ from api.database import (
     get_stuck_processing_reports,
     get_history_for_client,
     list_agentic_qa_history_for_client,
+    list_agentic_qa_reports_for_client,
     get_report_row,
     get_report_row_by_share_token,
     get_target_by_id,
@@ -3190,6 +3191,93 @@ def get_agentic_qa_history_route(
         client_name=auth_ctx.get("client_name"),
         limit=20,
     )
+
+
+def _derive_app_type_from_journeys(journey_timeline: list[dict[str, Any]] | None) -> str:
+    journeys = journey_timeline or []
+    for journey in journeys:
+        explicit = str(journey.get("app_type") or "").strip().lower()
+        if explicit:
+            return explicit
+        name = str(journey.get("journey") or "").strip().lower()
+        if "cart" in name or "checkout" in name:
+            return "ecommerce"
+        if "login" in name or "auth" in name:
+            return "saas_auth"
+        if "crud" in name:
+            return "task_manager"
+        if "mutation" in name:
+            return "dom_mutation"
+        if any(token in name for token in ("pricing", "features", "contact")):
+            return "marketing_site"
+    return "generic"
+
+
+@router.get("/agentic-qa/failure-patterns")
+@limiter.limit(LIMIT_READ)
+def get_agentic_qa_failure_patterns(
+    request: Request,
+    limit: int = 8,
+    lookback: int = 100,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> list[dict[str, Any]]:
+    rows = list_agentic_qa_reports_for_client(
+        client_name=auth_ctx.get("client_name"),
+        limit=max(int(limit), int(lookback)),
+    )
+    grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
+
+    for row in rows:
+        try:
+            step_results = json.loads(row.get("step_results_json") or "[]")
+        except json.JSONDecodeError:
+            step_results = []
+        try:
+            journey_timeline = json.loads(row.get("journey_timeline_json") or "[]")
+        except json.JSONDecodeError:
+            journey_timeline = []
+
+        app_type = _derive_app_type_from_journeys(journey_timeline)
+        for step in step_results:
+            status = str(step.get("status") or "").lower()
+            failure_type = str(
+                step.get("failure_type")
+                or (step.get("verification") or {}).get("failure_type")
+                or ""
+            ).lower()
+            if status not in {"failed", "blocked"} and failure_type in {"", "none"}:
+                continue
+            step_name = (
+                str(step.get("goal") or step.get("step_name") or "unknown_step")
+                .strip()
+                .lower()
+            )
+            normalized_failure = failure_type or ("blocked" if status == "blocked" else "unknown_failure")
+            key = (app_type, normalized_failure, step_name)
+            entry = grouped.setdefault(
+                key,
+                {
+                    "app_type": app_type,
+                    "failure_type": normalized_failure,
+                    "step_name": step_name,
+                    "count": 0,
+                    "last_seen_at": row.get("created_at"),
+                    "example_audit_id": row.get("audit_id"),
+                    "example_url": row.get("url"),
+                },
+            )
+            entry["count"] += 1
+            created_at = row.get("created_at")
+            if created_at and str(created_at) > str(entry.get("last_seen_at") or ""):
+                entry["last_seen_at"] = created_at
+                entry["example_audit_id"] = row.get("audit_id")
+                entry["example_url"] = row.get("url")
+
+    patterns = sorted(
+        grouped.values(),
+        key=lambda item: (-int(item.get("count") or 0), str(item.get("last_seen_at") or "")),
+    )
+    return patterns[: max(1, int(limit))]
 
 
 @router.get("/audit-history")

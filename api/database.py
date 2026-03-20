@@ -1882,3 +1882,18 @@ def list_agentic_qa_history_for_client(client_name: str | None, limit: int = 20)
             (client_name, limit),
         )
         return [_row_to_dict(r) for r in cur.fetchall()]
+
+
+def list_agentic_qa_reports_for_client(client_name: str | None, limit: int = 100) -> list[dict]:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            SELECT * FROM agentic_qa_reports
+            WHERE client_name={_P}
+            ORDER BY created_at DESC
+            LIMIT {_P}
+            """,
+            (client_name, limit),
+        )
+        return [_row_to_dict(r) for r in cur.fetchall()]

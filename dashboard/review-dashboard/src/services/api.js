@@ -149,6 +149,9 @@ export const api = {
   getAgenticQAHistory() {
     return request('/agentic-qa/history');
   },
+  getAgenticQAFailurePatterns(limit = 8, lookback = 100) {
+    return request(`/agentic-qa/failure-patterns?limit=${encodeURIComponent(limit)}&lookback=${encodeURIComponent(lookback)}`);
+  },
 
   // ── Gemini API key management ──
   saveGeminiKey(apiKey) {

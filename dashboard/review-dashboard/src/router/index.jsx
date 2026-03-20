@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, createBrowserRouter } from 'react-router-dom';
 import PrivateRoute from './PrivateRoute.jsx';
 import PublicLayout from '../layouts/PublicLayout.jsx';
@@ -14,10 +15,6 @@ import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage.jsx';
 
 import OverviewPage from '../pages/app/OverviewPage.jsx';
 import VibeCheckPage from '../pages/app/VibeCheckPage.jsx';
-import WebAuditPage from '../pages/app/WebAuditPage.jsx';
-import AgentAuditPage from '../pages/app/AgentAuditPage.jsx';
-import AuditsPage from '../pages/app/AuditsPage.jsx';
-import AuditDetailPage from '../pages/app/AuditDetailPage.jsx';
 import MonitoringPage from '../pages/app/MonitoringPage.jsx';
 import ApiKeysPage from '../pages/app/ApiKeysPage.jsx';
 import SettingsLayout from '../pages/app/settings/SettingsLayout.jsx';
@@ -25,6 +22,25 @@ import ProfilePage from '../pages/app/settings/ProfilePage.jsx';
 import SecurityPage from '../pages/app/settings/SecurityPage.jsx';
 import BillingPage from '../pages/app/settings/BillingPage.jsx';
 import WorkspacePage from '../pages/app/settings/WorkspacePage.jsx';
+
+const WebAuditPage = lazy(() => import('../pages/app/WebAuditPage.jsx'));
+const AgentAuditPage = lazy(() => import('../pages/app/AgentAuditPage.jsx'));
+const AuditsPage = lazy(() => import('../pages/app/AuditsPage.jsx'));
+const AuditDetailPage = lazy(() => import('../pages/app/AuditDetailPage.jsx'));
+
+function suspenseWrap(element) {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ padding: '2rem', color: 'var(--text-secondary)' }}>
+          Loading...
+        </div>
+      }
+    >
+      {element}
+    </Suspense>
+  );
+}
 
 const router = createBrowserRouter([
   {
@@ -51,10 +67,10 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/app/overview" replace /> },
       { path: 'overview', element: <OverviewPage /> },
       { path: 'vibe-check', element: <VibeCheckPage /> },
-      { path: 'web-audit', element: <WebAuditPage /> },
-      { path: 'agent-audit', element: <AgentAuditPage /> },
-      { path: 'audits', element: <AuditsPage /> },
-      { path: 'audits/:auditId', element: <AuditDetailPage /> },
+      { path: 'web-audit', element: suspenseWrap(<WebAuditPage />) },
+      { path: 'agent-audit', element: suspenseWrap(<AgentAuditPage />) },
+      { path: 'audits', element: suspenseWrap(<AuditsPage />) },
+      { path: 'audits/:auditId', element: suspenseWrap(<AuditDetailPage />) },
       { path: 'monitoring', element: <MonitoringPage /> },
       { path: 'api-keys', element: <ApiKeysPage /> },
       {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, ArrowRight, Zap, Filter, Loader } from 'lucide-react';
-import { apiFetch } from '../../App.jsx';
+import { Search, ArrowRight, Zap, Loader, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { api } from '../../services/api';
 import ScoreRing from '../../components/ScoreRing.jsx';
 
 const TIER_LABELS = { vibe: 'Vibe', deep: 'Deep', fix: 'Fix' };
@@ -9,14 +9,19 @@ const TIER_COLORS = { vibe: 'badge-blue', deep: 'badge-amber', fix: 'badge-green
 
 export default function AuditsPage() {
   const [audits, setAudits] = useState([]);
+  const [failurePatterns, setFailurePatterns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await apiFetch('/agentic-qa/history');
-        setAudits(Array.isArray(data) ? data : []);
+        const [historyData, patternsData] = await Promise.all([
+          api.getAgenticQAHistory(),
+          api.getAgenticQAFailurePatterns(),
+        ]);
+        setAudits(Array.isArray(historyData) ? historyData : []);
+        setFailurePatterns(Array.isArray(patternsData) ? patternsData : []);
       } catch (err) {
         console.error('Failed to load audits:', err);
       } finally {
@@ -59,6 +64,68 @@ export default function AuditsPage() {
       </div>
 
       {/* Table */}
+      {failurePatterns.length > 0 && (
+        <div className="card" style={{ padding: 20, marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+            <div>
+              <div className="card-label">Real-User Backlog</div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                Top recurring failed steps grouped by app type and failure type.
+              </div>
+            </div>
+            <span className="badge badge-amber">Live tuning loop</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            {failurePatterns.map((pattern) => (
+              <div
+                key={`${pattern.app_type}-${pattern.failure_type}-${pattern.step_name}`}
+                style={{
+                  borderRadius: 'var(--radius-lg)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: 'rgba(255,255,255,0.03)',
+                  padding: 14,
+                  display: 'grid',
+                  gap: 10,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <span className="badge badge-blue">{pattern.app_type || 'generic'}</span>
+                  <span style={{
+                    padding: '4px 8px',
+                    borderRadius: 'var(--radius-full)',
+                    background: 'rgba(255,107,107,0.12)',
+                    color: 'var(--red)',
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}>
+                    {pattern.count}x
+                  </span>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {String(pattern.step_name || 'unknown_step').replace(/[_-]+/g, ' ')}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', fontSize: 13 }}>
+                  <AlertTriangle size={14} style={{ color: 'var(--amber)' }} />
+                  {String(pattern.failure_type || 'unknown_failure').replace(/_/g, ' ')}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  Last seen {pattern.last_seen_at ? new Date(pattern.last_seen_at).toLocaleDateString() : 'recently'}
+                </div>
+                {pattern.example_audit_id && (
+                  <Link
+                    to={`/app/audits/${pattern.example_audit_id}`}
+                    className="btn btn-ghost"
+                    style={{ width: 'fit-content', padding: '6px 10px', fontSize: 12 }}
+                  >
+                    Example audit <ArrowUpRight size={14} />
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {filtered.length > 0 ? (
         <div className="card" style={{ padding: 0, overflow: 'auto' }}>
           <table className="data-table">
