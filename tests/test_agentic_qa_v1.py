@@ -413,3 +413,121 @@ def test_saas_auth_plan_is_login_only() -> None:
 
     assert len(journeys) == 1
     assert [step.goal for step in journeys[0].steps] == ["login"]
+
+
+def test_saucedemo_login_first_commerce_routes_to_ecommerce() -> None:
+    crawl = {
+        "title": "Swag Labs",
+        "text_snippet": "Swag Labs store inventory login username password cart",
+        "nav_links": [],
+        "buttons": ["Login"],
+        "forms": [{"id": "login", "action": "/login", "fields": 2}],
+        "page_html": "<form action='/login'><input type='text' name='user-name'><input type='password' name='password'></form>",
+        "structural_signals": {"auth_form_is_visible": True},
+    }
+
+    context = discover_site(crawl, description="Demo ecommerce store with auth and checkout")
+
+    assert context["app_type"] == AppType.ECOMMERCE.value
+    assert context["requires_auth_first"] is True
+
+
+def test_auth_first_ecommerce_plan_prepends_login_step() -> None:
+    journeys = plan_journeys({"app_type": AppType.ECOMMERCE.value, "requires_auth_first": True})
+
+    assert len(journeys) == 1
+    assert journeys[0].name == "auth_first_checkout"
+    assert [step.goal for step in journeys[0].steps] == ["login", "add_to_cart"]
+
+
+def test_magento_catalog_routes_to_ecommerce() -> None:
+    crawl = {
+        "title": "Magento Store",
+        "text_snippet": "shop products gear bags fitness add to cart checkout",
+        "nav_links": [{"text": "Shop", "href": "https://example.com/catalog"}],
+        "buttons": ["Add to Cart"],
+        "forms": [],
+        "page_html": """
+            <main class='products-grid'>
+              <div class='product-item'></div>
+              <div class='product-item-info'></div>
+              <a class='product-item-link' href='/catalog/product/view/id/1'></a>
+              <a class='product-item-photo' href='/catalog/product/view/id/2'></a>
+              <button class='action tocart'>Add to Cart</button>
+            </main>
+        """,
+    }
+
+    context = discover_site(crawl, description="Magento demo store with product catalog and checkout")
+
+    assert context["app_type"] == AppType.ECOMMERCE.value
+
+
+def test_advantage_category_tiles_route_to_ecommerce() -> None:
+    crawl = {
+        "title": "Advantage Online Shopping",
+        "text_snippet": "tablets laptops speakers popular items view details checkout",
+        "nav_links": [{"text": "Products", "href": "https://example.com/#/category"}],
+        "buttons": ["ADD TO CART"],
+        "forms": [{"id": "loginModal", "action": "/login", "fields": 2}],
+        "page_html": """
+            <main>
+              <div class='categoryCell'></div>
+              <div class='categoryCell'></div>
+              <div class='productName'></div>
+              <a href='#/product/3'>View Details</a>
+              <a class='shop_now' href='#/category/1'></a>
+              <input type='password' />
+            </main>
+        """,
+        "structural_signals": {"auth_form_is_visible": False},
+    }
+
+    context = discover_site(crawl, description="Electronics store with category tiles product catalog and cart")
+
+    assert context["app_type"] == AppType.ECOMMERCE.value
+
+
+def test_automation_exercise_commerce_beats_marketing() -> None:
+    crawl = {
+        "title": "Automation Exercise",
+        "text_snippet": "shop products features contact add to cart cart checkout",
+        "nav_links": [
+            {"text": "Features", "href": "https://example.com/features"},
+            {"text": "Contact", "href": "https://example.com/contact"},
+            {"text": "Products", "href": "https://example.com/products"},
+        ],
+        "buttons": ["Add to cart", "Contact us"],
+        "forms": [],
+        "page_html": """
+            <main>
+              <div class='product-card'></div>
+              <div class='product-card'></div>
+              <div class='product-card'></div>
+              <div class='product-card'></div>
+              <a href='/product/1'>View Product</a>
+              <a href='/product/2'>View Product</a>
+              <a href='/product/3'>View Product</a>
+            </main>
+        """,
+    }
+
+    context = discover_site(crawl, description="Ecommerce demo site with overlays and cart flow")
+
+    assert context["app_type"] == AppType.ECOMMERCE.value
+
+
+def test_discovery_timeout_falls_back_to_description_classification() -> None:
+    crawl = {
+        "title": "",
+        "text_snippet": "",
+        "nav_links": [],
+        "buttons": [],
+        "forms": [],
+        "page_html": "",
+        "classification_note": "discovery_timeout",
+    }
+
+    context = discover_site(crawl, description="OpenCart demo store with product catalog and checkout")
+
+    assert context["app_type"] == AppType.ECOMMERCE.value

@@ -177,12 +177,35 @@ def _structural_counts(crawl: dict[str, Any]) -> dict[str, int]:
             "categorycell",
             "shop_now",
             "popularitem",
+            "product-item",
+            "product-item-info",
+            "product-item-link",
+            "product-item-photo",
+            "products-grid",
+            "product-list",
+            "productname",
+            "product_name",
             "view details",
         )
     )
     product_detail_links = sum(
         html.count(token)
-        for token in ("/product/", "#/product/", "/item/", "/shop/", "product-card", "view details")
+        for token in (
+            "/product/",
+            "#/product/",
+            "/item/",
+            "/shop/",
+            "product-card",
+            "view details",
+            "product-item-link",
+            "product-item-photo",
+            "href=\"catalog",
+            "href='catalog",
+            "href=\"category",
+            "href='category",
+            "categorycell",
+            "shop_now",
+        )
     )
     rendered_list_item_count = sum(
         html.count(token)
@@ -190,7 +213,7 @@ def _structural_counts(crawl: dict[str, Any]) -> dict[str, int]:
     )
 
     counts = {
-        "has_add_to_cart_button": int(any(token in text for token in ("add to cart", "buy now", "add to bag"))),
+        "has_add_to_cart_button": int(any(token in text for token in ("add to cart", "buy now", "add to bag", "add to cart", "add to bag", "add to basket"))),
         "has_product_detail_links": int(product_detail_links > 2),
         "product_item_count": product_item_count,
         "has_checkboxes": int(any(token in html for token in ('type="checkbox"', "type='checkbox'", "role=\"checkbox\"", "role='checkbox'", "todo-checkbox"))),
@@ -230,7 +253,22 @@ def _has_auth_form(crawl: dict[str, Any], text: str) -> bool:
 
 
 def _has_product_catalog(text: str) -> bool:
-    return any(token in text for token in ("product", "shop", "collections", "buy now", "catalog", "store"))
+    return any(
+        token in text
+        for token in (
+            "product",
+            "products",
+            "shop",
+            "collections",
+            "buy now",
+            "catalog",
+            "store",
+            "categories",
+            "featured",
+            "popular items",
+            "view details",
+        )
+    )
 
 
 def _has_cart_or_checkout(text: str) -> bool:
@@ -257,7 +295,8 @@ def _has_marketing_signals(text: str, nav_texts: list[str], has_real_cart: bool,
         or any(token in nav_texts for token in ("pricing", "features", "product", "contact", "about", "resources"))
         or bool(structural.get("has_marketing_nav"))
     )
-    return positive and not has_real_cart and not has_real_crud
+    has_real_catalog = bool(structural.get("has_add_to_cart_button")) or structural.get("product_item_count", 0) > 3
+    return positive and not has_real_cart and not has_real_catalog and not has_real_crud
 
 
 def _has_dom_mutation_patterns(structural: dict[str, int], has_task_patterns: bool, has_catalog: bool) -> bool:
@@ -266,6 +305,24 @@ def _has_dom_mutation_patterns(structural: dict[str, int], has_task_patterns: bo
         and not has_task_patterns
         and not has_catalog
     )
+
+
+def _has_login_first_commerce(text: str, has_visible_auth_form: bool) -> bool:
+    commerce_intent = any(
+        signal in text
+        for signal in (
+            "store",
+            "shop",
+            "products",
+            "inventory",
+            "swag",
+            "cart",
+            "checkout",
+            "items",
+            "ecommerce",
+        )
+    )
+    return has_visible_auth_form and commerce_intent
 
 
 def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]:
@@ -277,9 +334,18 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
     features: list[str] = []
     primary_goal = "explore site"
 
-    has_catalog = _has_product_catalog(text) and (
-        structural["has_product_detail_links"] or structural["product_item_count"] > 3
+    has_description_fallback_catalog = (
+        str(crawl.get("classification_note") or "").lower() == "discovery_timeout"
+        and any(token in text for token in ("store", "shop", "catalog", "product catalog", "checkout", "cart"))
     )
+    has_catalog = (
+        _has_product_catalog(text)
+        and (
+            structural["has_product_detail_links"]
+            or structural["product_item_count"] > 3
+            or structural["has_add_to_cart_button"]
+        )
+    ) or has_description_fallback_catalog
     has_cart_or_checkout = _has_cart_or_checkout(text) or bool(structural["has_add_to_cart_button"])
     has_task_patterns = _has_task_list_patterns(text) and (
         structural["has_checkboxes"]
@@ -302,6 +368,7 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
         has_crud_interactions = True
     has_login_form = _has_auth_form(crawl, text)
     has_visible_auth_form = has_login_form and bool(structural["auth_form_is_visible"])
+    has_login_first_commerce = _has_login_first_commerce(text, has_visible_auth_form)
     has_real_cart = has_catalog and has_cart_or_checkout
     has_real_crud = has_task_patterns and has_crud_interactions
     has_dom_mutation = _has_dom_mutation_patterns(structural, has_task_patterns, has_catalog)
@@ -310,6 +377,10 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
     if has_real_cart:
         app_type = AppType.ECOMMERCE.value
         features = ["login", "search", "cart", "checkout"]
+        primary_goal = "purchase item"
+    elif has_login_first_commerce or has_catalog:
+        app_type = AppType.ECOMMERCE.value
+        features = ["login", "search", "cart", "checkout"] if has_login_first_commerce else ["search", "cart", "checkout"]
         primary_goal = "purchase item"
     elif has_real_crud:
         app_type = AppType.TASK_MANAGER.value
@@ -333,6 +404,7 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
         "features": features,
         "primary_goal": primary_goal,
         "site_description": description,
+        "requires_auth_first": has_login_first_commerce,
     }
 
     anthropic_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
@@ -628,6 +700,10 @@ def _dom_mutation_steps() -> list[JourneyStep]:
 def plan_journeys(context: dict[str, Any]) -> list[JourneyPlan]:
     app_type = str(context.get("app_type") or "generic").lower()
     if "commerce" in app_type or app_type == AppType.ECOMMERCE.value:
+        if context.get("requires_auth_first"):
+            return [
+                JourneyPlan(name="auth_first_checkout", app_type="ecommerce", steps=[_login_step(), _cart_step()]),
+            ]
         return [
             JourneyPlan(name="guest_checkout", app_type="ecommerce", steps=[_cart_step()]),
             JourneyPlan(name="user_checkout", app_type="ecommerce", steps=[_login_step(), _cart_step()]),

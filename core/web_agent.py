@@ -1035,7 +1035,10 @@ async def run_structured_journeys(
             ctx_kwargs["record_video_size"] = {"width": 1280, "height": 720}
         context = await browser.new_context(**ctx_kwargs)
         page = await context.new_page()
-        await page.goto(url, timeout=25000, wait_until="networkidle")
+        try:
+            await page.goto(url, timeout=25000, wait_until="networkidle")
+        except Exception:
+            await page.goto(url, timeout=30000, wait_until="domcontentloaded")
 
         parsed = [
             journey if isinstance(journey, JourneyPlan) else JourneyPlan.from_dict(journey)
@@ -1147,7 +1150,11 @@ async def run_web_audit(
         )
 
         try:
-            resp = await page.goto(url, timeout=25000, wait_until="networkidle")
+            try:
+                resp = await page.goto(url, timeout=25000, wait_until="networkidle")
+            except Exception:
+                result["classification_note"] = "discovery_timeout"
+                resp = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
             result["status_code"] = resp.status if resp else None
             result["title"] = await page.title()
 

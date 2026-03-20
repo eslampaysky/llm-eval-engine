@@ -92,11 +92,11 @@
         "site_description": "React todo app for task management"
       },
       {
-        "name": "TodoMVC Vue",
-        "url": "https://todomvc.com/examples/vue3/dist/",
+        "name": "TodoMVC Vanilla JS",
+        "url": "https://todomvc.com/examples/vanillajs/",
         "expected_type": "task_manager",
         "tier": "deep",
-        "site_description": "Vue 3 todo app for task management"
+        "site_description": "Vanilla JS todo app for task management"
       },
       {
         "name": "Add Remove Elements",
@@ -104,13 +104,6 @@
         "expected_type": "generic",
         "tier": "deep",
         "site_description": "Simple add and remove DOM elements page"
-      },
-      {
-        "name": "Advantage Online Shopping",
-        "url": "https://www.advantageonlineshopping.com",
-        "expected_type": "ecommerce",
-        "tier": "deep",
-        "site_description": "Shopping app with wishlist and saved items"
       }
     ],
     "ecommerce": [
@@ -143,11 +136,11 @@
         "site_description": "Ecommerce demo site with overlays and cart flow"
       },
       {
-        "name": "Demoblaze",
-        "url": "https://www.demoblaze.com/",
+        "name": "Advantage Online Shopping",
+        "url": "https://www.advantageonlineshopping.com",
         "expected_type": "ecommerce",
         "tier": "deep",
-        "site_description": "Minimal JS ecommerce store"
+        "site_description": "Electronics store with category tiles product catalog and cart"
       }
     ],
     "edge_cases": [
