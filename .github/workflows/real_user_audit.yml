@@ -1,0 +1,66 @@
+name: Real User Audit Data Collection
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      group:
+        description: 'Target group to run'
+        required: false
+        type: choice
+        options:
+          - saas
+          - marketing
+          - ecommerce
+      limit:
+        description: 'Limit number of targets'
+        required: false
+        type: string
+
+jobs:
+  run-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Run script
+        env:
+          AIBREAKER_API_BASE: ${{ secrets.AIBREAKER_API_BASE }}
+          AIBREAKER_EMAIL: ${{ secrets.AIBREAKER_EMAIL }}
+          AIBREAKER_PASSWORD: ${{ secrets.AIBREAKER_PASSWORD }}
+          AIBREAKER_API_KEY: ${{ secrets.AIBREAKER_API_KEY }}
+        run: |
+          ARGS="--once"
+          if [ "${{ github.event.inputs.group }}" != "" ]; then
+            ARGS="$ARGS --group ${{ github.event.inputs.group }}"
+          fi
+          if [ "${{ github.event.inputs.limit }}" != "" ]; then
+            ARGS="$ARGS --limit ${{ github.event.inputs.limit }}"
+          fi
+          python scripts/run_real_user_suite.py $ARGS
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add artifacts/real_user_data/
+          # Only commit if there are changes
+          if ! git diff --staged --quiet; then
+            DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
+            git commit -m "chore: audit results $DATE"
+            git push
+          else
+            echo "No changes to commit"
+          fi

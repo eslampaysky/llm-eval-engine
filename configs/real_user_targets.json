@@ -1,0 +1,38 @@
+{
+  "saas": [
+    {"name": "Notion", "url": "https://www.notion.so", "tier": "deep", "site_description": "Productivity and workspace SaaS", "expected_type": "marketing_site"},
+    {"name": "Slack", "url": "https://slack.com", "tier": "deep", "site_description": "Team communication platform", "expected_type": "marketing_site"},
+    {"name": "Canva", "url": "https://www.canva.com", "tier": "deep", "site_description": "Graphic design platform", "expected_type": "marketing_site"},
+    {"name": "Figma", "url": "https://www.figma.com", "tier": "deep", "site_description": "Collaborative interface design tool", "expected_type": "marketing_site"},
+    {"name": "Dropbox", "url": "https://www.dropbox.com", "tier": "deep", "site_description": "File hosting service", "expected_type": "marketing_site"},
+    {"name": "Linear", "url": "https://linear.app", "tier": "deep", "site_description": "Issue tracking tool", "expected_type": "marketing_site"},
+    {"name": "Airtable", "url": "https://airtable.com", "tier": "deep", "site_description": "Cloud collaboration service", "expected_type": "marketing_site"},
+    {"name": "Zapier", "url": "https://zapier.com", "tier": "deep", "site_description": "Workflow automation platform", "expected_type": "marketing_site"},
+    {"name": "Intercom", "url": "https://www.intercom.com", "tier": "deep", "site_description": "Customer messaging platform", "expected_type": "marketing_site"},
+    {"name": "HubSpot", "url": "https://www.hubspot.com", "tier": "deep", "site_description": "CRM and marketing software", "expected_type": "marketing_site"}
+  ],
+  "marketing": [
+    {"name": "Stripe", "url": "https://stripe.com", "tier": "deep", "site_description": "Payment processing platform", "expected_type": "marketing_site"},
+    {"name": "Webflow", "url": "https://webflow.com", "tier": "deep", "site_description": "Website building platform", "expected_type": "marketing_site"},
+    {"name": "Framer", "url": "https://www.framer.com", "tier": "deep", "site_description": "Website builder for designers", "expected_type": "marketing_site"},
+    {"name": "Vercel", "url": "https://vercel.com", "tier": "deep", "site_description": "Frontend cloud platform", "expected_type": "marketing_site"},
+    {"name": "NotionAI", "url": "https://www.notion.so/product/ai", "tier": "deep", "site_description": "AI writing assistant", "expected_type": "marketing_site"},
+    {"name": "Superhuman", "url": "https://superhuman.com", "tier": "deep", "site_description": "Email client", "expected_type": "marketing_site"},
+    {"name": "TLDraw", "url": "https://tldraw.com", "tier": "deep", "site_description": "Collaborative whiteboard", "expected_type": "marketing_site"},
+    {"name": "Resend", "url": "https://resend.com", "tier": "deep", "site_description": "Email API for developers", "expected_type": "marketing_site"},
+    {"name": "Raycast", "url": "https://www.raycast.com", "tier": "deep", "site_description": "Productivity tool for Mac", "expected_type": "marketing_site"},
+    {"name": "Arc", "url": "https://arc.net", "tier": "deep", "site_description": "Web browser by The Browser Company", "expected_type": "marketing_site"}
+  ],
+  "ecommerce": [
+    {"name": "Amazon", "url": "https://www.amazon.com", "tier": "deep", "site_description": "Online retailer", "expected_type": "ecommerce"},
+    {"name": "Nike", "url": "https://www.nike.com", "tier": "deep", "site_description": "Footwear and apparel", "expected_type": "ecommerce"},
+    {"name": "Zara", "url": "https://www.zara.com", "tier": "deep", "site_description": "Fashion retailer", "expected_type": "ecommerce"},
+    {"name": "H&M", "url": "https://www2.hm.com", "tier": "deep", "site_description": "Clothing retailer", "expected_type": "ecommerce"},
+    {"name": "BestBuy", "url": "https://www.bestbuy.com", "tier": "deep", "site_description": "Consumer electronics retailer", "expected_type": "ecommerce"},
+    {"name": "Target", "url": "https://www.target.com", "tier": "deep", "site_description": "General merchandise retailer", "expected_type": "ecommerce"},
+    {"name": "IKEA", "url": "https://www.ikea.com", "tier": "deep", "site_description": "Furniture retailer", "expected_type": "ecommerce"},
+    {"name": "Etsy", "url": "https://www.etsy.com", "tier": "deep", "site_description": "E-commerce marketplace", "expected_type": "ecommerce"},
+    {"name": "ASOS", "url": "https://www.asos.com", "tier": "deep", "site_description": "Fashion and cosmetic retailer", "expected_type": "ecommerce"},
+    {"name": "Walmart", "url": "https://www.walmart.com", "tier": "deep", "site_description": "Multinational retail corporation", "expected_type": "ecommerce"}
+  ]
+}

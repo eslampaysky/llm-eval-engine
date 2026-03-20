@@ -40,3 +40,10 @@ node_modules/
 
 # Gemini file cache (free-tier rate-limit helper)
 aibreaker_gemini_cache/
+
+# Real user audit raw responses (large files)
+artifacts/real_user_data/runs/**/*.json
+# Keep summary files tracked
+!artifacts/real_user_data/summary.csv
+!artifacts/real_user_data/failure_patterns.json
+!artifacts/real_user_data/README.md
