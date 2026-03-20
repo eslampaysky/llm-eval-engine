@@ -146,6 +146,11 @@ export const api = {
   getAgenticQAStatus(id) {
     return request(`/agentic-qa/status/${encodeURIComponent(id)}`);
   },
+  cancelAgenticQA(id) {
+    return request(`/agentic-qa/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+    });
+  },
   getAgenticQAHistory() {
     return request('/agentic-qa/history');
   },

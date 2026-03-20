@@ -16,11 +16,11 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field, asdict
-from typing import Any
+from typing import Any, Callable
 
 from core.models import AppType, JourneyPlan, JourneyStep, SuccessSignal, ActionCandidate, StepType, to_dict
 from core.report_builder import build_fix_prompt_context, build_journey_timeline, infer_spec
-from core.web_agent import run_structured_journeys, run_web_audit
+from core.web_agent import AuditCanceledError, run_structured_journeys, run_web_audit
 from core.gemini_judge import judge_visual
 
 _log = logging.getLogger(__name__)
@@ -913,6 +913,7 @@ def run_agentic_qa(
     journeys: list[dict] | None = None,
     *,
     on_progress: callable | None = None,
+    should_cancel: Callable[[], bool] | None = None,
     user_api_key: str | None = None,
     site_description: str | None = None,
     credentials: dict[str, str] | None = None,
@@ -941,9 +942,14 @@ def run_agentic_qa(
             except Exception:
                 pass
 
+    def _raise_if_canceled():
+        if should_cancel and should_cancel():
+            raise AuditCanceledError("Agentic QA canceled by user")
+
     total_steps = {"vibe": 4, "deep": 5, "fix": 6}[tier]
 
     # Step 1: Browser crawl
+    _raise_if_canceled()
     _progress(1, total_steps, "Opening browser and crawling site...")
 
     # ── Tier-specific crawl parameters ────────────────────────────────────
@@ -958,8 +964,11 @@ def run_agentic_qa(
                 record_video=record_video,
                 run_journeys=run_journeys if journeys and isinstance(journeys[0], dict) and "action" in journeys[0] else None,
                 max_pages=max_pages,
+                should_cancel=should_cancel,
             )
         )
+    except AuditCanceledError:
+        raise
     except Exception as exc:
         _log.error("[AgenticQA] Crawl failed: %s", exc, exc_info=True)
         return AgenticQAResult(
@@ -982,6 +991,7 @@ def run_agentic_qa(
         )
 
     # Step 2: Merge extra page data into crawl for deep/fix tiers
+    _raise_if_canceled()
     if tier in ("deep", "fix") and crawl.get("extra_pages"):
         _progress(2, total_steps, f"Analyzing {len(crawl['extra_pages'])} additional pages...")
         for ep in crawl["extra_pages"]:
@@ -1004,6 +1014,7 @@ def run_agentic_qa(
     discovery_context = discover_site(crawl, description=site_description)
 
     if tier in ("deep", "fix"):
+        _raise_if_canceled()
         _progress(3, total_steps, "Planning and executing verified user journeys...")
         structured_plans, legacy_journeys = _coerce_structured_journeys(journeys, discovery_context)
         if structured_plans:
@@ -1015,9 +1026,12 @@ def run_agentic_qa(
                         record_video=True,
                         base_context=discovery_context,
                         generated_credentials=credentials,
+                        should_cancel=should_cancel,
                     )
                 )
                 journey_results = structured_journey_run.get("journey_results")
+            except AuditCanceledError:
+                raise
             except Exception as exc:
                 _log.error("[AgenticQA] Structured journeys failed: %s", exc, exc_info=True)
         elif legacy_journeys:
@@ -1032,6 +1046,7 @@ def run_agentic_qa(
             ]
 
     # Step 3: Visual analysis via Gemini (with full fallback chain)
+    _raise_if_canceled()
     _progress(4 if tier in ("deep", "fix") else 3, total_steps, "Running AI visual analysis...")
 
     try:
@@ -1083,6 +1098,7 @@ def run_agentic_qa(
         confidence = verdict.get("confidence", 50)
 
     # Step 4: Build fix prompt bundle
+    _raise_if_canceled()
     _progress(5 if tier in ("deep", "fix") else 4, total_steps, "Generating fix prompts...")
     bundled = build_bundled_fix_prompt(findings, url)
     if journey_results:
@@ -1097,6 +1113,7 @@ def run_agentic_qa(
 
     # Step 5 (fix tier only): Code-level analysis using actual page HTML
     if tier == "fix":
+        _raise_if_canceled()
         _progress(6, total_steps, "Running code-level analysis on page HTML...")
         code_fix = _run_code_analysis(findings, crawl)
         if code_fix:
@@ -1110,6 +1127,7 @@ def run_agentic_qa(
                     fix_prompt=""
                 ))
 
+    _raise_if_canceled()
     _progress(total_steps, total_steps, "Done!")
 
     # ── Determine what to include in result per tier ──────────────────────

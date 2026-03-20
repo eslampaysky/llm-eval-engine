@@ -16,7 +16,7 @@ import random
 import re
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urljoin, urlparse
 
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_playwright
@@ -73,6 +73,15 @@ CAPTCHA_SIGNALS = (
     "i am human",
     "prove you are human",
 )
+
+
+class AuditCanceledError(RuntimeError):
+    """Raised when an in-flight browser audit is canceled by the user."""
+
+
+def _raise_if_canceled(should_cancel: Callable[[], bool] | None = None) -> None:
+    if should_cancel and should_cancel():
+        raise AuditCanceledError("Agentic QA canceled by user")
 
 
 async def _take_screenshot(page, viewport: dict) -> str | None:
@@ -867,11 +876,12 @@ def _append_recovery_notes(notes: list[str], events: list[RecoveryEvent]) -> Non
             notes.append(event.notes)
 
 
-async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState) -> dict[str, Any]:
+async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, *, should_cancel: Callable[[], bool] | None = None) -> dict[str, Any]:
     step_results: list[dict[str, Any]] = []
     journey_status = "PASSED"
 
     for step_index, step in enumerate(plan.steps[:MAX_TOTAL_STEPS_PER_JOURNEY]):
+        _raise_if_canceled(should_cancel)
         step = _as_journey_step(step)
         recovery_attempts: list[RecoveryEvent] = []
         notes: list[str] = []
@@ -1077,6 +1087,7 @@ async def run_structured_journeys(
     record_video: bool = True,
     base_context: dict[str, Any] | None = None,
     generated_credentials: dict[str, str] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     video_dir = None
@@ -1110,13 +1121,14 @@ async def run_structured_journeys(
             for journey in journeys
         ]
         for plan in parsed:
+            _raise_if_canceled(should_cancel)
             state = SessionState(
                 base_url=url,
                 current_url=url,
                 generated_credentials=credentials,
                 inferred_context=base_context or {},
             )
-            results.append(await _run_structured_journey(page, plan, state))
+            results.append(await _run_structured_journey(page, plan, state, should_cancel=should_cancel))
             try:
                 await page.goto(url, timeout=STEP_TIMEOUT_SECONDS * 1000, wait_until="domcontentloaded")
             except Exception:
@@ -1144,6 +1156,7 @@ async def run_web_audit(
     record_video: bool = True,
     run_journeys: list[dict] | None = None,
     max_pages: int = 1,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> dict:
     """
     Open a URL, capture dual-viewport screenshots, console errors,
@@ -1182,6 +1195,7 @@ async def run_web_audit(
         video_dir = VIDEO_DIR
         Path(video_dir).mkdir(parents=True, exist_ok=True)
 
+    _raise_if_canceled(should_cancel)
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=CHROMIUM_LAUNCH_ARGS)
 
@@ -1214,6 +1228,7 @@ async def run_web_audit(
         )
 
         try:
+            _raise_if_canceled(should_cancel)
             try:
                 resp = await page.goto(url, timeout=25000, wait_until="networkidle")
             except Exception:
@@ -1310,6 +1325,7 @@ async def run_web_audit(
 
             # ── Multi-page crawl (deep/fix tiers) ─────────────────────────
             if max_pages > 1 and result["nav_links"]:
+                _raise_if_canceled(should_cancel)
                 from urllib.parse import urlparse, urljoin
                 base_parsed = urlparse(url)
                 visited = {url.rstrip("/")}
@@ -1330,6 +1346,7 @@ async def run_web_audit(
                         break
 
                 for extra_url in candidates:
+                    _raise_if_canceled(should_cancel)
                     try:
                         _log.info("[MultiCrawl] Crawling extra page: %s", extra_url)
                         extra_resp = await page.goto(
@@ -1374,6 +1391,7 @@ async def run_web_audit(
 
             # ── User journeys (optional) ──────────────────────────────────
             if run_journeys:
+                _raise_if_canceled(should_cancel)
                 result["journey_results"] = await _run_user_journeys(
                     page, run_journeys
                 )

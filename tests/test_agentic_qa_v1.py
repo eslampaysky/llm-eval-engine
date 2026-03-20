@@ -5,6 +5,7 @@ import os
 import re
 import sys
 from dataclasses import asdict
+from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -652,3 +653,33 @@ def test_detail_then_cart_success_signals_cover_cart_confirmation() -> None:
     ]
 
     assert any("cart" in value for value in signal_values)
+
+
+def test_agentic_qa_cancel_endpoint_exists() -> None:
+    routes_source = Path("api/routes.py").read_text(encoding="utf-8")
+
+    assert '@router.post("/agentic-qa/{audit_id}/cancel"' in routes_source
+    assert 'status_code=202' in routes_source
+
+
+def test_agentic_qa_job_runner_uses_cancel_callback() -> None:
+    routes_source = Path("api/routes.py").read_text(encoding="utf-8")
+
+    assert "def _is_canceled() -> bool:" in routes_source
+    assert "should_cancel=_is_canceled" in routes_source
+    assert "except AuditCanceledError:" in routes_source
+
+
+def test_frontend_exposes_agentic_qa_cancel_api() -> None:
+    api_source = Path("dashboard/review-dashboard/src/services/api.js").read_text(encoding="utf-8")
+
+    assert "cancelAgenticQA(id)" in api_source
+    assert "/agentic-qa/${encodeURIComponent(id)}/cancel" in api_source
+
+
+def test_audit_detail_page_renders_stop_button_for_running_audits() -> None:
+    page_source = Path("dashboard/review-dashboard/src/pages/app/AuditDetailPage.jsx").read_text(encoding="utf-8")
+
+    assert "Stop Audit" in page_source
+    assert "api.cancelAgenticQA(report.audit_id)" in page_source
+    assert "data.status === 'canceled'" in page_source

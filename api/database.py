@@ -1805,6 +1805,30 @@ def update_agentic_qa_status(audit_id: str, status: str) -> None:
         )
 
 
+def cancel_agentic_qa_report(
+    *,
+    audit_id: str,
+    client_name: str | None,
+    reason: str = "Canceled by user",
+) -> bool:
+    now = _utc_now()
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            UPDATE agentic_qa_reports
+               SET status={_P},
+                   summary=COALESCE(summary, {_P}),
+                   updated_at={_P}
+             WHERE audit_id={_P}
+               AND client_name={_P}
+               AND status IN ({_P}, {_P})
+            """,
+            ("canceled", reason, now, audit_id, client_name, "queued", "processing"),
+        )
+        return (cur.rowcount or 0) > 0
+
+
 def finalize_agentic_qa_success(
     *,
     audit_id: str,

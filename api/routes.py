@@ -92,6 +92,7 @@ from api.database import (
     update_report_esg_metrics,
     get_model_scores,
     insert_agentic_qa_report,
+    cancel_agentic_qa_report,
     update_agentic_qa_status,
     finalize_agentic_qa_success,
     finalize_agentic_qa_failure,
@@ -3459,6 +3460,24 @@ def get_agentic_qa_status(
     }
 
 
+@router.post("/agentic-qa/{audit_id}/cancel", status_code=202)
+@limiter.limit(LIMIT_READ)
+def cancel_agentic_qa_endpoint(
+    request: Request,
+    audit_id: str,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    canceled = cancel_agentic_qa_report(
+        audit_id=audit_id,
+        client_name=auth_ctx.get("client_name"),
+        reason="Canceled by user",
+    )
+    if not canceled:
+        raise HTTPException(status_code=409, detail="Agentic QA audit is not running or you do not have access.")
+    _finish_progress(audit_id, "canceled")
+    return {"audit_id": audit_id, "status": "canceled"}
+
+
 @router.get("/agentic-qa/{audit_id}/video")
 @limiter.limit(LIMIT_READ)
 def get_agentic_qa_video(
@@ -3523,6 +3542,7 @@ def get_agentic_qa_screenshot_mobile(
 def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, credentials, client_name, user_api_key=None):
     """Background job: run the agentic QA orchestrator."""
     from core.agentic_qa import run_agentic_qa, result_to_dict
+    from core.web_agent import AuditCanceledError
     from dataclasses import asdict
 
     try:
@@ -3531,15 +3551,23 @@ def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, credent
         def _on_progress(step, total, msg):
             _update_progress(audit_id, step, total, msg)
 
+        def _is_canceled() -> bool:
+            row = get_agentic_qa_row(audit_id)
+            return bool(row and str(row.get("status") or "").lower() == "canceled")
+
         result = run_agentic_qa(
             url=url,
             tier=tier,
             journeys=journeys,
             on_progress=_on_progress,
+            should_cancel=_is_canceled,
             user_api_key=user_api_key,
             site_description=site_description,
             credentials=credentials,
         )
+        if _is_canceled():
+            _finish_progress(audit_id, "canceled")
+            return
 
         findings_dicts = [
             {
@@ -3568,6 +3596,9 @@ def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, credent
         )
         _finish_progress(audit_id, "done")
 
+    except AuditCanceledError:
+        update_agentic_qa_status(audit_id, "canceled")
+        _finish_progress(audit_id, "canceled")
     except Exception as e:
         _log.error("[AgenticQA] Job %s failed: %s", audit_id, e, exc_info=True)
         finalize_agentic_qa_failure(audit_id)

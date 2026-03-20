@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { RotateCcw, Share2, Download, Monitor, Smartphone, Check, Loader, Shield, ChevronDown, AlertTriangle } from 'lucide-react';
+import { RotateCcw, Share2, Download, Monitor, Smartphone, Check, Loader, Shield, ChevronDown, AlertTriangle, Square } from 'lucide-react';
 import { getAuthHeader } from '../../context/AuthContext.jsx';
 import { api } from '../../services/api';
 import ScoreRing from '../../components/ScoreRing.jsx';
@@ -13,6 +13,7 @@ const STATUS_STYLES = {
   failed: { label: 'Failed', background: 'rgba(255, 107, 107, 0.12)', color: 'var(--red)', border: '1px solid rgba(255, 107, 107, 0.24)' },
   blocked: { label: 'Blocked', background: 'rgba(251, 191, 36, 0.14)', color: 'var(--amber)', border: '1px solid rgba(251, 191, 36, 0.24)' },
   processing: { label: 'Processing', background: 'rgba(59, 180, 255, 0.12)', color: 'var(--accent)', border: '1px solid rgba(59, 180, 255, 0.24)' },
+  canceled: { label: 'Canceled', background: 'rgba(148, 163, 184, 0.14)', color: 'var(--text-muted)', border: '1px solid rgba(148, 163, 184, 0.24)' },
 };
 
 const cardStyle = { padding: 20, marginBottom: 24 };
@@ -72,6 +73,7 @@ function buildFailureMessage(step) {
 function computeOverview(report) {
   const steps = Array.isArray(report?.step_results) ? report.step_results : [];
   const findings = Array.isArray(report?.findings) ? report.findings : [];
+  const reportStatus = normalizeStatus(report?.status);
   const passed = steps.filter((s) => normalizeStatus(s?.status) === 'passed');
   const failed = steps.filter((s) => normalizeStatus(s?.status) === 'failed');
   const blocked = steps.filter((s) => normalizeStatus(s?.status) === 'blocked');
@@ -96,8 +98,12 @@ function computeOverview(report) {
     weightedScore,
     confidenceScore,
     confidenceMeta: getConfidenceMeta(confidenceScore),
-    statusLabel: blocked.length > 0 ? 'Blocked by Site' : failed.length > 0 || findings.length > 0 ? 'Issues Found' : 'Working',
-    headline: blocked.length > 0
+    statusLabel: reportStatus === 'canceled'
+      ? 'Canceled'
+      : blocked.length > 0 ? 'Blocked by Site' : failed.length > 0 || findings.length > 0 ? 'Issues Found' : 'Working',
+    headline: reportStatus === 'canceled'
+      ? 'This audit was stopped before it finished.'
+      : blocked.length > 0
       ? 'The audit hit live blockers or bot protection on the critical path.'
       : failed.length > 0 || findings.length > 0
         ? 'AiBreaker found user-visible friction in this audit.'
@@ -175,6 +181,7 @@ export default function AuditDetailPage() {
   const [shareBusy, setShareBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState('');
+  const [cancelBusy, setCancelBusy] = useState(false);
   const [progress, setProgress] = useState(null);
   const [mediaUrls, setMediaUrls] = useState({ video: '', desktop: '', mobile: '' });
 
@@ -193,7 +200,7 @@ export default function AuditDetailPage() {
       try {
         const data = await api.getAgenticQAStatus(auditId);
         if (!active) return;
-        if (data.status === 'done' || data.status === 'failed') {
+        if (data.status === 'done' || data.status === 'failed' || data.status === 'canceled') {
           setReport(data);
           setProgress(null);
           active = false;
@@ -272,6 +279,21 @@ export default function AuditDetailPage() {
     }
   }
 
+  async function handleCancel() {
+    if (!report?.audit_id || cancelBusy) return;
+    setCancelBusy(true);
+    try {
+      const response = await api.cancelAgenticQA(report.audit_id);
+      setReport((prev) => prev ? { ...prev, status: response?.status || 'canceled', summary: prev.summary || 'Canceled by user' } : prev);
+      setProgress(null);
+      setError('');
+    } catch (err) {
+      setError(err?.message || 'Failed to stop audit.');
+    } finally {
+      setCancelBusy(false);
+    }
+  }
+
   if (loading) return <div className="page-container fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}><Loader size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent)' }} /></div>;
   if (error) return <div className="page-container fade-in"><div className="error-box">Error: {error}</div></div>;
   if (!report) return <div className="page-container fade-in"><div className="error-box">Audit not found.</div></div>;
@@ -281,12 +303,19 @@ export default function AuditDetailPage() {
   const stepResults = Array.isArray(report.step_results) ? report.step_results : [];
   const tier = (report.tier || 'vibe').replace(/^\w/, (c) => c.toUpperCase());
   const screenshotUrl = viewport === 'desktop' ? mediaUrls.desktop : mediaUrls.mobile;
+  const canCancel = report.status === 'processing' || report.status === 'queued';
 
   return (
     <div className="page-container fade-in">
       {(report.status === 'processing' || report.status === 'queued') && (
         <div className="card" style={cardStyle}>
-          <div className="card-label">Audit Progress</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+            <div className="card-label" style={{ marginBottom: 0 }}>Audit Progress</div>
+            <button className="btn btn-ghost" onClick={handleCancel} disabled={cancelBusy} style={{ color: 'var(--red)', borderColor: 'rgba(255,107,107,0.2)' }}>
+              <Square size={14} />
+              {cancelBusy ? 'Stopping...' : 'Stop Audit'}
+            </button>
+          </div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>{progress?.current_step || 'Processing...'}</div>
           <div style={{ height: 6, borderRadius: 'var(--radius-full)', background: 'var(--bg-surface)', overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${progress?.progress_pct || 0}%`, background: 'var(--accent)', transition: 'width 0.4s ease' }} />
@@ -326,6 +355,7 @@ export default function AuditDetailPage() {
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
         <button className="btn btn-ghost"><RotateCcw size={14} /> Re-run</button>
+        {canCancel && <button className="btn btn-ghost" onClick={handleCancel} disabled={cancelBusy} style={{ color: 'var(--red)', borderColor: 'rgba(255,107,107,0.2)' }}><Square size={14} /> {cancelBusy ? 'Stopping...' : 'Stop'}</button>}
         <button className="btn btn-ghost" onClick={handleShare} disabled={shareBusy}><Share2 size={14} /> {shareBusy ? 'Sharing...' : 'Share'}</button>
         <button className="btn btn-ghost" onClick={downloadPdf} disabled={pdfBusy}><Download size={14} /> {pdfBusy ? 'Downloading...' : 'Download PDF'}</button>
       </div>
