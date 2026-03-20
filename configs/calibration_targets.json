@@ -150,13 +150,6 @@
         "expected_type": "ecommerce",
         "tier": "deep",
         "site_description": "Simple JavaScript store with product catalog cart and checkout"
-      },
-      {
-        "name": "Fake Store API Products",
-        "url": "https://fakestoreapi.com/products",
-        "expected_type": "ecommerce",
-        "tier": "deep",
-        "site_description": "Fake store API with product catalog"
       }
     ],
     "edge_cases": [

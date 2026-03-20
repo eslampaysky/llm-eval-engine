@@ -362,7 +362,7 @@ def test_calibration_manifest_skips_blocked_ecommerce_targets_and_adds_replaceme
 
     assert {target["name"] for target in skipped} == {"OpenCart Demo", "Magento Demo"}
     assert "Demoblaze" in names
-    assert "Fake Store API Products" in names
+    assert "Fake Store API Products" not in names
 
 
 def test_login_page_classifies_as_saas_auth_not_generic() -> None:
@@ -411,6 +411,7 @@ def test_saucedemo_data_test_selectors_are_prioritized_for_login_step() -> None:
     assert username_candidate.selectors[0] == "input[data-test='username']"
     assert password_candidate.selectors[0] == "input[data-test='password']"
     assert submit_candidate.selectors[0] == "input[data-test='login-button']"
+    assert submit_candidate.selectors.index("input[type='submit']") < submit_candidate.selectors.index("button[type='submit']")
 
 
 def test_orangehrm_dashboard_index_matches_auth_success_signals() -> None:
@@ -460,9 +461,10 @@ def test_saucedemo_login_first_commerce_routes_to_ecommerce() -> None:
 def test_auth_first_ecommerce_plan_prepends_login_step() -> None:
     journeys = plan_journeys({"app_type": AppType.ECOMMERCE.value, "requires_auth_first": True})
 
-    assert len(journeys) == 1
-    assert journeys[0].name == "auth_first_checkout"
+    assert len(journeys) == 2
+    assert [journey.name for journey in journeys] == ["auth_first_direct_add_to_cart", "auth_first_detail_then_cart"]
     assert [step.goal for step in journeys[0].steps] == ["login", "add_to_cart"]
+    assert [step.goal for step in journeys[1].steps] == ["login", "open_product", "add_to_cart_from_detail"]
 
 
 def test_magento_catalog_routes_to_ecommerce() -> None:
@@ -601,3 +603,21 @@ def test_hydration_wait_changes_do_not_break_auth_classification() -> None:
     context = discover_site(crawl, description="Simple auth page")
 
     assert context["app_type"] == AppType.SAAS_AUTH.value
+
+
+def test_detail_first_journey_exists_in_ecommerce_template() -> None:
+    journeys = plan_journeys({"app_type": AppType.ECOMMERCE.value})
+
+    assert [journey.name for journey in journeys] == ["direct_add_to_cart", "detail_then_cart"]
+
+
+def test_detail_then_cart_success_signals_cover_cart_confirmation() -> None:
+    journeys = plan_journeys({"app_type": AppType.ECOMMERCE.value})
+    detail_step = journeys[1].steps[1]
+    signal_values = [
+        str(signal.value).lower()
+        for signal in detail_step.success_signals
+        if signal.type in {"text_present", "element_visible", "url_contains"}
+    ]
+
+    assert any("cart" in value for value in signal_values)

@@ -481,8 +481,10 @@ def _login_step() -> JourneyStep:
                 intent="login button",
                 selectors=[
                     "input[data-test='login-button']",
-                    "button[type='submit']",
+                    "*[data-test*='login']",
                     "input[type='submit']",
+                    "input[value='Login']",
+                    "button[type='submit']",
                     "button:has-text('Login')",
                     "button:has-text('Log in')",
                     "button:has-text('Sign in')",
@@ -536,19 +538,85 @@ def _login_step() -> JourneyStep:
 def _cart_step() -> JourneyStep:
     return JourneyStep(
         goal="add_to_cart",
-        intent="add item to cart",
+        intent="add to cart button on listing page",
         action_candidates=[
-            ActionCandidate(type="click", intent="add to cart", role="button", name="Add to cart", text="Add to cart"),
-            ActionCandidate(type="click", intent="buy now", role="button", name="Buy now", text="Buy now"),
+            ActionCandidate(
+                type="click",
+                intent="add to cart",
+                selectors=[
+                    "button:has-text('Add to cart')",
+                    "button:has-text('ADD TO CART')",
+                    "button:has-text('Add To Cart')",
+                    "button:has-text('Add to bag')",
+                    "[data-test*='add-to-cart']",
+                    "button[class*='add-to-cart']",
+                    "a:has-text('Add to cart')",
+                ],
+                role="button",
+                name="Add to cart",
+                text="Add to cart",
+            ),
+            ActionCandidate(
+                type="click",
+                intent="buy now",
+                selectors=["button:has-text('Buy now')", "a:has-text('Buy now')"],
+                role="button",
+                name="Buy now",
+                text="Buy now",
+            ),
         ],
         success_signals=[
             SuccessSignal(type="text_present", value="cart", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="1", priority="medium", required=False),
             SuccessSignal(type="url_contains", value="cart", priority="high", required=False),
+            SuccessSignal(type="element_visible", value="Cart", priority="medium", required=False),
             SuccessSignal(type="state_assertion", value={"cart_has_items": True}, priority="medium", required=False),
         ],
         failure_hints=["Cart count did not change", "Item not added"],
         expected_state_change={"cart_has_items": True},
         allow_soft_recovery=True,
+    )
+
+
+def _open_product_step() -> JourneyStep:
+    return JourneyStep(
+        goal="open_product",
+        intent="product detail link or view details button",
+        step_type=StepType.CLICK.value,
+        action_candidates=[
+            ActionCandidate(type="click", intent="view details link", selectors=["a:has-text('View Details')", "a:has-text('View Product')"], role="link", name="View Details", text="View Details"),
+            ActionCandidate(type="click", intent="product item link", selectors=[".product-item a:first-of-type", ".product-card a", ".categoryCell a", "a[href*='#/product/']", "a[href*='/product/']", ".card-title a"], role="link", name="Product", text="Product"),
+            ActionCandidate(type="click", intent="shop now link", selectors=["a:has-text('Shop Now')", ".shop_now"], role="link", name="Shop Now", text="Shop Now"),
+        ],
+        success_signals=[
+            SuccessSignal(type="url_contains", value="product", priority="high", required=False),
+            SuccessSignal(type="element_visible", value="Add to cart", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="ADD TO CART", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="View Details", priority="low", required=False),
+        ],
+        failure_hints=["product page did not load"],
+        allow_soft_recovery=True,
+    )
+
+
+def _cart_from_detail_step() -> JourneyStep:
+    return JourneyStep(
+        goal="add_to_cart_from_detail",
+        intent="add to cart button on product detail page",
+        step_type=StepType.CLICK.value,
+        action_candidates=[
+            ActionCandidate(type="click", intent="add to cart button", selectors=["button:has-text('Add to cart')", "button:has-text('ADD TO CART')", "button:has-text('Add To Cart')", "a:has-text('Add to cart')", "[onclick*='addToCart']", ".btn-cart"], role="button", name="Add to cart", text="Add to cart"),
+        ],
+        success_signals=[
+            SuccessSignal(type="element_visible", value="Cart", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="added", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Cart", priority="medium", required=False),
+            SuccessSignal(type="url_contains", value="cart", priority="high", required=False),
+            SuccessSignal(type="state_assertion", value={"cart_has_items": True}, priority="medium", required=False),
+        ],
+        failure_hints=["item not added", "cart unchanged"],
+        expected_state_change={"cart_has_items": True},
+        allow_soft_recovery=False,
     )
 
 
@@ -706,11 +774,12 @@ def plan_journeys(context: dict[str, Any]) -> list[JourneyPlan]:
     if "commerce" in app_type or app_type == AppType.ECOMMERCE.value:
         if context.get("requires_auth_first"):
             return [
-                JourneyPlan(name="auth_first_checkout", app_type="ecommerce", steps=[_login_step(), _cart_step()]),
+                JourneyPlan(name="auth_first_direct_add_to_cart", app_type="ecommerce", steps=[_login_step(), _cart_step()]),
+                JourneyPlan(name="auth_first_detail_then_cart", app_type="ecommerce", steps=[_login_step(), _open_product_step(), _cart_from_detail_step()]),
             ]
         return [
-            JourneyPlan(name="guest_checkout", app_type="ecommerce", steps=[_cart_step()]),
-            JourneyPlan(name="user_checkout", app_type="ecommerce", steps=[_login_step(), _cart_step()]),
+            JourneyPlan(name="direct_add_to_cart", app_type="ecommerce", steps=[_cart_step()]),
+            JourneyPlan(name="detail_then_cart", app_type="ecommerce", steps=[_open_product_step(), _cart_from_detail_step()]),
         ]
     if app_type in {AppType.SAAS_AUTH.value, "saas"} or "dashboard" in app_type:
         return [
