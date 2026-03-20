@@ -116,14 +116,50 @@ def test_job_queue_defaults_to_one_worker() -> None:
     assert 'JOB_WORKERS", "1"' in queue_text
 
 
+def test_main_defaults_startup_workers_to_one() -> None:
+    main_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "main.py"))
+    with open(main_path, encoding="utf-8") as fh:
+        main_text = fh.read()
+
+    assert 'JOB_WORKERS", "1"' in main_text
+
+
 def test_web_agent_uses_container_safe_chromium_flags() -> None:
     agent_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "core", "web_agent.py"))
     with open(agent_path, encoding="utf-8") as fh:
         agent_text = fh.read()
 
     assert '"--disable-dev-shm-usage"' in agent_text
+    assert '"--disable-setuid-sandbox"' in agent_text
+    assert '"--disable-background-timer-throttling"' in agent_text
+    assert '"--disable-renderer-backgrounding"' in agent_text
+    assert '"--disable-backgrounding-occluded-windows"' in agent_text
+    assert '"--disable-features=site-per-process"' in agent_text
     assert '"--single-process"' in agent_text
     assert '"--no-zygote"' in agent_text
+    assert '"--disable-sync"' in agent_text
+    assert '"--metrics-recording-only"' in agent_text
+    assert '"--mute-audio"' in agent_text
+    assert '"--no-first-run"' in agent_text
+
+
+def test_main_enables_memory_logger() -> None:
+    main_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "main.py"))
+    with open(main_path, encoding="utf-8") as fh:
+        main_text = fh.read()
+
+    assert "import psutil" in main_text
+    assert "async def _log_memory_usage" in main_text
+    assert 'asyncio.create_task(_log_memory_usage()' in main_text
+
+
+def test_agentic_qa_has_tier_timeout_guard() -> None:
+    agentic_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "core", "agentic_qa.py"))
+    with open(agentic_path, encoding="utf-8") as fh:
+        agentic_text = fh.read()
+
+    assert 'audit_timeout_seconds = 60 if tier == "vibe" else 180' in agentic_text
+    assert "asyncio.wait_for(" in agentic_text
 
 
 def test_marketing_site_discovery_prefers_marketing_template_family() -> None:

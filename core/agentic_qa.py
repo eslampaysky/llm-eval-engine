@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass, field, asdict
 from typing import Any, Callable
 
@@ -24,6 +25,10 @@ from core.web_agent import AuditCanceledError, run_structured_journeys, run_web_
 from core.gemini_judge import judge_visual
 
 _log = logging.getLogger(__name__)
+
+
+class AuditTimeoutError(RuntimeError):
+    """Raised when an audit exceeds its tier-wide execution budget."""
 
 
 # ── Data models ───────────────────────────────────────────────────────────────
@@ -934,6 +939,8 @@ def run_agentic_qa(
     tier = tier.lower().strip()
     if tier not in ("vibe", "deep", "fix"):
         tier = "vibe"
+    audit_timeout_seconds = 60 if tier == "vibe" else 180
+    started_at = time.monotonic()
 
     def _progress(step: int, total: int, msg: str):
         if on_progress:
@@ -946,10 +953,18 @@ def run_agentic_qa(
         if should_cancel and should_cancel():
             raise AuditCanceledError("Agentic QA canceled by user")
 
+    def _seconds_remaining() -> float:
+        return max(1.0, audit_timeout_seconds - (time.monotonic() - started_at))
+
+    def _raise_if_timed_out():
+        if time.monotonic() - started_at > audit_timeout_seconds:
+            raise AuditTimeoutError("Audit exceeded maximum allowed time")
+
     total_steps = {"vibe": 4, "deep": 5, "fix": 6}[tier]
 
     # Step 1: Browser crawl
     _raise_if_canceled()
+    _raise_if_timed_out()
     _progress(1, total_steps, "Opening browser and crawling site...")
 
     # ── Tier-specific crawl parameters ────────────────────────────────────
@@ -959,16 +974,28 @@ def run_agentic_qa(
 
     try:
         crawl = asyncio.run(
-            run_web_audit(
-                url,
-                record_video=record_video,
-                run_journeys=run_journeys if journeys and isinstance(journeys[0], dict) and "action" in journeys[0] else None,
-                max_pages=max_pages,
-                should_cancel=should_cancel,
+            asyncio.wait_for(
+                run_web_audit(
+                    url,
+                    record_video=record_video,
+                    run_journeys=run_journeys if journeys and isinstance(journeys[0], dict) and "action" in journeys[0] else None,
+                    max_pages=max_pages,
+                    should_cancel=should_cancel,
+                ),
+                timeout=_seconds_remaining(),
             )
         )
     except AuditCanceledError:
         raise
+    except asyncio.TimeoutError:
+        return AgenticQAResult(
+            url=url,
+            tier=tier,
+            score=0,
+            confidence=0,
+            summary="Audit exceeded maximum allowed time.",
+            error="Audit exceeded maximum allowed time",
+        )
     except Exception as exc:
         _log.error("[AgenticQA] Crawl failed: %s", exc, exc_info=True)
         return AgenticQAResult(
@@ -992,6 +1019,7 @@ def run_agentic_qa(
 
     # Step 2: Merge extra page data into crawl for deep/fix tiers
     _raise_if_canceled()
+    _raise_if_timed_out()
     if tier in ("deep", "fix") and crawl.get("extra_pages"):
         _progress(2, total_steps, f"Analyzing {len(crawl['extra_pages'])} additional pages...")
         for ep in crawl["extra_pages"]:
@@ -1015,23 +1043,36 @@ def run_agentic_qa(
 
     if tier in ("deep", "fix"):
         _raise_if_canceled()
+        _raise_if_timed_out()
         _progress(3, total_steps, "Planning and executing verified user journeys...")
         structured_plans, legacy_journeys = _coerce_structured_journeys(journeys, discovery_context)
         if structured_plans:
             try:
                 structured_journey_run = asyncio.run(
-                    run_structured_journeys(
-                        url,
-                        structured_plans,
-                        record_video=True,
-                        base_context=discovery_context,
-                        generated_credentials=credentials,
-                        should_cancel=should_cancel,
+                    asyncio.wait_for(
+                        run_structured_journeys(
+                            url,
+                            structured_plans,
+                            record_video=True,
+                            base_context=discovery_context,
+                            generated_credentials=credentials,
+                            should_cancel=should_cancel,
+                        ),
+                        timeout=_seconds_remaining(),
                     )
                 )
                 journey_results = structured_journey_run.get("journey_results")
             except AuditCanceledError:
                 raise
+            except asyncio.TimeoutError:
+                return AgenticQAResult(
+                    url=url,
+                    tier=tier,
+                    score=0,
+                    confidence=0,
+                    summary="Audit exceeded maximum allowed time.",
+                    error="Audit exceeded maximum allowed time",
+                )
             except Exception as exc:
                 _log.error("[AgenticQA] Structured journeys failed: %s", exc, exc_info=True)
         elif legacy_journeys:
@@ -1047,6 +1088,7 @@ def run_agentic_qa(
 
     # Step 3: Visual analysis via Gemini (with full fallback chain)
     _raise_if_canceled()
+    _raise_if_timed_out()
     _progress(4 if tier in ("deep", "fix") else 3, total_steps, "Running AI visual analysis...")
 
     try:
@@ -1099,6 +1141,7 @@ def run_agentic_qa(
 
     # Step 4: Build fix prompt bundle
     _raise_if_canceled()
+    _raise_if_timed_out()
     _progress(5 if tier in ("deep", "fix") else 4, total_steps, "Generating fix prompts...")
     bundled = build_bundled_fix_prompt(findings, url)
     if journey_results:
@@ -1114,6 +1157,7 @@ def run_agentic_qa(
     # Step 5 (fix tier only): Code-level analysis using actual page HTML
     if tier == "fix":
         _raise_if_canceled()
+        _raise_if_timed_out()
         _progress(6, total_steps, "Running code-level analysis on page HTML...")
         code_fix = _run_code_analysis(findings, crawl)
         if code_fix:
@@ -1128,6 +1172,7 @@ def run_agentic_qa(
                 ))
 
     _raise_if_canceled()
+    _raise_if_timed_out()
     _progress(total_steps, total_steps, "Done!")
 
     # ── Determine what to include in result per tier ──────────────────────

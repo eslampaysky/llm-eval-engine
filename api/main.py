@@ -9,11 +9,16 @@ Changes vs previous version:
 
 from __future__ import annotations
 
+import asyncio
 import logging, sys
 import os
 from contextlib import asynccontextmanager
 
 import sentry_sdk
+try:
+    import psutil
+except Exception:  # pragma: no cover
+    psutil = None
 
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")
 if SENTRY_DSN:
@@ -42,6 +47,24 @@ EXTRA_FRONTEND_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+
+async def _log_memory_usage(interval_seconds: int = 10) -> None:
+    if psutil is None:
+        _log.warning("[Memory] psutil not installed; memory logging disabled")
+        return
+    while True:
+        try:
+            process = psutil.Process(os.getpid())
+            mem = process.memory_info()
+            _log.info(
+                "[Memory] rss=%dMB vms=%dMB",
+                mem.rss // 1024 // 1024,
+                mem.vms // 1024 // 1024,
+            )
+        except Exception as exc:
+            _log.warning("[Memory] Failed to read process memory: %s", exc)
+        await asyncio.sleep(interval_seconds)
 
 
 def _recover_stuck_reports() -> int:
@@ -112,12 +135,14 @@ async def lifespan(app: FastAPI):
     recovered = _recover_stuck_reports()
     app.state.recovered_on_startup = recovered
 
-    num_workers = int(os.getenv("JOB_WORKERS", "4"))
+    num_workers = int(os.getenv("JOB_WORKERS", "1"))
     await start_workers(num_workers=num_workers)
+    memory_logger_task = asyncio.create_task(_log_memory_usage(), name="memory-usage-logger")
 
     yield  # app is running
 
     # ── Shutdown ─────────────────────────────────────────────────────────────
+    memory_logger_task.cancel()
     await stop_workers()
 
 

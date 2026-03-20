@@ -42,12 +42,21 @@ _log = logging.getLogger(__name__)
 DESKTOP_VIEWPORT = {"width": 1280, "height": 720}
 MOBILE_VIEWPORT = {"width": 390, "height": 844}
 CHROMIUM_LAUNCH_ARGS = [
-    "--no-sandbox",
     "--disable-dev-shm-usage",
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
     "--disable-gpu",
+    "--disable-background-timer-throttling",
+    "--disable-renderer-backgrounding",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-features=site-per-process",
     "--single-process",
     "--no-zygote",
     "--disable-extensions",
+    "--disable-sync",
+    "--metrics-recording-only",
+    "--mute-audio",
+    "--no-first-run",
     "--disable-background-networking",
     "--memory-pressure-off",
 ]
@@ -1104,6 +1113,9 @@ async def run_structured_journeys(
         credentials["email"] = email
 
     async with async_playwright() as p:
+        browser = None
+        context = None
+        page = None
         browser = await p.chromium.launch(headless=True, args=CHROMIUM_LAUNCH_ARGS)
         ctx_kwargs: dict[str, Any] = {"viewport": DESKTOP_VIEWPORT}
         if video_dir:
@@ -1134,15 +1146,28 @@ async def run_structured_journeys(
             except Exception:
                 pass
 
-        video = page.video
-        await context.close()
         video_path = None
-        if video:
+        if page is not None:
             try:
-                video_path = await video.path()
+                video = page.video
+                if video:
+                    video_path = await video.path()
             except Exception:
                 pass
-        await browser.close()
+            try:
+                await page.close()
+            except Exception:
+                pass
+        if context is not None:
+            try:
+                await context.close()
+            except Exception:
+                pass
+        if browser is not None:
+            try:
+                await browser.close()
+            except Exception:
+                pass
 
     return {
         "journey_results": results,
@@ -1197,6 +1222,9 @@ async def run_web_audit(
 
     _raise_if_canceled(should_cancel)
     async with async_playwright() as p:
+        browser = None
+        context = None
+        page = None
         browser = await p.chromium.launch(headless=True, args=CHROMIUM_LAUNCH_ARGS)
 
         ctx_kwargs: dict = {"viewport": DESKTOP_VIEWPORT}
@@ -1399,15 +1427,28 @@ async def run_web_audit(
         except Exception as e:
             result["error"] = str(e)[:500]
         finally:
-            video = page.video
-            await context.close()
             video_path = None
-            if video:
+            if page is not None:
                 try:
-                    video_path = await video.path()
+                    video = page.video
+                    if video:
+                        video_path = await video.path()
+                except Exception:
+                    pass
+                try:
+                    await page.close()
+                except Exception:
+                    pass
+            if context is not None:
+                try:
+                    await context.close()
                 except Exception:
                     pass
             result["video_path"] = str(video_path) if video_path else None
-            await browser.close()
+            if browser is not None:
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
 
     return result
