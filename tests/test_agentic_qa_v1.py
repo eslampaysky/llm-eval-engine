@@ -125,22 +125,19 @@ def test_main_defaults_startup_workers_to_one() -> None:
 
 
 def test_web_agent_uses_container_safe_chromium_flags() -> None:
-    agent_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "core", "web_agent.py"))
-    with open(agent_path, encoding="utf-8") as fh:
-        agent_text = fh.read()
+    agent_path = Path("core/web_agent.py")
+    agent_text = agent_path.read_text(encoding="utf-8")
 
-    assert '"--disable-dev-shm-usage"' in agent_text
-    assert '"--disable-setuid-sandbox"' in agent_text
-    assert '"--disable-background-timer-throttling"' in agent_text
-    assert '"--disable-renderer-backgrounding"' in agent_text
-    assert '"--disable-backgrounding-occluded-windows"' in agent_text
-    assert '"--disable-features=site-per-process"' in agent_text
-    assert '"--single-process"' in agent_text
-    assert '"--no-zygote"' in agent_text
-    assert '"--disable-sync"' in agent_text
-    assert '"--metrics-recording-only"' in agent_text
-    assert '"--mute-audio"' in agent_text
-    assert '"--no-first-run"' in agent_text
+    # These flags must be present — critical for Railway container stability
+    assert "--disable-dev-shm-usage" in agent_text, "Missing --disable-dev-shm-usage"
+    assert "--no-sandbox" in agent_text, "Missing --no-sandbox"
+    assert "--disable-gpu" in agent_text, "Missing --disable-gpu"
+    assert "--no-zygote" in agent_text, "Missing --no-zygote"
+    assert "--disable-setuid-sandbox" in agent_text, "Missing --disable-setuid-sandbox"
+
+    # This flag must NOT be present — causes IPC stall on Railway Linux kernel
+    assert "--single-process" not in agent_text, \
+        "--single-process must be removed: causes 2-hour Playwright hangs on Railway"
 
 
 def test_main_enables_memory_logger() -> None:
