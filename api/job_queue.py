@@ -9,7 +9,7 @@ Usage:
 
 Startup (in main.py lifespan):
     async with lifespan(app):
-        await start_workers(num_workers=4)
+        await start_workers(num_workers=1)
 
 Enqueueing:
     await enqueue_job(fn, *args, **kwargs)
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-NUM_WORKERS   = int(os.getenv("JOB_WORKERS", "2"))
+NUM_WORKERS   = int(os.getenv("JOB_WORKERS", "1"))
 MAX_QUEUE_SIZE = int(os.getenv("JOB_QUEUE_SIZE", "100"))
 JOB_TIMEOUT   = int(os.getenv("JOB_TIMEOUT_SECONDS", "150"))  # 2.5 min max per job
 

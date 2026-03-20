@@ -108,12 +108,12 @@ def test_routes_include_optional_timeline_fields() -> None:
     assert '"step_results": step_results' in route_text
 
 
-def test_job_queue_defaults_to_two_workers() -> None:
+def test_job_queue_defaults_to_one_worker() -> None:
     queue_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "api", "job_queue.py"))
     with open(queue_path, encoding="utf-8") as fh:
         queue_text = fh.read()
 
-    assert 'JOB_WORKERS", "2"' in queue_text
+    assert 'JOB_WORKERS", "1"' in queue_text
 
 
 def test_web_agent_uses_container_safe_chromium_flags() -> None:
