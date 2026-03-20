@@ -29,6 +29,7 @@ usage.db
 
 # Local scratch data
 .tmp-data/
+artifacts/failure_patterns/
 
 # IDE
 .vscode/

@@ -8,7 +8,7 @@ from dataclasses import asdict
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from core.agentic_qa import _login_step, discover_site, plan_journeys
+from core.agentic_qa import _login_step, _open_product_step, discover_site, plan_journeys
 from core.models import ActionCandidate, AppType, JourneyPlan, JourneyStep, RecoveryEvent, SessionState, StepResult, StepType, SuccessSignal
 from core.report_builder import build_journey_timeline
 
@@ -414,6 +414,12 @@ def test_saucedemo_data_test_selectors_are_prioritized_for_login_step() -> None:
     assert submit_candidate.selectors.index("input[type='submit']") < submit_candidate.selectors.index("button[type='submit']")
 
 
+def test_login_input_submit_before_button_submit() -> None:
+    candidates = _login_step().action_candidates[2].selectors
+
+    assert candidates.index("input[type='submit']") < candidates.index("button[type='submit']")
+
+
 def test_orangehrm_dashboard_index_matches_auth_success_signals() -> None:
     step = _login_step()
     matching_signals = [
@@ -609,6 +615,13 @@ def test_detail_first_journey_exists_in_ecommerce_template() -> None:
     journeys = plan_journeys({"app_type": AppType.ECOMMERCE.value})
 
     assert [journey.name for journey in journeys] == ["direct_add_to_cart", "detail_then_cart"]
+
+
+def test_open_product_has_advantage_and_demoblaze_candidates() -> None:
+    selectors = _open_product_step().action_candidates[1].selectors
+
+    assert any("product/" in selector for selector in selectors)
+    assert any("card-title" in selector for selector in selectors)
 
 
 def test_detail_then_cart_success_signals_cover_cart_confirmation() -> None:

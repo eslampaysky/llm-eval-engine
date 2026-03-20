@@ -484,6 +484,7 @@ def _login_step() -> JourneyStep:
                     "*[data-test*='login']",
                     "input[type='submit']",
                     "input[value='Login']",
+                    "input[value='Sign in']",
                     "button[type='submit']",
                     "button:has-text('Login')",
                     "button:has-text('Log in')",
@@ -584,8 +585,8 @@ def _open_product_step() -> JourneyStep:
         intent="product detail link or view details button",
         step_type=StepType.CLICK.value,
         action_candidates=[
-            ActionCandidate(type="click", intent="view details link", selectors=["a:has-text('View Details')", "a:has-text('View Product')"], role="link", name="View Details", text="View Details"),
-            ActionCandidate(type="click", intent="product item link", selectors=[".product-item a:first-of-type", ".product-card a", ".categoryCell a", "a[href*='#/product/']", "a[href*='/product/']", ".card-title a"], role="link", name="Product", text="Product"),
+            ActionCandidate(type="click", intent="view details link", selectors=["a:has-text('View Details')", "a:has-text('View Product')", "a:has-text('See Details')"], role="link", name="View Details", text="View Details"),
+            ActionCandidate(type="click", intent="product item link", selectors=["a[href*='#/product/']", "a[href*='/product/']", ".card-title a", ".product-item-link", ".productName a", ".product-card a:first-of-type", ".product-item a:first-of-type", ".categoryCell a", ".products-grid a:first-of-type", ".product-list a:first-of-type"], role="link", name="Product", text="Product"),
             ActionCandidate(type="click", intent="shop now link", selectors=["a:has-text('Shop Now')", ".shop_now"], role="link", name="Shop Now", text="Shop Now"),
         ],
         success_signals=[
