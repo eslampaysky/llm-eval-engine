@@ -1,0 +1,5 @@
+group,name,url,expected_type,predicted_type,classification_correct,final_status,journey_result,journey_count,recovery_count,recovery_types,truth_over_exception_count,notes,audit_id
+crud,TodoMVC React,https://todomvc.com/examples/react/dist/,task_manager,task_manager,True,done,core_crud:PASSED,1,0,,0,,98b86ad4-b666-4df6-ab90-c2e25d20fd7f
+crud,TodoMVC Vue,https://todomvc.com/examples/vue3/dist/,task_manager,generic,False,done,core_navigation:FAILED,1,0,,0,Could not resolve action candidate: dashboard link,66bb212f-6f48-4aeb-b152-3cf539bae1e1
+crud,Add Remove Elements,https://the-internet.herokuapp.com/add_remove_elements/,generic,dom_mutation,False,done,dom_mutation_basic:PASSED,1,0,,0,,7a81e463-967b-411e-b0e8-66b98c3e50fe
+crud,Advantage Online Shopping,https://www.advantageonlineshopping.com,ecommerce,generic,False,done,core_navigation:FAILED,1,0,,0,Could not resolve action candidate: dashboard link,c9cd97de-327a-43e0-bd58-ad80c74ed793

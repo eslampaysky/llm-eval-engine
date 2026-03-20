@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
-
-const NAV_LINKS = [
-  { to: '/demo', label: 'Demo' },
-  { to: '/pricing', label: 'Pricing' },
-];
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from '../components/LanguageSwitcher.jsx';
 
 export default function PublicLayout() {
+  const { t } = useTranslation();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navLinks = [
+    { to: '/demo', label: t('navigation.public.demo', 'Demo') },
+    { to: '/pricing', label: t('navigation.public.pricing', 'Pricing') },
+  ];
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
@@ -59,13 +61,13 @@ export default function PublicLayout() {
               color: 'var(--text-primary)',
               letterSpacing: '-0.02em',
             }}>
-              AiBreaker
+              {t('common.appName', 'AiBreaker')}
             </span>
           </Link>
 
           {/* Desktop nav */}
           <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }} className="hide-mobile-nav">
-            {NAV_LINKS.map((link) => (
+            {navLinks.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}
@@ -90,11 +92,12 @@ export default function PublicLayout() {
               color: 'var(--text-secondary)',
               textDecoration: 'none',
             }}>
-              Login
+              {t('navigation.public.login', 'Login')}
             </Link>
             <Link to="/auth/signup" className="btn btn-primary" style={{ padding: '8px 18px', fontSize: 13 }}>
-              Get Started
+              {t('navigation.public.getStarted', 'Get Started')}
             </Link>
+            <LanguageSwitcher />
           </nav>
 
           {/* Mobile hamburger */}
@@ -124,7 +127,7 @@ export default function PublicLayout() {
             flexDirection: 'column',
             gap: 8,
           }}>
-            {NAV_LINKS.map((link) => (
+            {navLinks.map((link) => (
               <Link key={link.to} to={link.to} style={{
                 padding: '10px 0',
                 fontSize: 14,
@@ -141,11 +144,12 @@ export default function PublicLayout() {
               color: 'var(--text-secondary)',
               textDecoration: 'none',
             }}>
-              Login
+              {t('navigation.public.login', 'Login')}
             </Link>
             <Link to="/auth/signup" className="btn btn-primary" style={{ textAlign: 'center', marginTop: 8 }}>
-              Get Started
+              {t('navigation.public.getStarted', 'Get Started')}
             </Link>
+            <LanguageSwitcher />
           </div>
         )}
       </header>

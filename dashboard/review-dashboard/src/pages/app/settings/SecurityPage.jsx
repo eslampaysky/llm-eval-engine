@@ -1,12 +1,14 @@
-import { useAuth } from '../../../context/AuthContext.jsx';
 import { Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../../context/AuthContext.jsx';
 
 const MOCK_SESSIONS = [
-  { id: '1', device: 'Chrome on Windows', lastActive: 'Active now', current: true },
-  { id: '2', device: 'Safari on iPhone', lastActive: 'Mar 17, 2026', current: false },
+  { id: '1', deviceKey: 'chromeWindows', lastActiveKey: 'activeNow', current: true, lastActiveRaw: 'Active now' },
+  { id: '2', deviceKey: 'safariIphone', lastActiveKey: null, current: false, lastActiveRaw: 'Mar 17, 2026' },
 ];
 
 export default function SecurityPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const isOAuth = user?.provider === 'google';
 
@@ -14,57 +16,57 @@ export default function SecurityPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {!isOAuth && (
         <div className="card" style={{ padding: 28, maxWidth: 480 }}>
-          <div className="card-label">Change Password</div>
+          <div className="card-label">{t('settings.security.changePassword')}</div>
           <div style={{ display: 'grid', gap: 14 }}>
             <div>
-              <label className="form-label">Current Password</label>
+              <label className="form-label">{t('settings.security.currentPassword')}</label>
               <input className="form-input" type="password" />
             </div>
             <div>
-              <label className="form-label">New Password</label>
+              <label className="form-label">{t('settings.security.newPassword')}</label>
               <input className="form-input" type="password" />
             </div>
             <div>
-              <label className="form-label">Confirm New Password</label>
+              <label className="form-label">{t('settings.security.confirmPassword')}</label>
               <input className="form-input" type="password" />
             </div>
           </div>
-          <button className="btn btn-primary" style={{ marginTop: 16 }}>Update Password</button>
+          <button className="btn btn-primary" style={{ marginTop: 16 }}>{t('settings.security.updatePassword')}</button>
         </div>
       )}
 
       {isOAuth && (
         <div className="card" style={{ padding: 28 }}>
-          <div className="card-label">Password</div>
+          <div className="card-label">{t('settings.security.password')}</div>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            Your account is connected via Google. Password management is handled through your Google account.
+            {t('settings.security.oauthMessage')}
           </p>
         </div>
       )}
 
       <div className="card" style={{ padding: 28 }}>
-        <div className="card-label">Active Sessions</div>
+        <div className="card-label">{t('settings.security.activeSessions')}</div>
         <div className="card" style={{ padding: 0, overflow: 'auto', marginTop: 8 }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Device</th>
-                <th>Last Active</th>
-                <th>Actions</th>
+                <th>{t('settings.security.device')}</th>
+                <th>{t('settings.security.lastActive')}</th>
+                <th>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {MOCK_SESSIONS.map((s) => (
-                <tr key={s.id}>
+              {MOCK_SESSIONS.map((session) => (
+                <tr key={session.id}>
                   <td style={{ color: 'var(--text-primary)' }}>
-                    {s.device}
-                    {s.current && <span className="badge badge-green" style={{ marginLeft: 8 }}>Current</span>}
+                    {t(`settings.security.sessions.${session.deviceKey}`)}
+                    {session.current && <span className="badge badge-green" style={{ marginInlineStart: 8 }}>{t('common.current')}</span>}
                   </td>
-                  <td>{s.lastActive}</td>
+                  <td>{session.lastActiveKey ? t(`settings.security.sessions.${session.lastActiveKey}`) : session.lastActiveRaw}</td>
                   <td>
-                    {!s.current && (
+                    {!session.current && (
                       <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }}>
-                        <Trash2 size={12} /> Revoke
+                        <Trash2 size={12} /> {t('settings.security.revoke')}
                       </button>
                     )}
                   </td>

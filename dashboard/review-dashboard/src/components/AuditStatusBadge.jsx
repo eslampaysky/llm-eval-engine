@@ -4,9 +4,9 @@ const STATUS_CONFIG = {
   critical:  { color: 'var(--coral)', bg: 'var(--coral-dim)', border: 'rgba(232, 89, 60, 0.2)' },
 };
 
-export default function AuditStatusBadge({ status = 'healthy' }) {
+export default function AuditStatusBadge({ status = 'healthy', label }) {
   const config = STATUS_CONFIG[status.toLowerCase()] || STATUS_CONFIG.healthy;
-  const label = status.charAt(0).toUpperCase() + status.slice(1);
+  const resolvedLabel = label || (status.charAt(0).toUpperCase() + status.slice(1));
 
   return (
     <span style={{
@@ -30,7 +30,7 @@ export default function AuditStatusBadge({ status = 'healthy' }) {
         background: config.color,
         boxShadow: `0 0 6px ${config.color}`,
       }} />
-      {label}
+      {resolvedLabel}
     </span>
   );
 }

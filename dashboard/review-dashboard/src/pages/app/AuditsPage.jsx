@@ -1,17 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Search, ArrowRight, Zap, Loader, AlertTriangle, ArrowUpRight } from 'lucide-react';
 import { api } from '../../services/api';
 import ScoreRing from '../../components/ScoreRing.jsx';
 
-const TIER_LABELS = { vibe: 'Vibe', deep: 'Deep', fix: 'Fix' };
 const TIER_COLORS = { vibe: 'badge-blue', deep: 'badge-amber', fix: 'badge-green' };
 
 export default function AuditsPage() {
+  const { t, i18n } = useTranslation();
   const [audits, setAudits] = useState([]);
   const [failurePatterns, setFailurePatterns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const tierLabels = useMemo(
+    () => ({
+      vibe: t('audit.list.tierLabels.vibe', 'Vibe'),
+      deep: t('audit.list.tierLabels.deep', 'Deep'),
+      fix: t('audit.list.tierLabels.fix', 'Fix'),
+    }),
+    [t],
+  );
 
   useEffect(() => {
     (async () => {
@@ -30,9 +40,7 @@ export default function AuditsPage() {
     })();
   }, []);
 
-  const filtered = audits.filter((a) =>
-    (a.url || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = audits.filter((audit) => (audit.url || '').toLowerCase().includes(searchQuery.toLowerCase()));
 
   if (loading) {
     return (
@@ -45,35 +53,34 @@ export default function AuditsPage() {
   return (
     <div className="page-container fade-in">
       <div className="page-header">
-        <div className="page-eyebrow">History</div>
-        <h1 className="page-title">Audits</h1>
-        <p className="page-subtitle">All your audit results in one place.</p>
+        <div className="page-eyebrow">{t('audit.list.eyebrow', 'History')}</div>
+        <h1 className="page-title">{t('audit.list.title', 'Audits')}</h1>
+        <p className="page-subtitle">{t('audit.list.subtitle', 'All your audit results in one place.')}</p>
       </div>
 
-      {/* Search */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
-          <Search size={16} style={{
-            position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-            color: 'var(--text-dim)',
-          }} />
-          <input className="form-input" placeholder="Search by URL..."
-            value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: 36 }} />
+          <Search size={16} style={{ position: 'absolute', insetInlineStart: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+          <input
+            className="form-input"
+            placeholder={t('audit.list.searchPlaceholder', 'Search by URL...')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ paddingInlineStart: 36 }}
+          />
         </div>
       </div>
 
-      {/* Table */}
       {failurePatterns.length > 0 && (
         <div className="card" style={{ padding: 20, marginBottom: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
             <div>
-              <div className="card-label">Real-User Backlog</div>
+              <div className="card-label">{t('audit.list.realUserBacklog', 'Real-User Backlog')}</div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                Top recurring failed steps grouped by app type and failure type.
+                {t('audit.list.backlogSubtitle', 'Top recurring failed steps grouped by app type and failure type.')}
               </div>
             </div>
-            <span className="badge badge-amber">Live tuning loop</span>
+            <span className="badge badge-amber">{t('audit.list.liveTuningLoop', 'Live tuning loop')}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             {failurePatterns.map((pattern) => (
@@ -90,15 +97,8 @@ export default function AuditsPage() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                   <span className="badge badge-blue">{pattern.app_type || 'generic'}</span>
-                  <span style={{
-                    padding: '4px 8px',
-                    borderRadius: 'var(--radius-full)',
-                    background: 'rgba(255,107,107,0.12)',
-                    color: 'var(--red)',
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}>
-                    {pattern.count}x
+                  <span style={{ padding: '4px 8px', borderRadius: 'var(--radius-full)', background: 'rgba(255,107,107,0.12)', color: 'var(--red)', fontSize: 11, fontWeight: 700 }}>
+                    {t('audit.list.countBadge', { count: pattern.count })}
                   </span>
                 </div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -109,15 +109,13 @@ export default function AuditsPage() {
                   {String(pattern.failure_type || 'unknown_failure').replace(/_/g, ' ')}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  Last seen {pattern.last_seen_at ? new Date(pattern.last_seen_at).toLocaleDateString() : 'recently'}
+                  {t('audit.list.lastSeen', {
+                    date: pattern.last_seen_at ? new Date(pattern.last_seen_at).toLocaleDateString(i18n.language === 'ar' ? 'ar' : undefined) : t('audit.list.recently', 'recently'),
+                  })}
                 </div>
                 {pattern.example_audit_id && (
-                  <Link
-                    to={`/app/audits/${pattern.example_audit_id}`}
-                    className="btn btn-ghost"
-                    style={{ width: 'fit-content', padding: '6px 10px', fontSize: 12 }}
-                  >
-                    Example audit <ArrowUpRight size={14} />
+                  <Link to={`/app/audits/${pattern.example_audit_id}`} className="btn btn-ghost" style={{ width: 'fit-content', padding: '6px 10px', fontSize: 12 }}>
+                    {t('audit.list.exampleAudit', 'Example audit')} <ArrowUpRight size={14} style={{ transform: i18n.dir() === 'rtl' ? 'scaleX(-1)' : undefined }} />
                   </Link>
                 )}
               </div>
@@ -131,12 +129,12 @@ export default function AuditsPage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>URL</th>
-                <th>Tier</th>
-                <th>Score</th>
-                <th>Date</th>
-                <th>Findings</th>
-                <th>Actions</th>
+                <th>{t('audit.list.table.url', 'URL')}</th>
+                <th>{t('audit.list.table.tier', 'Tier')}</th>
+                <th>{t('audit.list.table.score', 'Score')}</th>
+                <th>{t('audit.list.table.createdAt', 'Date')}</th>
+                <th>{t('audit.list.table.findings', 'Findings')}</th>
+                <th>{t('audit.list.table.actions', 'Actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -148,38 +146,42 @@ export default function AuditsPage() {
                 return (
                   <tr key={id} style={{ cursor: 'pointer' }}>
                     <td>
-                      <span style={{
-                        fontFamily: 'var(--font-mono)', fontSize: 13,
-                        color: 'var(--text-primary)',
-                        maxWidth: 200, display: 'inline-block',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }} title={audit.url}>
-                        {audit.url || 'Unknown'}
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 13,
+                          color: 'var(--text-primary)',
+                          maxWidth: 200,
+                          display: 'inline-block',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={audit.url}
+                      >
+                        {audit.url || t('common.unknown', 'Unknown')}
                       </span>
                     </td>
                     <td>
                       <span className={`badge ${TIER_COLORS[tier] || 'badge-blue'}`}>
-                        {TIER_LABELS[tier] || tier}
+                        {tierLabels[tier] || tier}
                       </span>
                     </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <ScoreRing score={score} size={28} strokeWidth={3} showScore={false} />
-                        <span style={{
-                          fontFamily: 'var(--font-mono)', fontSize: 13,
-                          color: score >= 80 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)',
-                        }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: score >= 80 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)' }}>
                           {score}
                         </span>
                       </div>
                     </td>
                     <td style={{ fontSize: 12 }}>
-                      {audit.created_at ? new Date(audit.created_at).toLocaleDateString() : '—'}
+                      {audit.created_at ? new Date(audit.created_at).toLocaleDateString(i18n.language === 'ar' ? 'ar' : undefined) : '-'}
                     </td>
                     <td>{findingsCount}</td>
                     <td>
                       <Link to={`/app/audits/${id}`} className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }}>
-                        View
+                        {t('common.view', 'View')}
                       </Link>
                     </td>
                   </tr>
@@ -190,16 +192,16 @@ export default function AuditsPage() {
         </div>
       ) : (
         <div className="card" style={{ textAlign: 'center', padding: '60px 24px' }}>
-          <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🔍</div>
+          <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>?</div>
           <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-            {searchQuery ? 'No results found' : 'No audits yet'}
+            {searchQuery ? t('audit.list.noResultsTitle', 'No results found') : t('audit.list.emptyTitle', 'No audits yet')}
           </h3>
           <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
-            {searchQuery ? 'Try a different search term.' : 'Run your first audit to see results here.'}
+            {searchQuery ? t('audit.list.noResultsSubtitle', 'Try a different search term.') : t('audit.list.emptySubtitle', 'Run your first audit to see results here.')}
           </p>
           {!searchQuery && (
             <Link to="/app/vibe-check" className="btn btn-primary">
-              <Zap size={16} /> Run Your First Audit <ArrowRight size={16} />
+              <Zap size={16} /> {t('audit.list.firstAudit', 'Run Your First Audit')} <ArrowRight size={16} style={{ transform: i18n.dir() === 'rtl' ? 'scaleX(-1)' : undefined }} />
             </Link>
           )}
         </div>

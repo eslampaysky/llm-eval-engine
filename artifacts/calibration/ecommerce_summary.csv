@@ -1,0 +1,20 @@
+group,name,url,expected_type,predicted_type,classification_correct,final_status,journey_result,journey_count,recovery_count,recovery_types,truth_over_exception_count,notes,audit_id
+ecommerce,SauceDemo,https://www.saucedemo.com/,ecommerce,ecommerce,True,done,auth_first_direct_add_to_cart:FAILED / auth_first_detail_then_cart:FAILED,2,0,,0,Could not resolve action candidate: sign in button | Could not resolve action candidate: sign in button,f2f76a37-33cf-4d47-ad94-70d56333e0a8
+ecommerce,Automation Exercise,https://automationexercise.com/,ecommerce,ecommerce,True,done,direct_add_to_cart:FAILED / detail_then_cart:FAILED,2,7,cookie_consent,1,"Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator(""a:has-text('Add to cart')"").first
+    - locator resolved to <a data-product-id=""1"" class=""btn btn-default add-to-cart"">…</a>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - e | Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator(""a:has-text('Add to cart')"").first
+    - locator resolved to <a data-product-id=""1"" class=""btn btn-default add-to-cart"">…</a>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - e | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator(""a:has-text('View Details')"").first
+    - locator resolved to <a href=""#"" tabindex=""0"" role=""button"" data-purpose-id=""1"" class=""fc-purpose-feature-more-info"" data-name=""Store and/or access information on a device"" aria-label=",6820bd88-fea5-4016-ab67-f41e1c6032bd
+ecommerce,Advantage Online Shopping,https://www.advantageonlineshopping.com,ecommerce,ecommerce,True,done,direct_add_to_cart:FAILED / detail_then_cart:FAILED,2,0,,1,Could not resolve action candidate: add to cart | Could not resolve action candidate: add to cart button | Action error overruled by success signals: Could not resolve action candidate: view details link,67854934-56e3-485b-932b-0f581f849630
+ecommerce,Demoblaze,https://www.demoblaze.com,ecommerce,ecommerce,True,done,direct_add_to_cart:FAILED / detail_then_cart:FAILED,2,0,,1,Could not resolve action candidate: add to cart | Could not resolve action candidate: add to cart button | Action error overruled by success signals: Could not resolve action candidate: view details link,6ddef2e6-ad5c-4985-ab6e-0f8cc8893baa

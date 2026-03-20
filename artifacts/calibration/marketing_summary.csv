@@ -1,0 +1,35 @@
+group,name,url,expected_type,predicted_type,classification_correct,final_status,journey_result,journey_count,recovery_count,recovery_types,truth_over_exception_count,notes,audit_id
+marketing,Cookiebot,https://www.cookiebot.com/en/,marketing_site,marketing_site,True,done,pricing_navigation:PASSED / features_navigation:PASSED / contact_navigation:PASSED,3,3,cookie_consent,3,"Action error overruled by success signals: Could not resolve action candidate: see pricing link | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_role(""link"", name=re.compile(r""Features"", re.IGNORECASE)).first
+    - locator resolved to <a data-pos=""1"" rel=""nofollow"" target=""_blank"" data-hid=""312f9f33"" class=""cb-rating-cards-slider__card cb-rating-cards-slider__card--wit | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator(""a[href*='demo']"").first
+    - locator resolved to <a data-pos=""1"" target=""_blank"" data-hid=""117a934c"" href=""https://www.cookiebot.com/en/product-demo/"">explore our product demo</a>
+  - attempting click action
+    2 × waiting",261ee9e1-bd9f-4702-a78a-f5f5cddc92a7
+marketing,Stripe,https://stripe.com/,marketing_site,marketing_site,True,done,pricing_navigation:PASSED / features_navigation:PASSED / contact_navigation:PASSED,3,4,unknown_blocker,3,"Action error overruled by success signals: Could not resolve action candidate: see pricing link | Action error overruled by success signals: Could not resolve action candidate: features link | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator(""a[href*='contact']"").first
+    - locator resolved to <a href=""/nl/contact/sales"" data-analytics-label=""global_nav__contact_sales"" class=""hds-button hds-button--secondary-on-quiet"">Contact opnemen met sales</a>
+  - attempting",6c004480-cf06-47ed-aba1-f301a2464c5e
+marketing,Linear,https://linear.app/,marketing_site,marketing_site,True,done,pricing_navigation:PASSED / features_navigation:PASSED / contact_navigation:PASSED,3,4,modal,2,"Action error overruled by success signals: Could not resolve action candidate: see pricing link | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator(""a[href*='product']"").first
+    - locator resolved to <a rel=""noopener"" class=""Changelog_link__IM2Ji Link_root__cNtak"" href=""/changelog/2026-02-05-linear-mcp-for-product-management"">…</a>
+  - attempting click action
+    2 × w",1dd1d46c-7e15-4c57-a7c9-72f17de95802
+marketing,Notion,https://www.notion.so/,marketing_site,marketing_site,True,done,pricing_navigation:PASSED / features_navigation:PASSED / contact_navigation:PASSED,3,2,unknown_blocker,3,"Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator(""a:has-text('See pricing')"").first
+ | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for get_by_text(re.compile(r""Features"", re.IGNORECASE)).first
+    - locator resolved to <h2 class=""semanticTypography_semanticTypography__mWJkv semanticTypography_variantNavigationHeading__uo7yO globalNavigation_desktopDropDownNavigation | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.
+Call log:
+  - waiting for locator(""a[href*='demo']"").first
+    - locator resolved to <a href=""/product/demos"" class=""navItem_navItem__qrlp3"">…</a>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is not",9b32a022-6917-4aa0-a4bb-cb1630993933
+marketing,Vercel,https://vercel.com/,marketing_site,marketing_site,True,done,pricing_navigation:BLOCKED / features_navigation:BLOCKED / contact_navigation:BLOCKED,3,0,,0,CAPTCHA or human-verification wall active — manual intervention required | CAPTCHA or human-verification wall active — manual intervention required | CAPTCHA or human-verification wall active — manual intervention required,9a02704b-c9e5-41ef-84fa-077da9161dc5

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export default function CopyButton({ text, label = 'Copy', size = 'sm' }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -35,7 +37,7 @@ export default function CopyButton({ text, label = 'Copy', size = 'sm' }) {
       }}
     >
       {copied ? <Check size={isSmall ? 12 : 14} /> : <Copy size={isSmall ? 12 : 14} />}
-      {copied ? 'Copied!' : label}
+      {copied ? t('common.copied', 'Copied!') : label}
     </button>
   );
 }

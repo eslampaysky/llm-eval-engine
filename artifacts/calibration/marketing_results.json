@@ -1,0 +1,1648 @@
+[
+  {
+    "group": "marketing",
+    "name": "Cookiebot",
+    "url": "https://www.cookiebot.com/en/",
+    "expected_type": "marketing_site",
+    "predicted_type": "marketing_site",
+    "classification_correct": true,
+    "final_status": "done",
+    "journey_result": "pricing_navigation:PASSED / features_navigation:PASSED / contact_navigation:PASSED",
+    "journey_count": 3,
+    "recovery_count": 3,
+    "recovery_types": "cookie_consent",
+    "truth_over_exception_count": 3,
+    "notes": "Action error overruled by success signals: Could not resolve action candidate: see pricing link | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for get_by_role(\"link\", name=re.compile(r\"Features\", re.IGNORECASE)).first\n    - locator resolved to <a data-pos=\"1\" rel=\"nofollow\" target=\"_blank\" data-hid=\"312f9f33\" class=\"cb-rating-cards-slider__card cb-rating-cards-slider__card--wit | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a[href*='demo']\").first\n    - locator resolved to <a data-pos=\"1\" target=\"_blank\" data-hid=\"117a934c\" href=\"https://www.cookiebot.com/en/product-demo/\">explore our product demo</a>\n  - attempting click action\n    2 \u00d7 waiting",
+    "audit_id": "261ee9e1-bd9f-4702-a78a-f5f5cddc92a7",
+    "raw_status": {
+      "audit_id": "261ee9e1-bd9f-4702-a78a-f5f5cddc92a7",
+      "status": "done",
+      "url": "https://www.cookiebot.com/en/",
+      "tier": "deep",
+      "score": 88,
+      "confidence": 95,
+      "findings": [
+        {
+          "severity": "low",
+          "category": "layout",
+          "title": "Mobile layout issue",
+          "description": "On mobile view, the 'Get to know Cookiebot CMP' section appears cut off. The three steps are not fully visible.",
+          "fix_prompt": "Add media query to adjust padding and styling for mobile devices to ensure all elements are visible.",
+          "confidence": 95
+        },
+        {
+          "severity": "low",
+          "category": "content",
+          "title": "Truncated text on mobile",
+          "description": "Some text, such as in the 'What our customers and partners are saying' section, appears truncated on mobile devices.",
+          "fix_prompt": "Use responsive typography and adjust text wrapping to ensure all text is fully visible on mobile devices.",
+          "confidence": 95
+        },
+        {
+          "severity": "medium",
+          "category": "functionality",
+          "title": "Google Analytics network errors",
+          "description": "Multiple POST requests to Google Analytics failed with net::ERR_ABORTED error.",
+          "fix_prompt": "Investigate and resolve Google Analytics configuration issues to prevent network errors.",
+          "confidence": 95
+        },
+        {
+          "severity": "low",
+          "category": "accessibility",
+          "title": "Missing alt text for images",
+          "description": "Some images, such as logos and graphics, lack alt text.",
+          "fix_prompt": "Add descriptive alt text to all images for better accessibility.",
+          "confidence": 95
+        }
+      ],
+      "summary": "The website generally appears to be well-designed and functional, but there are some minor layout and content issues on mobile devices, as well as some Google Analytics errors. Overall, the site is professional and usable.",
+      "bundled_fix_prompt": "I ran a reliability audit on https://www.cookiebot.com/en/ and found the following issues.\nPlease fix all of them:\n\n1. [LOW] Mobile layout issue\n   Fix: Add media query to adjust padding and styling for mobile devices to ensure all elements are visible.\n\n2. [LOW] Truncated text on mobile\n   Fix: Use responsive typography and adjust text wrapping to ensure all text is fully visible on mobile devices.\n\n3. [MEDIUM] Google Analytics network errors\n   Fix: Investigate and resolve Google Analytics configuration issues to prevent network errors.\n\n4. [LOW] Missing alt text for images\n   Fix: Add descriptive alt text to all images for better accessibility.\n\nAfter fixing all issues, make sure the site works correctly on both desktop (1280px) and mobile (390px) viewports.\n\nJourney context:\nState context: {\"base_url\": \"https://www.cookiebot.com/en/\", \"current_url\": \"https://www.cookiebot.com/en/pricing/\", \"auth\": {}, \"generated_credentials\": {}, \"inferred_context\": {\"app_type\": \"marketing_site\", \"features\": [\"pricing\", \"features\", \"contact\"], \"primary_goal\": \"explore marketing paths\", \"site_description\": \"Cookie consent management platform\"}, \"items\": {}, \"recovery_counters\": {}, \"step_history\": [{\"goal\": \"reach_pricing\", \"url\": \"https://www.cookiebot.com/en/pricing/\", \"verification_success\": true}]}\nJourney: pricing_navigation\n- Step pricing page link: passed | delta: URL changed from https://www.cookiebot.com/ to https://www.cookiebot.com/en/pricing/, New text appeared: 'Advanced', New text appeared: 'CORE', New text appeared: 'Core'\nJourney: features_navigation\n- Step features or product page link: passed | delta: New text appeared: 'About', New text appeared: 'Allow all', New text appeared: 'Check if your website i'\nJourney: contact_navigation\n- Step contact or request demo link: passed | delta: URL changed from https://www.cookiebot.com/ to https://www.cookiebot.com/en/trial-guide-consultation/, New text appeared: 'About', New text appeared: 'Allow all', New text appeared: 'Consent'",
+      "journey_timeline": [
+        {
+          "journey": "pricing_navigation",
+          "status": "PASSED",
+          "failed_step": null,
+          "reason": null,
+          "steps": [
+            {
+              "step": "pricing page link",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [
+                "URL changed from https://www.cookiebot.com/ to https://www.cookiebot.com/en/pricing/",
+                "New text appeared: 'Advanced'",
+                "New text appeared: 'CORE'",
+                "New text appeared: 'Core'"
+              ],
+              "recovery_attempts": [
+                {
+                  "choke_point": "before_action",
+                  "blocker_type": "cookie_consent",
+                  "action_taken": "clicked_close",
+                  "success": true,
+                  "selector_used": "button[aria-label*='close' i]",
+                  "notes": "Cookie Consent detected and dismissed before action"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "journey": "features_navigation",
+          "status": "PASSED",
+          "failed_step": null,
+          "reason": null,
+          "steps": [
+            {
+              "step": "features or product page link",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [
+                "New text appeared: 'About'",
+                "New text appeared: 'Allow all'",
+                "New text appeared: 'Check if your website i'"
+              ],
+              "recovery_attempts": [
+                {
+                  "choke_point": "before_action",
+                  "blocker_type": "cookie_consent",
+                  "action_taken": "clicked_close",
+                  "success": true,
+                  "selector_used": "button[aria-label*='close' i]",
+                  "notes": "Cookie Consent detected and dismissed before action"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "journey": "contact_navigation",
+          "status": "PASSED",
+          "failed_step": null,
+          "reason": null,
+          "steps": [
+            {
+              "step": "contact or request demo link",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [
+                "URL changed from https://www.cookiebot.com/ to https://www.cookiebot.com/en/trial-guide-consultation/",
+                "New text appeared: 'About'",
+                "New text appeared: 'Allow all'",
+                "New text appeared: 'Consent'"
+              ],
+              "recovery_attempts": [
+                {
+                  "choke_point": "before_action",
+                  "blocker_type": "cookie_consent",
+                  "action_taken": "clicked_close",
+                  "success": true,
+                  "selector_used": "button[aria-label*='close' i]",
+                  "notes": "Cookie Consent detected and dismissed before action"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "step_results": [
+        {
+          "step_name": "pricing page link",
+          "goal": "reach_pricing",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": [
+              {
+                "type": "click",
+                "intent": "pricing link",
+                "selectors": [
+                  "a[href*='pricing']"
+                ],
+                "role": "link",
+                "name": "Pricing",
+                "value": null
+              }
+            ]
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [
+              {
+                "type": "url_contains",
+                "value": "pricing",
+                "priority": "high",
+                "required": true
+              },
+              {
+                "type": "text_present",
+                "value": "pricing",
+                "priority": "medium",
+                "required": false
+              },
+              {
+                "type": "text_present",
+                "value": "plan",
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [],
+            "delta_summary": [
+              "URL changed from https://www.cookiebot.com/ to https://www.cookiebot.com/en/pricing/",
+              "New text appeared: 'Advanced'",
+              "New text appeared: 'CORE'",
+              "New text appeared: 'Core'"
+            ],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "URL changed from https://www.cookiebot.com/ to https://www.cookiebot.com/en/pricing/",
+            "New text appeared: 'Advanced'",
+            "New text appeared: 'CORE'",
+            "New text appeared: 'Core'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": true,
+              "selector_used": "button[aria-label*='close' i]",
+              "notes": "Cookie Consent detected and dismissed before action"
+            }
+          ],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Cookie Consent detected and dismissed before action",
+            "Action error overruled by success signals: Could not resolve action candidate: see pricing link"
+          ],
+          "before_snapshot": {
+            "url": "https://www.cookiebot.com/",
+            "title": "Cookiebot\u2122 CMP by Usercentrics - GDPR Compliance for SMBs",
+            "text_snippet": "Consent\nDetails\nAbout\nThis website uses cookies\nWe use cookies to personalise content and ads, to provide social media features and to analyse our traffic. We also share information about your use of our site with our social media, advertising and analytics partners who may combine it with other information that you\u2019ve provided to them or that they\u2019ve collected from your use of their services.\nDeny\nCustomize\nAllow all\nSkip to content\nNEWS\n\nUsercentrics acquires MCP Manager to bring consent and trust to AI. Learn more.\n\nSEARCH\nLOG IN\nABOUT US\nSUPPORT\nENGLISH\nProducts\nRegulations\nPartners\nResources\nPricing\nCONTACT SALES\nSTART FREE\nAUTOMATE CONSENT SIGNALING AND DRIVE RESULTS ON TOP AD PLATFORMS\nCollect and manage user consent with our plug-and-play solution.\nEasy to integrate. Flexible. Reli"
+          },
+          "after_snapshot": {
+            "url": "https://www.cookiebot.com/en/pricing/",
+            "title": "Cookiebot Pricing and Plans - CMP Solution - Cookiebot\u2122",
+            "text_snippet": "Consent\nDetails\nAbout\nThis website uses cookies\nWe use cookies to personalise content and ads, to provide social media features and to analyse our traffic. We also share information about your use of our site with our social media, advertising and analytics partners who may combine it with other information that you\u2019ve provided to them or that they\u2019ve collected from your use of their services.\nDeny\nCustomize\nAllow all\nSkip to content\nSEARCH\nLOG IN\nABOUT US\nSUPPORT\nENGLISH\nProducts\nRegulations\nPartners\nResources\nPricing\nCONTACT SALES\nSTART FREE\nCore\nAdvanced\nEuro - \u20ac\nCORE\nPricing\n\nYou do not have to worry about selecting a plan right now, all of our plans start with a 14-day trial\n\nSTART FREE TRIAL\nNo credit card required\nHow does the trial work?\n\nIntegrate a Cookiebot\u2122 banner to enjoy all "
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "features or product page link",
+          "goal": "reach_features",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": []
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [
+              {
+                "type": "text_present",
+                "value": "feature",
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [],
+            "delta_summary": [
+              "New text appeared: 'About'",
+              "New text appeared: 'Allow all'",
+              "New text appeared: 'Check if your website i'"
+            ],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "New text appeared: 'About'",
+            "New text appeared: 'Allow all'",
+            "New text appeared: 'Check if your website i'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": true,
+              "selector_used": "button[aria-label*='close' i]",
+              "notes": "Cookie Consent detected and dismissed before action"
+            }
+          ],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Cookie Consent detected and dismissed before action",
+            "Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for get_by_role(\"link\", name=re.compile(r\"Features\", re.IGNORECASE)).first\n    - locator resolved to <a data-pos=\"1\" rel=\"nofollow\" target=\"_blank\" data-hid=\"312f9f33\" class=\"cb-rating-cards-slider__card cb-rating-cards-slider__card--wit"
+          ],
+          "before_snapshot": {
+            "url": "https://www.cookiebot.com/",
+            "title": "Cookiebot\u2122 CMP by Usercentrics - GDPR Compliance for SMBs",
+            "text_snippet": "Skip to content\nNEWS\n\nUsercentrics acquires MCP Manager to bring consent and trust to AI. Learn more.\n\nSEARCH\nLOG IN\nABOUT US\nSUPPORT\nENGLISH\nProducts\nRegulations\nPartners\nResources\nPricing\nCONTACT SALES\nSTART FREE\nAUTOMATE CONSENT SIGNALING AND DRIVE RESULTS ON TOP AD PLATFORMS\nCollect and manage user consent with our plug-and-play solution.\nEasy to integrate. Flexible. Reliable.\nSTART FREE\nSCAN WEBSITE\n14-day free trial\nCancel any time\nCheck if your website is privacy compliant\n2.4M\nwebsites and apps\n8.8B\nmonthly user consents\n47+\nlanguages\n600,000+\ncustomers\nWhich solution works for you?\n\nCore Solopreneur Emerging Business\n\nAchieve privacy compliance and easily signal user consent to ad tech platforms. Implement our plug-and-play solution with automated consent collection and management"
+          },
+          "after_snapshot": {
+            "url": "https://www.cookiebot.com/",
+            "title": "Cookiebot\u2122 CMP by Usercentrics - GDPR Compliance for SMBs",
+            "text_snippet": "Consent\nDetails\nAbout\nThis website uses cookies\nWe use cookies to personalise content and ads, to provide social media features and to analyse our traffic. We also share information about your use of our site with our social media, advertising and analytics partners who may combine it with other information that you\u2019ve provided to them or that they\u2019ve collected from your use of their services.\nDeny\nCustomize\nAllow all\nSkip to content\nSEARCH\nLOG IN\nABOUT US\nSUPPORT\nENGLISH\nProducts\nRegulations\nPartners\nResources\nPricing\nCONTACT SALES\nSTART FREE\nAUTOMATE CONSENT SIGNALING AND DRIVE RESULTS ON TOP AD PLATFORMS\nCollect and manage user consent with our plug-and-play solution.\nEasy to integrate. Flexible. Reliable.\nSTART FREE\nSCAN WEBSITE\n14-day free trial\nCancel any time\nCheck if your website i"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "contact or request demo link",
+          "goal": "reach_contact_or_demo",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": [
+              {
+                "type": "click",
+                "intent": "contact link",
+                "selectors": [
+                  "a[href*='contact']",
+                  "a:has-text('Contact')"
+                ],
+                "role": "link",
+                "name": "Contact",
+                "value": null
+              }
+            ]
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [
+              {
+                "type": "element_visible",
+                "value": {
+                  "selector": "form"
+                },
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [],
+            "delta_summary": [
+              "URL changed from https://www.cookiebot.com/ to https://www.cookiebot.com/en/trial-guide-consultation/",
+              "New text appeared: 'About'",
+              "New text appeared: 'Allow all'",
+              "New text appeared: 'Consent'"
+            ],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "URL changed from https://www.cookiebot.com/ to https://www.cookiebot.com/en/trial-guide-consultation/",
+            "New text appeared: 'About'",
+            "New text appeared: 'Allow all'",
+            "New text appeared: 'Consent'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": true,
+              "selector_used": "button[aria-label*='close' i]",
+              "notes": "Cookie Consent detected and dismissed before action"
+            }
+          ],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Cookie Consent detected and dismissed before action",
+            "Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a[href*='demo']\").first\n    - locator resolved to <a data-pos=\"1\" target=\"_blank\" data-hid=\"117a934c\" href=\"https://www.cookiebot.com/en/product-demo/\">explore our product demo</a>\n  - attempting click action\n    2 \u00d7 waiting"
+          ],
+          "before_snapshot": {
+            "url": "https://www.cookiebot.com/",
+            "title": "Cookiebot\u2122 CMP by Usercentrics - GDPR Compliance for SMBs",
+            "text_snippet": "Skip to content\nNEWS\n\nUsercentrics acquires MCP Manager to bring consent and trust to AI. Learn more.\n\nSEARCH\nLOG IN\nABOUT US\nSUPPORT\nENGLISH\nProducts\nRegulations\nPartners\nResources\nPricing\nCONTACT SALES\nSTART FREE\nAUTOMATE CONSENT SIGNALING AND DRIVE RESULTS ON TOP AD PLATFORMS\nCollect and manage user consent with our plug-and-play solution.\nEasy to integrate. Flexible. Reliable.\nSTART FREE\nSCAN WEBSITE\n14-day free trial\nCancel any time\nCheck if your website is privacy compliant\n2.4M\nwebsites and apps\n8.8B\nmonthly user consents\n47+\nlanguages\n600,000+\ncustomers\nWhich solution works for you?\n\nCore Solopreneur Emerging Business\n\nAchieve privacy compliance and easily signal user consent to ad tech platforms. Implement our plug-and-play solution with automated consent collection and management"
+          },
+          "after_snapshot": {
+            "url": "https://www.cookiebot.com/en/trial-guide-consultation/",
+            "title": "Cookiebot CMP Trial Guide Consultation",
+            "text_snippet": "Consent\nDetails\nAbout\nThis website uses cookies\nWe use cookies to personalise content and ads, to provide social media features and to analyse our traffic. We also share information about your use of our site with our social media, advertising and analytics partners who may combine it with other information that you\u2019ve provided to them or that they\u2019ve collected from your use of their services.\nDeny\nCustomize\nAllow all\nSkip to content\nEnglish\nGET ANSWERS, EXPLORE OUR SOLUTIONS\nNew customer? Fill out the form to schedule your call.\nNeed help with your existing account? Visit our Support Center\nLooking for solutions for your clients? Join our Partner Program\nNew customer? Schedule a call with our team.\n\nIf you\u2019re with a mid-sized or larger company with advanced consent and privacy setup, fill"
+          },
+          "screenshot_path": null
+        }
+      ],
+      "analysis_limited": false,
+      "video_url": "/agentic-qa/261ee9e1-bd9f-4702-a78a-f5f5cddc92a7/video",
+      "desktop_screenshot_url": "/agentic-qa/261ee9e1-bd9f-4702-a78a-f5f5cddc92a7/screenshot/desktop",
+      "mobile_screenshot_url": "/agentic-qa/261ee9e1-bd9f-4702-a78a-f5f5cddc92a7/screenshot/mobile",
+      "created_at": "2026-03-19T21:59:39.972078+00:00"
+    }
+  },
+  {
+    "group": "marketing",
+    "name": "Stripe",
+    "url": "https://stripe.com/",
+    "expected_type": "marketing_site",
+    "predicted_type": "marketing_site",
+    "classification_correct": true,
+    "final_status": "done",
+    "journey_result": "pricing_navigation:PASSED / features_navigation:PASSED / contact_navigation:PASSED",
+    "journey_count": 3,
+    "recovery_count": 4,
+    "recovery_types": "unknown_blocker",
+    "truth_over_exception_count": 3,
+    "notes": "Action error overruled by success signals: Could not resolve action candidate: see pricing link | Action error overruled by success signals: Could not resolve action candidate: features link | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a[href*='contact']\").first\n    - locator resolved to <a href=\"/nl/contact/sales\" data-analytics-label=\"global_nav__contact_sales\" class=\"hds-button hds-button--secondary-on-quiet\">Contact opnemen met sales</a>\n  - attempting",
+    "audit_id": "6c004480-cf06-47ed-aba1-f301a2464c5e",
+    "raw_status": {
+      "audit_id": "6c004480-cf06-47ed-aba1-f301a2464c5e",
+      "status": "done",
+      "url": "https://stripe.com/",
+      "tier": "deep",
+      "score": 88,
+      "confidence": 80,
+      "findings": [
+        {
+          "severity": "low",
+          "category": "layout",
+          "title": "Inconsistent button styling",
+          "description": "Buttons have different styling and sizes throughout the page",
+          "fix_prompt": "Standardize button styles to have consistent padding, font size, and color scheme",
+          "confidence": 80
+        },
+        {
+          "severity": "medium",
+          "category": "functionality",
+          "title": "Failed network requests",
+          "description": "Multiple failed network requests to https://r.stripe.com/0 and https://r.stripe.com/b",
+          "fix_prompt": "Investigate and fix the cause of failed network requests to ensure proper functionality",
+          "confidence": 80
+        },
+        {
+          "severity": "low",
+          "category": "content",
+          "title": "Duplicate navigation links",
+          "description": "Duplicate navigation links with same text and href",
+          "fix_prompt": "Remove duplicate navigation links to improve accessibility and user experience",
+          "confidence": 80
+        },
+        {
+          "severity": "low",
+          "category": "accessibility",
+          "title": "Missing alt text for images",
+          "description": "Images are missing alt text, which can affect screen reader users",
+          "fix_prompt": "Add descriptive alt text to all images to improve accessibility",
+          "confidence": 80
+        }
+      ],
+      "summary": "The page has some layout inconsistencies, functionality issues, and accessibility concerns that need to be addressed. Overall, the page appears to be mostly functional but requires some improvements to provide a better user experience.",
+      "bundled_fix_prompt": "I ran a reliability audit on https://stripe.com/ and found the following issues.\nPlease fix all of them:\n\n1. [LOW] Inconsistent button styling\n   Fix: Standardize button styles to have consistent padding, font size, and color scheme\n\n2. [MEDIUM] Failed network requests\n   Fix: Investigate and fix the cause of failed network requests to ensure proper functionality\n\n3. [LOW] Duplicate navigation links\n   Fix: Remove duplicate navigation links to improve accessibility and user experience\n\n4. [LOW] Missing alt text for images\n   Fix: Add descriptive alt text to all images to improve accessibility\n\nAfter fixing all issues, make sure the site works correctly on both desktop (1280px) and mobile (390px) viewports.\n\nJourney context:\nState context: {\"base_url\": \"https://stripe.com/\", \"current_url\": \"https://stripe.com/nl/pricing\", \"auth\": {}, \"generated_credentials\": {}, \"inferred_context\": {\"app_type\": \"marketing_site\", \"features\": [\"pricing\", \"features\", \"contact\"], \"primary_goal\": \"explore marketing paths\", \"site_description\": \"Payments infrastructure marketing site\"}, \"items\": {}, \"recovery_counters\": {}, \"step_history\": [{\"goal\": \"reach_pricing\", \"url\": \"https://stripe.com/nl/pricing\", \"verification_success\": true}]}\nJourney: pricing_navigation\n- Step pricing page link: passed | delta: URL changed from https://stripe.com/nl to https://stripe.com/nl/pricing, New text appeared: 'Abonnementsbeheer', New text appeared: 'Authorization Boost', New text appeared: 'Autom. omzetbelasting + btw'\nJourney: features_navigation\n- Step features or product page link: passed | delta: New text appeared: 'Accepteer en optimaliseer betalingen, online en persoonl', New text appeared: 'Wereldwijd bbp dat draait op Stripe: 1,61834489%'\nJourney: contact_navigation\n- Step contact or request demo link: passed | delta: New text appeared: 'Accepteer en optimaliseer betalingen, online en persoonl', New text appeared: 'Wereldwijd bbp dat draait op Stripe: 1,61834493%'",
+      "journey_timeline": [
+        {
+          "journey": "pricing_navigation",
+          "status": "PASSED",
+          "failed_step": null,
+          "reason": null,
+          "steps": [
+            {
+              "step": "pricing page link",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [
+                "URL changed from https://stripe.com/nl to https://stripe.com/nl/pricing",
+                "New text appeared: 'Abonnementsbeheer'",
+                "New text appeared: 'Authorization Boost'",
+                "New text appeared: 'Autom. omzetbelasting + btw'"
+              ],
+              "recovery_attempts": [
+                {
+                  "choke_point": "before_action",
+                  "blocker_type": "unknown_blocker",
+                  "action_taken": "clicked_accept",
+                  "success": false,
+                  "selector_used": "button:has-text('Accept')",
+                  "notes": "Unknown Blocker detected but could not be fully dismissed"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "journey": "features_navigation",
+          "status": "PASSED",
+          "failed_step": null,
+          "reason": null,
+          "steps": [
+            {
+              "step": "features or product page link",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [
+                "New text appeared: 'Accepteer en optimaliseer betalingen, online en persoonl'",
+                "New text appeared: 'Wereldwijd bbp dat draait op Stripe: 1,61834489%'"
+              ],
+              "recovery_attempts": [
+                {
+                  "choke_point": "before_action",
+                  "blocker_type": "unknown_blocker",
+                  "action_taken": "clicked_accept",
+                  "success": false,
+                  "selector_used": "button:has-text('Accept')",
+                  "notes": "Unknown Blocker detected but could not be fully dismissed"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "journey": "contact_navigation",
+          "status": "PASSED",
+          "failed_step": null,
+          "reason": null,
+          "steps": [
+            {
+              "step": "contact or request demo link",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [
+                "New text appeared: 'Accepteer en optimaliseer betalingen, online en persoonl'",
+                "New text appeared: 'Wereldwijd bbp dat draait op Stripe: 1,61834493%'"
+              ],
+              "recovery_attempts": [
+                {
+                  "choke_point": "before_action",
+                  "blocker_type": "unknown_blocker",
+                  "action_taken": "clicked_accept",
+                  "success": false,
+                  "selector_used": "button:has-text('Accept')",
+                  "notes": "Unknown Blocker detected but could not be fully dismissed"
+                },
+                {
+                  "choke_point": "after_failure",
+                  "blocker_type": "unknown_blocker",
+                  "action_taken": "clicked_accept",
+                  "success": false,
+                  "selector_used": "button:has-text('Accept')",
+                  "notes": "Unknown Blocker detected but could not be fully dismissed"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "step_results": [
+        {
+          "step_name": "pricing page link",
+          "goal": "reach_pricing",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": [
+              {
+                "type": "click",
+                "intent": "pricing link",
+                "selectors": [
+                  "a[href*='pricing']"
+                ],
+                "role": "link",
+                "name": "Pricing",
+                "value": null
+              }
+            ]
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [
+              {
+                "type": "url_contains",
+                "value": "pricing",
+                "priority": "high",
+                "required": true
+              }
+            ],
+            "failed_signals": [],
+            "delta_summary": [
+              "URL changed from https://stripe.com/nl to https://stripe.com/nl/pricing",
+              "New text appeared: 'Abonnementsbeheer'",
+              "New text appeared: 'Authorization Boost'",
+              "New text appeared: 'Autom. omzetbelasting + btw'"
+            ],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "URL changed from https://stripe.com/nl to https://stripe.com/nl/pricing",
+            "New text appeared: 'Abonnementsbeheer'",
+            "New text appeared: 'Authorization Boost'",
+            "New text appeared: 'Autom. omzetbelasting + btw'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_accept",
+              "success": false,
+              "selector_used": "button:has-text('Accept')",
+              "notes": "Unknown Blocker detected but could not be fully dismissed"
+            }
+          ],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Unknown Blocker detected but could not be fully dismissed",
+            "Action error overruled by success signals: Could not resolve action candidate: see pricing link"
+          ],
+          "before_snapshot": {
+            "url": "https://stripe.com/nl",
+            "title": "Stripe | Financi\u00eble infrastructuur voor meer omzet",
+            "text_snippet": "Producten\nOplossingen\nDevelopers\nBronnen\nTarieven\nAanmelden\nAanmelden\nContact opnemen met sales\nWereldwijd bbp dat draait op Stripe: 1,61834480%\n1,61834481%\nFinanci\u00eble infrastructuur om je omzet te laten groeien. Ontvang betalingen, bied financi\u00eble diensten aan en implementeer je eigen verdienmodellen, van je eerste transactie tot je miljardste.\nFinanci\u00eble infrastructuur om je omzet te laten groeien. Ontvang betalingen, bied financi\u00eble diensten aan en implementeer je eigen verdienmodellen, van je eerste transactie tot je miljardste.\nAan de slag\nRegistreer met Google\nFlexibele oplossingen voor elk businessmodel.\n\nLaat je onderneming groeien met uitgebreide betalings- en financi\u00eble tools, ontwikkeld om afzonderlijk of samen te werken.\n\nAccepteer en optimaliseer betalingen, online en persoonl"
+          },
+          "after_snapshot": {
+            "url": "https://stripe.com/nl/pricing",
+            "title": "Tarieven en kosten",
+            "text_snippet": "Producten\nOplossingen\nDevelopers\nBronnen\nTarieven\nAanmelden\u00a0\nNeem contact op\u00a0\nBetalingen\nPayments \u00a0\n\nOnline betalingen\n\nManaged Payments \u00a0\n\nMerchant of record-oplossing\n\nPayment Links \u00a0\n\nBetalingen zonder code\n\nCheckout \u00a0\n\nKant-en-klaar betaalformulier\n\nElements \u00a0\n\nFlexibele UI-componenten\n\nBetaalmethoden \u00a0\n\nToegang tot meer dan 100\n\nTerminal \u00a0\n\nFysieke betalingen\n\nRadar \u00a0\n\nFraudepreventie\n\nAuthorization Boost \u00a0\n\nOptimaliseer de acceptatie\n\nLink \u00a0\n\nVersneld afrekenen\n\nOmzet\nBilling \u00a0\n\nAbonnementsbeheer\n\nUsage-based billing \u00a0\n\nFacturatie naar gebruik\n\nInvoicing \u00a0\n\nEenmalig of terugkerend\n\nTax \u00a0\n\nAutom. omzetbelasting + btw\n\nRevenue Recognition \u00a0\n\nAutomatische boekhouding\n\nStripe Sigma \u00a0\n\nRapporten op maat\n\nData Pipeline \u00a0\n\nGegevenssynchronisatie\n\nGeldbeheer\nGlobal Payouts \u00a0\n\nUitbetalingen a"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "features or product page link",
+          "goal": "reach_features",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": []
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [],
+            "failed_signals": [],
+            "delta_summary": [
+              "New text appeared: 'Accepteer en optimaliseer betalingen, online en persoonl'",
+              "New text appeared: 'Wereldwijd bbp dat draait op Stripe: 1,61834489%'"
+            ],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "New text appeared: 'Accepteer en optimaliseer betalingen, online en persoonl'",
+            "New text appeared: 'Wereldwijd bbp dat draait op Stripe: 1,61834489%'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_accept",
+              "success": false,
+              "selector_used": "button:has-text('Accept')",
+              "notes": "Unknown Blocker detected but could not be fully dismissed"
+            }
+          ],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Unknown Blocker detected but could not be fully dismissed",
+            "Action error overruled by success signals: Could not resolve action candidate: features link"
+          ],
+          "before_snapshot": {
+            "url": "https://stripe.com/nl",
+            "title": "Stripe | Financi\u00eble infrastructuur voor meer omzet",
+            "text_snippet": "Producten\nOplossingen\nDevelopers\nBronnen\nTarieven\nAanmelden\nAanmelden\nContact opnemen met sales\nWereldwijd bbp dat draait op Stripe: \n1,61834489%\nFinanci\u00eble infrastructuur om je omzet te laten groeien. Ontvang betalingen, bied financi\u00eble diensten aan en implementeer je eigen verdienmodellen, van je eerste transactie tot je miljardste.\nFinanci\u00eble infrastructuur om je omzet te laten groeien. Ontvang betalingen, bied financi\u00eble diensten aan en implementeer je eigen verdienmodellen, van je eerste transactie tot je miljardste.\nAan de slag\nRegistreer met Google\nFlexibele oplossingen voor elk businessmodel.\n\nLaat je onderneming groeien met uitgebreide betalings- en financi\u00eble tools, ontwikkeld om afzonderlijk of samen te werken.\n\nAccepteer en optimaliseer betalingen, online en persoonlijk\nGebruik"
+          },
+          "after_snapshot": {
+            "url": "https://stripe.com/nl",
+            "title": "Stripe | Financi\u00eble infrastructuur voor meer omzet",
+            "text_snippet": "Producten\nOplossingen\nDevelopers\nBronnen\nTarieven\nAanmelden\nAanmelden\nContact opnemen met sales\nWereldwijd bbp dat draait op Stripe: 1,61834489%\n1,61834489%\nFinanci\u00eble infrastructuur om je omzet te laten groeien. Ontvang betalingen, bied financi\u00eble diensten aan en implementeer je eigen verdienmodellen, van je eerste transactie tot je miljardste.\nFinanci\u00eble infrastructuur om je omzet te laten groeien. Ontvang betalingen, bied financi\u00eble diensten aan en implementeer je eigen verdienmodellen, van je eerste transactie tot je miljardste.\nAan de slag\nRegistreer met Google\nFlexibele oplossingen voor elk businessmodel.\n\nLaat je onderneming groeien met uitgebreide betalings- en financi\u00eble tools, ontwikkeld om afzonderlijk of samen te werken.\n\nAccepteer en optimaliseer betalingen, online en persoonl"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "contact or request demo link",
+          "goal": "reach_contact_or_demo",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": []
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [
+              {
+                "type": "text_present",
+                "value": "contact",
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [],
+            "delta_summary": [
+              "New text appeared: 'Accepteer en optimaliseer betalingen, online en persoonl'",
+              "New text appeared: 'Wereldwijd bbp dat draait op Stripe: 1,61834493%'"
+            ],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "New text appeared: 'Accepteer en optimaliseer betalingen, online en persoonl'",
+            "New text appeared: 'Wereldwijd bbp dat draait op Stripe: 1,61834493%'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_accept",
+              "success": false,
+              "selector_used": "button:has-text('Accept')",
+              "notes": "Unknown Blocker detected but could not be fully dismissed"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_accept",
+              "success": false,
+              "selector_used": "button:has-text('Accept')",
+              "notes": "Unknown Blocker detected but could not be fully dismissed"
+            }
+          ],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Unknown Blocker detected but could not be fully dismissed",
+            "Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a[href*='contact']\").first\n    - locator resolved to <a href=\"/nl/contact/sales\" data-analytics-label=\"global_nav__contact_sales\" class=\"hds-button hds-button--secondary-on-quiet\">Contact opnemen met sales</a>\n  - attempting"
+          ],
+          "before_snapshot": {
+            "url": "https://stripe.com/nl",
+            "title": "Stripe | Financi\u00eble infrastructuur voor meer omzet",
+            "text_snippet": "Producten\nOplossingen\nDevelopers\nBronnen\nTarieven\nAanmelden\nAanmelden\nContact opnemen met sales\nWereldwijd bbp dat draait op Stripe: \n1,61834493%\nFinanci\u00eble infrastructuur om je omzet te laten groeien. Ontvang betalingen, bied financi\u00eble diensten aan en implementeer je eigen verdienmodellen, van je eerste transactie tot je miljardste.\nFinanci\u00eble infrastructuur om je omzet te laten groeien. Ontvang betalingen, bied financi\u00eble diensten aan en implementeer je eigen verdienmodellen, van je eerste transactie tot je miljardste.\nAan de slag\nRegistreer met Google\nFlexibele oplossingen voor elk businessmodel.\n\nLaat je onderneming groeien met uitgebreide betalings- en financi\u00eble tools, ontwikkeld om afzonderlijk of samen te werken.\n\nAccepteer en optimaliseer betalingen, online en persoonlijk\nGebruik"
+          },
+          "after_snapshot": {
+            "url": "https://stripe.com/nl",
+            "title": "Stripe | Financi\u00eble infrastructuur voor meer omzet",
+            "text_snippet": "Producten\nOplossingen\nDevelopers\nBronnen\nTarieven\nAanmelden\nAanmelden\nContact opnemen met sales\nWereldwijd bbp dat draait op Stripe: 1,61834493%\n1,61834493%\nFinanci\u00eble infrastructuur om je omzet te laten groeien. Ontvang betalingen, bied financi\u00eble diensten aan en implementeer je eigen verdienmodellen, van je eerste transactie tot je miljardste.\nFinanci\u00eble infrastructuur om je omzet te laten groeien. Ontvang betalingen, bied financi\u00eble diensten aan en implementeer je eigen verdienmodellen, van je eerste transactie tot je miljardste.\nAan de slag\nRegistreer met Google\nFlexibele oplossingen voor elk businessmodel.\n\nLaat je onderneming groeien met uitgebreide betalings- en financi\u00eble tools, ontwikkeld om afzonderlijk of samen te werken.\n\nAccepteer en optimaliseer betalingen, online en persoonl"
+          },
+          "screenshot_path": null
+        }
+      ],
+      "analysis_limited": false,
+      "video_url": "/agentic-qa/6c004480-cf06-47ed-aba1-f301a2464c5e/video",
+      "desktop_screenshot_url": "/agentic-qa/6c004480-cf06-47ed-aba1-f301a2464c5e/screenshot/desktop",
+      "mobile_screenshot_url": "/agentic-qa/6c004480-cf06-47ed-aba1-f301a2464c5e/screenshot/mobile",
+      "created_at": "2026-03-19T22:01:31.436809+00:00"
+    }
+  },
+  {
+    "group": "marketing",
+    "name": "Linear",
+    "url": "https://linear.app/",
+    "expected_type": "marketing_site",
+    "predicted_type": "marketing_site",
+    "classification_correct": true,
+    "final_status": "done",
+    "journey_result": "pricing_navigation:PASSED / features_navigation:PASSED / contact_navigation:PASSED",
+    "journey_count": 3,
+    "recovery_count": 4,
+    "recovery_types": "modal",
+    "truth_over_exception_count": 2,
+    "notes": "Action error overruled by success signals: Could not resolve action candidate: see pricing link | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a[href*='product']\").first\n    - locator resolved to <a rel=\"noopener\" class=\"Changelog_link__IM2Ji Link_root__cNtak\" href=\"/changelog/2026-02-05-linear-mcp-for-product-management\">\u2026</a>\n  - attempting click action\n    2 \u00d7 w",
+    "audit_id": "1dd1d46c-7e15-4c57-a7c9-72f17de95802",
+    "raw_status": {
+      "audit_id": "1dd1d46c-7e15-4c57-a7c9-72f17de95802",
+      "status": "done",
+      "url": "https://linear.app/",
+      "tier": "deep",
+      "score": 90,
+      "confidence": 90,
+      "findings": [
+        {
+          "severity": "low",
+          "category": "performance",
+          "title": "Blocked network requests",
+          "description": "Several network requests are blocked or aborted, which may impact page functionality.",
+          "fix_prompt": "Investigate and resolve the blocked and aborted network requests to ensure all resources load properly.",
+          "confidence": 90
+        },
+        {
+          "severity": "low",
+          "category": "accessibility",
+          "title": "Missing alt text for images",
+          "description": "Some images may not have alt text, which can affect accessibility for screen readers.",
+          "fix_prompt": "Add alt text to all images to improve accessibility.",
+          "confidence": 90
+        },
+        {
+          "severity": "medium",
+          "category": "layout",
+          "title": "Inconsistent font sizes",
+          "description": "Font sizes appear inconsistent across the page, which may affect readability.",
+          "fix_prompt": "Standardize font sizes across the page to improve readability.",
+          "confidence": 90
+        }
+      ],
+      "summary": "The page appears to be mostly functional but has some performance and accessibility issues. There are blocked network requests and inconsistent font sizes, which should be addressed to improve the user experience.",
+      "bundled_fix_prompt": "I ran a reliability audit on https://linear.app/ and found the following issues.\nPlease fix all of them:\n\n1. [LOW] Blocked network requests\n   Fix: Investigate and resolve the blocked and aborted network requests to ensure all resources load properly.\n\n2. [LOW] Missing alt text for images\n   Fix: Add alt text to all images to improve accessibility.\n\n3. [MEDIUM] Inconsistent font sizes\n   Fix: Standardize font sizes across the page to improve readability.\n\nAfter fixing all issues, make sure the site works correctly on both desktop (1280px) and mobile (390px) viewports.\n\nJourney context:\nState context: {\"base_url\": \"https://linear.app/\", \"current_url\": \"https://linear.app/pricing\", \"auth\": {}, \"generated_credentials\": {}, \"inferred_context\": {\"app_type\": \"marketing_site\", \"features\": [\"pricing\", \"features\", \"contact\"], \"primary_goal\": \"explore marketing paths\", \"site_description\": \"Project management SaaS marketing site\"}, \"items\": {}, \"recovery_counters\": {}, \"step_history\": [{\"goal\": \"reach_pricing\", \"url\": \"https://linear.app/pricing\", \"verification_success\": true}]}\nJourney: pricing_navigation\n- Step pricing page link: passed | delta: URL changed from https://linear.app/ to https://linear.app/pricing, New text appeared: '$10 per user/month', New text appeared: '$16 per user/month', New text appeared: '2 teams'\nJourney: features_navigation\n- Step features or product page link: passed\nJourney: contact_navigation\n- Step contact or request demo link: passed | delta: URL changed from https://linear.app/ to https://linear.app/contact/sales, New text appeared: '1-20', New text appeared: '100-500', New text appeared: '1000-5000'",
+      "journey_timeline": [
+        {
+          "journey": "pricing_navigation",
+          "status": "PASSED",
+          "failed_step": null,
+          "reason": null,
+          "steps": [
+            {
+              "step": "pricing page link",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [
+                "URL changed from https://linear.app/ to https://linear.app/pricing",
+                "New text appeared: '$10 per user/month'",
+                "New text appeared: '$16 per user/month'",
+                "New text appeared: '2 teams'"
+              ],
+              "recovery_attempts": [
+                {
+                  "choke_point": "before_action",
+                  "blocker_type": "modal",
+                  "action_taken": "clicked_close",
+                  "success": false,
+                  "selector_used": "button[aria-label*='close' i]",
+                  "notes": "Modal detected but could not be fully dismissed"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "journey": "features_navigation",
+          "status": "PASSED",
+          "failed_step": null,
+          "reason": null,
+          "steps": [
+            {
+              "step": "features or product page link",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [],
+              "recovery_attempts": [
+                {
+                  "choke_point": "before_action",
+                  "blocker_type": "modal",
+                  "action_taken": "clicked_close",
+                  "success": false,
+                  "selector_used": "button[aria-label*='close' i]",
+                  "notes": "Modal detected but could not be fully dismissed"
+                },
+                {
+                  "choke_point": "after_failure",
+                  "blocker_type": "modal",
+                  "action_taken": "clicked_close",
+                  "success": false,
+                  "selector_used": "button[aria-label*='close' i]",
+                  "notes": "Modal detected but could not be fully dismissed"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "journey": "contact_navigation",
+          "status": "PASSED",
+          "failed_step": null,
+          "reason": null,
+          "steps": [
+            {
+              "step": "contact or request demo link",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [
+                "URL changed from https://linear.app/ to https://linear.app/contact/sales",
+                "New text appeared: '1-20'",
+                "New text appeared: '100-500'",
+                "New text appeared: '1000-5000'"
+              ],
+              "recovery_attempts": [
+                {
+                  "choke_point": "before_action",
+                  "blocker_type": "modal",
+                  "action_taken": "clicked_close",
+                  "success": false,
+                  "selector_used": "button[aria-label*='close' i]",
+                  "notes": "Modal detected but could not be fully dismissed"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "step_results": [
+        {
+          "step_name": "pricing page link",
+          "goal": "reach_pricing",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": [
+              {
+                "type": "click",
+                "intent": "pricing link",
+                "selectors": [
+                  "a[href*='pricing']"
+                ],
+                "role": "link",
+                "name": "Pricing",
+                "value": null
+              }
+            ]
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [
+              {
+                "type": "url_contains",
+                "value": "pricing",
+                "priority": "high",
+                "required": true
+              },
+              {
+                "type": "text_present",
+                "value": "pricing",
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [],
+            "delta_summary": [
+              "URL changed from https://linear.app/ to https://linear.app/pricing",
+              "New text appeared: '$10 per user/month'",
+              "New text appeared: '$16 per user/month'",
+              "New text appeared: '2 teams'"
+            ],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "URL changed from https://linear.app/ to https://linear.app/pricing",
+            "New text appeared: '$10 per user/month'",
+            "New text appeared: '$16 per user/month'",
+            "New text appeared: '2 teams'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "modal",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "button[aria-label*='close' i]",
+              "notes": "Modal detected but could not be fully dismissed"
+            }
+          ],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Modal detected but could not be fully dismissed",
+            "Action error overruled by success signals: Could not resolve action candidate: see pricing link"
+          ],
+          "before_snapshot": {
+            "url": "https://linear.app/",
+            "title": "Linear \u2013 The system for product development",
+            "text_snippet": "Skip to content \u2192\nProduct\nResources\nCustomers\nPricing\nNow\nContact\nLog in\nSign up\nThe product development\nsystem for teams and agents\nThe product development system for teams and agents\n\nPurpose-built for planning and building products. Designed for the AI era.\n\nNew\nLinear Diffs (Beta) \u2192\nLinear\nInbox\nMy issues\nReviews\nPulse\nWorkspace\nInitiatives\nProjects\nMore\nFavorites\nFaster app launch\nAgent tasks\nUI Refresh\nAgents Insights\nFaster app launch\n02\n/\n145\nFaster app launch\n\nRender UI before vehicle_state sync when minimum required state is present, instead of blocking on full refresh during iOS startup.\n\nActivity\nLinear created the issue via Slack on behalf of karri \u00b7 2min ago\nTriage Intelligence added the label Performance and iOS \u00b7 2min ago\nkarri\n\u00b7 4 min ago\nRight now we show a spinner foreve"
+          },
+          "after_snapshot": {
+            "url": "https://linear.app/pricing",
+            "title": "Pricing \u2013 Linear",
+            "text_snippet": "Skip to content \u2192\nProduct\nResources\nCustomers\nPricing\nNow\nContact\nLog in\nSign up\nPricing\nFree\n$0\nFree for everyone\nUnlimited members\n2 teams\n250 issues\nSlack & GitHub access\nAI agents\nGet started\nBasic\n$10 per user/month\nBilled yearly\nAll Free features +\n5 teams\nUnlimited issues\nUnlimited file uploads\nAdmin roles\nGet started\nBusiness\n$16 per user/month\nBilled yearly\nAll Basic features +\nUnlimited teams\nPrivate teams and guests\nTriage Intelligence\nLinear Insights\nLinear Asks\nZendesk and Intercom integrations\nGet started\nContact sales\nEnterprise\nCustom\nAnnual billing only\nAll Business features +\nInvoice/PO billing\nSAML and SCIM\nGranular admin controls\nEnterprise-grade security\nAdvanced org modeling\nMigration & onboarding support\nPriority support\nAccount management\nContact sales\n\nTrusted by m"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "features or product page link",
+          "goal": "reach_features",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": [
+              {
+                "type": "click",
+                "intent": "features link",
+                "selectors": [
+                  "a[href*='features']",
+                  "nav a:has-text('Features')"
+                ],
+                "role": "link",
+                "name": "Features",
+                "value": null
+              }
+            ]
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [],
+            "failed_signals": [],
+            "delta_summary": [],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "modal",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "button[aria-label*='close' i]",
+              "notes": "Modal detected but could not be fully dismissed"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "modal",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "button[aria-label*='close' i]",
+              "notes": "Modal detected but could not be fully dismissed"
+            }
+          ],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Modal detected but could not be fully dismissed",
+            "Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a[href*='product']\").first\n    - locator resolved to <a rel=\"noopener\" class=\"Changelog_link__IM2Ji Link_root__cNtak\" href=\"/changelog/2026-02-05-linear-mcp-for-product-management\">\u2026</a>\n  - attempting click action\n    2 \u00d7 w"
+          ],
+          "before_snapshot": {
+            "url": "https://linear.app/",
+            "title": "Linear \u2013 The system for product development",
+            "text_snippet": "Skip to content \u2192\nProduct\nResources\nCustomers\nPricing\nNow\nContact\nLog in\nSign up\nThe product development\nsystem for teams and agents\nThe product development system for teams and agents\n\nPurpose-built for planning and building products. Designed for the AI era.\n\nNew\nLinear Diffs (Beta) \u2192\nLinear\nInbox\nMy issues\nReviews\nPulse\nWorkspace\nInitiatives\nProjects\nMore\nFavorites\nFaster app launch\nAgent tasks\nUI Refresh\nAgents Insights\nFaster app launch\n02\n/\n145\nFaster app launch\n\nRender UI before vehicle_state sync when minimum required state is present, instead of blocking on full refresh during iOS startup.\n\nActivity\nLinear created the issue via Slack on behalf of karri \u00b7 2min ago\nTriage Intelligence added the label Performance and iOS \u00b7 2min ago\nkarri\n\u00b7 4 min ago\nRight now we show a spinner foreve"
+          },
+          "after_snapshot": {
+            "url": "https://linear.app/",
+            "title": "Linear \u2013 The system for product development",
+            "text_snippet": "Skip to content \u2192\nProduct\nResources\nCustomers\nPricing\nNow\nContact\nLog in\nSign up\nThe product development\nsystem for teams and agents\nThe product development system for teams and agents\n\nPurpose-built for planning and building products. Designed for the AI era.\n\nNew\nLinear Diffs (Beta) \u2192\nLinear\nInbox\nMy issues\nReviews\nPulse\nWorkspace\nInitiatives\nProjects\nMore\nFavorites\nFaster app launch\nAgent tasks\nUI Refresh\nAgents Insights\nFaster app launch\n02\n/\n145\nFaster app launch\n\nRender UI before vehicle_state sync when minimum required state is present, instead of blocking on full refresh during iOS startup.\n\nActivity\nLinear created the issue via Slack on behalf of karri \u00b7 2min ago\nTriage Intelligence added the label Performance and iOS \u00b7 2min ago\nkarri\n\u00b7 4 min ago\nRight now we show a spinner foreve"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "contact or request demo link",
+          "goal": "reach_contact_or_demo",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": [
+              {
+                "type": "click",
+                "intent": "contact link",
+                "selectors": [
+                  "a[href*='contact']",
+                  "a:has-text('Contact')"
+                ],
+                "role": "link",
+                "name": "Contact",
+                "value": null
+              },
+              {
+                "type": "click",
+                "intent": "request demo link",
+                "selectors": [
+                  "a[href*='demo']",
+                  "a:has-text('Request demo')",
+                  "a:has-text('Talk to sales')"
+                ],
+                "role": "link",
+                "name": "Request demo",
+                "value": null
+              }
+            ]
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [
+              {
+                "type": "url_contains",
+                "value": "contact",
+                "priority": "high",
+                "required": false
+              },
+              {
+                "type": "text_present",
+                "value": "contact",
+                "priority": "medium",
+                "required": false
+              },
+              {
+                "type": "element_visible",
+                "value": {
+                  "selector": "form"
+                },
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [],
+            "delta_summary": [
+              "URL changed from https://linear.app/ to https://linear.app/contact/sales",
+              "New text appeared: '1-20'",
+              "New text appeared: '100-500'",
+              "New text appeared: '1000-5000'"
+            ],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "URL changed from https://linear.app/ to https://linear.app/contact/sales",
+            "New text appeared: '1-20'",
+            "New text appeared: '100-500'",
+            "New text appeared: '1000-5000'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "modal",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "button[aria-label*='close' i]",
+              "notes": "Modal detected but could not be fully dismissed"
+            }
+          ],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Modal detected but could not be fully dismissed"
+          ],
+          "before_snapshot": {
+            "url": "https://linear.app/",
+            "title": "Linear \u2013 The system for product development",
+            "text_snippet": "Skip to content \u2192\nProduct\nResources\nCustomers\nPricing\nNow\nContact\nLog in\nSign up\nThe product development\nsystem for teams and agents\nThe product development system for teams and agents\n\nPurpose-built for planning and building products. Designed for the AI era.\n\nNew\nLinear Diffs (Beta) \u2192\nLinear\nInbox\nMy issues\nReviews\nPulse\nWorkspace\nInitiatives\nProjects\nMore\nFavorites\nFaster app launch\nAgent tasks\nUI Refresh\nAgents Insights\nFaster app launch\n02\n/\n145\nFaster app launch\n\nRender UI before vehicle_state sync when minimum required state is present, instead of blocking on full refresh during iOS startup.\n\nActivity\nLinear created the issue via Slack on behalf of karri \u00b7 2min ago\nTriage Intelligence added the label Performance and iOS \u00b7 2min ago\nkarri\n\u00b7 4 min ago\nRight now we show a spinner foreve"
+          },
+          "after_snapshot": {
+            "url": "https://linear.app/contact/sales",
+            "title": "Talk to sales \u2013 Linear",
+            "text_snippet": "Skip to content \u2192\nProduct\nResources\nCustomers\nPricing\nNow\nContact\nLog in\nSign up\nContact sales\nRequest a demo\nLearn which plan is right for your team\nGet onboarding help\nTechnical issues or product questions?\nContact support\nTell us how we can help\nFull name\nWork email\nCompany size\n1-20\n20-100\n100-500\n500-1000\n1000-5000\n5000+\nTell us about your requirements\nYou can also email us at sales@linear.app\nSend message\nProduct\nIntake\nPlan\nBuild\nDiffs\nMonitor\nPricing\nSecurity\nFeatures\nAsks\nAgents\nCustomer Requests\nInsights\nMobile\nIntegrations\nChangelog\nCompany\nAbout\nCustomers\nCareers\nBlog\nMethod\nQuality\nBrand\nResources\nSwitch\nDownload\nDocumentation\nDevelopers\nStatus\nEnterprise\nStartups\nConnect\nContact us\nCommunity\nX (Twitter)\nGitHub\nYouTube\nPrivacy\nTerms\nDPA"
+          },
+          "screenshot_path": null
+        }
+      ],
+      "analysis_limited": false,
+      "video_url": "/agentic-qa/1dd1d46c-7e15-4c57-a7c9-72f17de95802/video",
+      "desktop_screenshot_url": "/agentic-qa/1dd1d46c-7e15-4c57-a7c9-72f17de95802/screenshot/desktop",
+      "mobile_screenshot_url": "/agentic-qa/1dd1d46c-7e15-4c57-a7c9-72f17de95802/screenshot/mobile",
+      "created_at": "2026-03-19T22:03:26.893754+00:00"
+    }
+  },
+  {
+    "group": "marketing",
+    "name": "Notion",
+    "url": "https://www.notion.so/",
+    "expected_type": "marketing_site",
+    "predicted_type": "marketing_site",
+    "classification_correct": true,
+    "final_status": "done",
+    "journey_result": "pricing_navigation:PASSED / features_navigation:PASSED / contact_navigation:PASSED",
+    "journey_count": 3,
+    "recovery_count": 2,
+    "recovery_types": "unknown_blocker",
+    "truth_over_exception_count": 3,
+    "notes": "Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('See pricing')\").first\n | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for get_by_text(re.compile(r\"Features\", re.IGNORECASE)).first\n    - locator resolved to <h2 class=\"semanticTypography_semanticTypography__mWJkv semanticTypography_variantNavigationHeading__uo7yO globalNavigation_desktopDropDownNavigation | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a[href*='demo']\").first\n    - locator resolved to <a href=\"/product/demos\" class=\"navItem_navItem__qrlp3\">\u2026</a>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is not",
+    "audit_id": "9b32a022-6917-4aa0-a4bb-cb1630993933",
+    "raw_status": {
+      "audit_id": "9b32a022-6917-4aa0-a4bb-cb1630993933",
+      "status": "done",
+      "url": "https://www.notion.so/",
+      "tier": "deep",
+      "score": 94,
+      "confidence": 95,
+      "findings": [
+        {
+          "severity": "low",
+          "category": "performance",
+          "title": "Failed network requests",
+          "description": "Three video assets failed to load due to 'net::ERR_ABORTED'. This may impact page performance and user experience.",
+          "fix_prompt": "Check the video asset URLs and ensure they are correct and accessible. Consider optimizing or replacing the assets to prevent similar errors.",
+          "confidence": 95
+        },
+        {
+          "severity": "low",
+          "category": "content",
+          "title": "Console error",
+          "description": "A console error message indicates that the 'Provider's accounts list is empty.' This may not directly impact the user experience but could indicate an issue with the application's functionality.",
+          "fix_prompt": "Investigate the cause of the 'Provider's accounts list is empty' error and address it to prevent potential issues.",
+          "confidence": 95
+        },
+        {
+          "severity": "low",
+          "category": "layout",
+          "title": "Cookie consent banner",
+          "description": "The cookie consent banner appears on the page, which may be expected behavior. However, ensure that it complies with relevant regulations and does not obstruct the user experience.",
+          "fix_prompt": "Review and configure the cookie consent banner to ensure compliance and optimal user experience.",
+          "confidence": 95
+        }
+      ],
+      "summary": "The Notion website generally appears to be well-designed and functional, but there are some minor issues related to performance and content that should be addressed.",
+      "bundled_fix_prompt": "I ran a reliability audit on https://www.notion.so/ and found the following issues.\nPlease fix all of them:\n\n1. [LOW] Failed network requests\n   Fix: Check the video asset URLs and ensure they are correct and accessible. Consider optimizing or replacing the assets to prevent similar errors.\n\n2. [LOW] Console error\n   Fix: Investigate the cause of the 'Provider's accounts list is empty' error and address it to prevent potential issues.\n\n3. [LOW] Cookie consent banner\n   Fix: Review and configure the cookie consent banner to ensure compliance and optimal user experience.\n\nAfter fixing all issues, make sure the site works correctly on both desktop (1280px) and mobile (390px) viewports.\n\nJourney context:\nState context: {\"base_url\": \"https://www.notion.so/\", \"current_url\": \"https://www.notion.com/pricing\", \"auth\": {}, \"generated_credentials\": {}, \"inferred_context\": {\"app_type\": \"marketing_site\", \"features\": [\"pricing\", \"features\", \"contact\"], \"primary_goal\": \"explore marketing paths\", \"site_description\": \"Workspace SaaS marketing site\"}, \"items\": {}, \"recovery_counters\": {}, \"step_history\": [{\"goal\": \"reach_pricing\", \"url\": \"https://www.notion.com/pricing\", \"verification_success\": true}]}\nJourney: pricing_navigation\n- Step pricing page link: passed | delta: URL changed from https://www.notion.com/ to https://www.notion.com/pricing, New text appeared: 'Basic forms', New text appeared: 'Basic integrations', New text appeared: 'Basic sites'\nJourney: features_navigation\n- Step features or product page link: passed\nJourney: contact_navigation\n- Step contact or request demo link: passed | delta: URL changed from https://www.notion.com/ to https://www.notion.com/contact-sales, New text appeared: '1-99 employees', New text appeared: '100-499 employees', New text appeared: '3000+ employees'",
+      "journey_timeline": [
+        {
+          "journey": "pricing_navigation",
+          "status": "PASSED",
+          "failed_step": null,
+          "reason": null,
+          "steps": [
+            {
+              "step": "pricing page link",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [
+                "URL changed from https://www.notion.com/ to https://www.notion.com/pricing",
+                "New text appeared: 'Basic forms'",
+                "New text appeared: 'Basic integrations'",
+                "New text appeared: 'Basic sites'"
+              ],
+              "recovery_attempts": [
+                {
+                  "choke_point": "before_action",
+                  "blocker_type": "unknown_blocker",
+                  "action_taken": "clicked_accept",
+                  "success": true,
+                  "selector_used": "button:has-text('Accept')",
+                  "notes": "Unknown Blocker detected and dismissed before action"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "journey": "features_navigation",
+          "status": "PASSED",
+          "failed_step": null,
+          "reason": null,
+          "steps": [
+            {
+              "step": "features or product page link",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [],
+              "recovery_attempts": [
+                {
+                  "choke_point": "after_failure",
+                  "blocker_type": "unknown_blocker",
+                  "action_taken": "clicked_accept",
+                  "success": true,
+                  "selector_used": "button:has-text('Accept')",
+                  "notes": "Unknown Blocker detected and cleared at after failure"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "journey": "contact_navigation",
+          "status": "PASSED",
+          "failed_step": null,
+          "reason": null,
+          "steps": [
+            {
+              "step": "contact or request demo link",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [
+                "URL changed from https://www.notion.com/ to https://www.notion.com/contact-sales",
+                "New text appeared: '1-99 employees'",
+                "New text appeared: '100-499 employees'",
+                "New text appeared: '3000+ employees'"
+              ],
+              "recovery_attempts": []
+            }
+          ]
+        }
+      ],
+      "step_results": [
+        {
+          "step_name": "pricing page link",
+          "goal": "reach_pricing",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": [
+              {
+                "type": "click",
+                "intent": "pricing link",
+                "selectors": [
+                  "a[href*='pricing']"
+                ],
+                "role": "link",
+                "name": "Pricing",
+                "value": null
+              }
+            ]
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [
+              {
+                "type": "url_contains",
+                "value": "pricing",
+                "priority": "high",
+                "required": true
+              },
+              {
+                "type": "text_present",
+                "value": "pricing",
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [],
+            "delta_summary": [
+              "URL changed from https://www.notion.com/ to https://www.notion.com/pricing",
+              "New text appeared: 'Basic forms'",
+              "New text appeared: 'Basic integrations'",
+              "New text appeared: 'Basic sites'"
+            ],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "URL changed from https://www.notion.com/ to https://www.notion.com/pricing",
+            "New text appeared: 'Basic forms'",
+            "New text appeared: 'Basic integrations'",
+            "New text appeared: 'Basic sites'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_accept",
+              "success": true,
+              "selector_used": "button:has-text('Accept')",
+              "notes": "Unknown Blocker detected and dismissed before action"
+            }
+          ],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Unknown Blocker detected and dismissed before action",
+            "Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('See pricing')\").first\n"
+          ],
+          "before_snapshot": {
+            "url": "https://www.notion.com/",
+            "title": "The AI workspace that works for you. | Notion",
+            "text_snippet": "Product\nAI\nSolutions\nResources\nEnterprise\nPricing\nRequest a demo\nLog in\nGet Notion free\nOne workspace. Zero busywork.\nNotion is where your teams and AI agents capture knowledge, find answers, and automate projects. Now a team of 7 feels like 70.\nGet Notion free\nRequest a demo\nPlay\n\nTrusted by top teams\n\nIntroducing Notion 3.0\nNotion Agent\n\nYou assign the tasks. Your Notion Agent does the work.\n\u2192\n\nHand off your busywork\n\nWhat used to take days in minutes. Tell it your goal and watch it work.\n\nCollaborates with your team\n\nIt's like having a built-in power user that works alongside your team.\n\nKnows everything you know\n\nSearches all your pages, messages, files, and the web to surface exactly what you need.\n\nPersonalized to you\n\nYour Agent learns how you work. You control everything from how i"
+          },
+          "after_snapshot": {
+            "url": "https://www.notion.com/pricing",
+            "title": "Notion Pricing Plans: Free, Plus, Business, & Enterprise.",
+            "text_snippet": "Product\nAI\nSolutions\nResources\nEnterprise\nPricing\nRequest a demo\nLog in\nGet Notion free\nOne tool to run your company.\nTrusted by teams at\nSelect payment mode:\nPay monthly\nPay yearly\nSave up to 20% with yearly\nPrice in\nEUR\nEssentials for staying organized.\nFree\n\u20ac0\nper member / month\n\nFor individuals to organize personal projects and life.\n\nSign up\n\nIncludes:\n\nTrial of Notion AI\nBasic forms\nBasic sites\nNotion Calendar\nNotion Mail (Syncs with Gmail)\nDatabases including subtasks, dependencies, custom properties and more\nPlus\n\u20ac9.50\nper member / month\n\nFor small teams and professionals to work together.\n\nGet started\n\nEverything in Free, and:\n\nTrial of Notion AI\nCustom forms\nCustom sites\nUnlimited charts\nUnlimited collaborative blocks\nUnlimited file uploads\nBasic integrations\nThe AI workspace for"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "features or product page link",
+          "goal": "reach_features",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": []
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [],
+            "failed_signals": [],
+            "delta_summary": [],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [],
+          "recovery_attempts": [
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_accept",
+              "success": true,
+              "selector_used": "button:has-text('Accept')",
+              "notes": "Unknown Blocker detected and cleared at after failure"
+            }
+          ],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Unknown Blocker detected and cleared at after failure",
+            "Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for get_by_text(re.compile(r\"Features\", re.IGNORECASE)).first\n    - locator resolved to <h2 class=\"semanticTypography_semanticTypography__mWJkv semanticTypography_variantNavigationHeading__uo7yO globalNavigation_desktopDropDownNavigation"
+          ],
+          "before_snapshot": {
+            "url": "https://www.notion.so/",
+            "title": "The AI workspace that works for you. | Notion",
+            "text_snippet": "Product\nAI\nSolutions\nResources\nEnterprise\nPricing\nRequest a demo\nLog in\nGet Notion free\nOne workspace. Zero busywork.\nNotion is where your teams and AI agents capture knowledge, find answers, and automate projects. Now a team of 7 feels like 70.\nGet Notion free\nRequest a demo\nPlay\n\nTrusted by top teams\n\nIntroducing Notion 3.0\nNotion Agent\n\nYou assign the tasks. Your Notion Agent does the work.\n\u2192\n\nHand off your busywork\n\nWhat used to take days in minutes. Tell it your goal and watch it work.\n\nCollaborates with your team\n\nIt's like having a built-in power user that works alongside your team.\n\nKnows everything you know\n\nSearches all your pages, messages, files, and the web to surface exactly what you need.\n\nPersonalized to you\n\nYour Agent learns how you work. You control everything from how i"
+          },
+          "after_snapshot": {
+            "url": "https://www.notion.so/",
+            "title": "The AI workspace that works for you. | Notion",
+            "text_snippet": "Product\nAI\nSolutions\nResources\nEnterprise\nPricing\nRequest a demo\nLog in\nGet Notion free\nOne workspace. Zero busywork.\nNotion is where your teams and AI agents capture knowledge, find answers, and automate projects. Now a team of 7 feels like 70.\nGet Notion free\nRequest a demo\nPlay\n\nTrusted by top teams\n\nIntroducing Notion 3.0\nNotion Agent\n\nYou assign the tasks. Your Notion Agent does the work.\n\u2192\n\nHand off your busywork\n\nWhat used to take days in minutes. Tell it your goal and watch it work.\n\nCollaborates with your team\n\nIt's like having a built-in power user that works alongside your team.\n\nKnows everything you know\n\nSearches all your pages, messages, files, and the web to surface exactly what you need.\n\nPersonalized to you\n\nYour Agent learns how you work. You control everything from how i"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "contact or request demo link",
+          "goal": "reach_contact_or_demo",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": [
+              {
+                "type": "click",
+                "intent": "contact link",
+                "selectors": [
+                  "a[href*='contact']",
+                  "a:has-text('Contact')"
+                ],
+                "role": "link",
+                "name": "Contact",
+                "value": null
+              }
+            ]
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [
+              {
+                "type": "url_contains",
+                "value": "contact",
+                "priority": "high",
+                "required": false
+              },
+              {
+                "type": "text_present",
+                "value": "contact",
+                "priority": "medium",
+                "required": false
+              },
+              {
+                "type": "element_visible",
+                "value": {
+                  "selector": "form"
+                },
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [],
+            "delta_summary": [
+              "URL changed from https://www.notion.com/ to https://www.notion.com/contact-sales",
+              "New text appeared: '1-99 employees'",
+              "New text appeared: '100-499 employees'",
+              "New text appeared: '3000+ employees'"
+            ],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "URL changed from https://www.notion.com/ to https://www.notion.com/contact-sales",
+            "New text appeared: '1-99 employees'",
+            "New text appeared: '100-499 employees'",
+            "New text appeared: '3000+ employees'"
+          ],
+          "recovery_attempts": [],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a[href*='demo']\").first\n    - locator resolved to <a href=\"/product/demos\" class=\"navItem_navItem__qrlp3\">\u2026</a>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is not"
+          ],
+          "before_snapshot": {
+            "url": "https://www.notion.com/",
+            "title": "The AI workspace that works for you. | Notion",
+            "text_snippet": "Product\nAI\nSolutions\nResources\nEnterprise\nPricing\nRequest a demo\nLog in\nGet Notion free\nOne workspace. Zero busywork.\nNotion is where your teams and AI agents capture knowledge, find answers, and automate projects. Now a team of 7 feels like 70.\nGet Notion free\nRequest a demo\nPlay\n\nTrusted by top teams\n\nIntroducing Notion 3.0\nNotion Agent\n\nYou assign the tasks. Your Notion Agent does the work.\n\u2192\n\nHand off your busywork\n\nWhat used to take days in minutes. Tell it your goal and watch it work.\n\nCollaborates with your team\n\nIt's like having a built-in power user that works alongside your team.\n\nKnows everything you know\n\nSearches all your pages, messages, files, and the web to surface exactly what you need.\n\nPersonalized to you\n\nYour Agent learns how you work. You control everything from how i"
+          },
+          "after_snapshot": {
+            "url": "https://www.notion.com/contact-sales",
+            "title": "Contact our Sales Team \u2013 Notion",
+            "text_snippet": "Product\nAI\nSolutions\nResources\nEnterprise\nPricing\nRequest a demo\nLog in\nGet Notion free\nContact our sales team\nGet help with pricing and plans, schedule a demo, explore use-cases for your team, and more.\nMillions run on Notion everyday\n\nPeople need an application to store knowledge for the team and keep pace with how quickly OpenAl moves. There's power in a single platform where you can do all your work. Notion is that single place.\n\nNick Erdenberger\n\nGTM, OpenAI\n\nFirst name*\nLast name*\nWork email*\nJob title*\nCompany name*\nCompany size*\nSelect\u2026\n1-99 employees\n100-499 employees\n500-2999 employees\n3000+ employees\nCountry or region*\nSelect\u2026\nAfghanistan\n\u00c5land Islands\nAlbania\nAlgeria\nAmerican Samoa\nAndorra\nAngola\nAnguilla\nAntarctica\nAntigua & Barbuda\nArgentina\nArmenia\nAruba\nAustralia\nAustria\nAz"
+          },
+          "screenshot_path": null
+        }
+      ],
+      "analysis_limited": false,
+      "video_url": "/agentic-qa/9b32a022-6917-4aa0-a4bb-cb1630993933/video",
+      "desktop_screenshot_url": "/agentic-qa/9b32a022-6917-4aa0-a4bb-cb1630993933/screenshot/desktop",
+      "mobile_screenshot_url": "/agentic-qa/9b32a022-6917-4aa0-a4bb-cb1630993933/screenshot/mobile",
+      "created_at": "2026-03-19T22:05:28.319966+00:00"
+    }
+  },
+  {
+    "group": "marketing",
+    "name": "Vercel",
+    "url": "https://vercel.com/",
+    "expected_type": "marketing_site",
+    "predicted_type": "marketing_site",
+    "classification_correct": true,
+    "final_status": "done",
+    "journey_result": "pricing_navigation:BLOCKED / features_navigation:BLOCKED / contact_navigation:BLOCKED",
+    "journey_count": 3,
+    "recovery_count": 0,
+    "recovery_types": "",
+    "truth_over_exception_count": 0,
+    "notes": "CAPTCHA or human-verification wall active \u2014 manual intervention required | CAPTCHA or human-verification wall active \u2014 manual intervention required | CAPTCHA or human-verification wall active \u2014 manual intervention required",
+    "audit_id": "9a02704b-c9e5-41ef-84fa-077da9161dc5",
+    "raw_status": {
+      "audit_id": "9a02704b-c9e5-41ef-84fa-077da9161dc5",
+      "status": "done",
+      "url": "https://vercel.com/",
+      "tier": "deep",
+      "score": 90,
+      "confidence": 95,
+      "findings": [
+        {
+          "severity": "low",
+          "category": "performance",
+          "title": "Several network requests are failing",
+          "description": "The page is making several network requests that are failing with a 403 status code. This could impact the functionality of the page.",
+          "fix_prompt": "Review the Content Security Policy (CSP) directives and adjust them to allow the necessary requests. For example, add 'https://www.vercel-status.com/api/v2/incidents/unresolved.json' to the 'connect-src' directive.",
+          "confidence": 95
+        },
+        {
+          "severity": "low",
+          "category": "accessibility",
+          "title": "Missing alt text for images",
+          "description": "Some images on the page are missing alt text, which could impact accessibility for users with visual impairments.",
+          "fix_prompt": "Add alt text to all images on the page. For example, add an 'alt' attribute to the img tag: '<img src='image.jpg' alt='Description of image'>'.",
+          "confidence": 95
+        },
+        {
+          "severity": "medium",
+          "category": "layout",
+          "title": "Layout issues on mobile devices",
+          "description": "The page layout appears to be broken on mobile devices, with some elements overlapping or not displaying correctly.",
+          "fix_prompt": "Review the CSS media queries and adjust the layout to ensure that it is responsive and works correctly on mobile devices.",
+          "confidence": 95
+        }
+      ],
+      "summary": "The page appears to be mostly functional, but there are some minor issues with network requests and accessibility. The layout also appears to be broken on mobile devices.",
+      "bundled_fix_prompt": "I ran a reliability audit on https://vercel.com/ and found the following issues.\nPlease fix all of them:\n\n1. [LOW] Several network requests are failing\n   Fix: Review the Content Security Policy (CSP) directives and adjust them to allow the necessary requests. For example, add 'https://www.vercel-status.com/api/v2/incidents/unresolved.json' to the 'connect-src' directive.\n\n2. [LOW] Missing alt text for images\n   Fix: Add alt text to all images on the page. For example, add an 'alt' attribute to the img tag: '<img src='image.jpg' alt='Description of image'>'.\n\n3. [MEDIUM] Layout issues on mobile devices\n   Fix: Review the CSS media queries and adjust the layout to ensure that it is responsive and works correctly on mobile devices.\n\nAfter fixing all issues, make sure the site works correctly on both desktop (1280px) and mobile (390px) viewports.\n\nJourney context:\nState context: {\"base_url\": \"https://vercel.com/\", \"current_url\": \"https://vercel.com/\", \"auth\": {}, \"generated_credentials\": {}, \"inferred_context\": {\"app_type\": \"marketing_site\", \"features\": [\"pricing\", \"features\", \"contact\"], \"primary_goal\": \"explore marketing paths\", \"site_description\": \"Developer platform marketing site\"}, \"items\": {}, \"recovery_counters\": {}, \"step_history\": []}\nJourney: pricing_navigation\n- Step pricing page link: blocked | reason: CAPTCHA or human-verification wall active \u2014 manual intervention required\nJourney: features_navigation\n- Step features or product page link: blocked | reason: CAPTCHA or human-verification wall active \u2014 manual intervention required\nJourney: contact_navigation\n- Step contact or request demo link: blocked | reason: CAPTCHA or human-verification wall active \u2014 manual intervention required",
+      "journey_timeline": [
+        {
+          "journey": "pricing_navigation",
+          "status": "BLOCKED",
+          "failed_step": "pricing page link",
+          "reason": "CAPTCHA or human-verification wall active \u2014 manual intervention required",
+          "steps": [
+            {
+              "step": "pricing page link",
+              "status": "blocked",
+              "failure_type": "captcha_required",
+              "evidence_delta": [],
+              "recovery_attempts": []
+            }
+          ]
+        },
+        {
+          "journey": "features_navigation",
+          "status": "BLOCKED",
+          "failed_step": "features or product page link",
+          "reason": "CAPTCHA or human-verification wall active \u2014 manual intervention required",
+          "steps": [
+            {
+              "step": "features or product page link",
+              "status": "blocked",
+              "failure_type": "captcha_required",
+              "evidence_delta": [],
+              "recovery_attempts": []
+            }
+          ]
+        },
+        {
+          "journey": "contact_navigation",
+          "status": "BLOCKED",
+          "failed_step": "contact or request demo link",
+          "reason": "CAPTCHA or human-verification wall active \u2014 manual intervention required",
+          "steps": [
+            {
+              "step": "contact or request demo link",
+              "status": "blocked",
+              "failure_type": "captcha_required",
+              "evidence_delta": [],
+              "recovery_attempts": []
+            }
+          ]
+        }
+      ],
+      "step_results": [
+        {
+          "step_name": "pricing page link",
+          "goal": "reach_pricing",
+          "status": "blocked",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [],
+            "failed_signals": [],
+            "delta_summary": [],
+            "failure_type": "captcha_required",
+            "llm_used": false
+          },
+          "evidence_delta": [],
+          "recovery_attempts": [],
+          "failure_type": "captcha_required",
+          "error": "CAPTCHA or human-verification wall active \u2014 manual intervention required",
+          "notes": [
+            "CAPTCHA or human-verification wall active \u2014 manual intervention required"
+          ],
+          "before_snapshot": {
+            "url": "https://vercel.com/",
+            "title": "Vercel: Build and deploy the best web experiences with the AI Cloud",
+            "text_snippet": "Skip to content\nProducts\nAI Cloud\nv0\n\nBuild applications with AI\n\nAI SDK\n\nThe AI Toolkit for TypeScript\n\nAI Gateway\n\nOne endpoint, all your models\n\nVercel Agent\n\nAn agent that knows your stack\n\nSandbox\n\nAI workflows in live environments\n\nCore Platform\nCI/CD\n\nHelping teams ship 6\u00d7 faster\n\nContent Delivery\n\nFast, scalable, and reliable\n\nFluid Compute\n\nServers, in serverless form\n\nObservability\n\nTrace every step\n\nSecurity\nBot Management\n\nScalable bot protection\n\nBotID\n\nInvisible CAPTCHA\n\nPlatform Security\n\nDDoS Protection, Firewall\n\nWeb Application Firewall\n\nGranular, custom protection\n\nResources\nCompany\nCustomers\n\nTrusted by the best teams\n\nBlog\n\nThe latest posts and changes\n\nChangelog\n\nSee what shipped\n\nPress\n\nRead the latest news\n\nEvents\n\nJoin us at an event\n\nLearn\nDocs\n\nVercel documentati"
+          },
+          "after_snapshot": {
+            "url": "https://vercel.com/",
+            "title": "Vercel: Build and deploy the best web experiences with the AI Cloud",
+            "text_snippet": "Skip to content\nProducts\nAI Cloud\nv0\n\nBuild applications with AI\n\nAI SDK\n\nThe AI Toolkit for TypeScript\n\nAI Gateway\n\nOne endpoint, all your models\n\nVercel Agent\n\nAn agent that knows your stack\n\nSandbox\n\nAI workflows in live environments\n\nCore Platform\nCI/CD\n\nHelping teams ship 6\u00d7 faster\n\nContent Delivery\n\nFast, scalable, and reliable\n\nFluid Compute\n\nServers, in serverless form\n\nObservability\n\nTrace every step\n\nSecurity\nBot Management\n\nScalable bot protection\n\nBotID\n\nInvisible CAPTCHA\n\nPlatform Security\n\nDDoS Protection, Firewall\n\nWeb Application Firewall\n\nGranular, custom protection\n\nResources\nCompany\nCustomers\n\nTrusted by the best teams\n\nBlog\n\nThe latest posts and changes\n\nChangelog\n\nSee what shipped\n\nPress\n\nRead the latest news\n\nEvents\n\nJoin us at an event\n\nLearn\nDocs\n\nVercel documentati"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "features or product page link",
+          "goal": "reach_features",
+          "status": "blocked",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [],
+            "failed_signals": [],
+            "delta_summary": [],
+            "failure_type": "captcha_required",
+            "llm_used": false
+          },
+          "evidence_delta": [],
+          "recovery_attempts": [],
+          "failure_type": "captcha_required",
+          "error": "CAPTCHA or human-verification wall active \u2014 manual intervention required",
+          "notes": [
+            "CAPTCHA or human-verification wall active \u2014 manual intervention required"
+          ],
+          "before_snapshot": {
+            "url": "https://vercel.com/",
+            "title": "Vercel: Build and deploy the best web experiences with the AI Cloud",
+            "text_snippet": "Skip to content\nProducts\nAI Cloud\nv0\n\nBuild applications with AI\n\nAI SDK\n\nThe AI Toolkit for TypeScript\n\nAI Gateway\n\nOne endpoint, all your models\n\nVercel Agent\n\nAn agent that knows your stack\n\nSandbox\n\nAI workflows in live environments\n\nCore Platform\nCI/CD\n\nHelping teams ship 6\u00d7 faster\n\nContent Delivery\n\nFast, scalable, and reliable\n\nFluid Compute\n\nServers, in serverless form\n\nObservability\n\nTrace every step\n\nSecurity\nBot Management\n\nScalable bot protection\n\nBotID\n\nInvisible CAPTCHA\n\nPlatform Security\n\nDDoS Protection, Firewall\n\nWeb Application Firewall\n\nGranular, custom protection\n\nResources\nCompany\nCustomers\n\nTrusted by the best teams\n\nBlog\n\nThe latest posts and changes\n\nChangelog\n\nSee what shipped\n\nPress\n\nRead the latest news\n\nEvents\n\nJoin us at an event\n\nLearn\nDocs\n\nVercel documentati"
+          },
+          "after_snapshot": {
+            "url": "https://vercel.com/",
+            "title": "Vercel: Build and deploy the best web experiences with the AI Cloud",
+            "text_snippet": "Skip to content\nProducts\nAI Cloud\nv0\n\nBuild applications with AI\n\nAI SDK\n\nThe AI Toolkit for TypeScript\n\nAI Gateway\n\nOne endpoint, all your models\n\nVercel Agent\n\nAn agent that knows your stack\n\nSandbox\n\nAI workflows in live environments\n\nCore Platform\nCI/CD\n\nHelping teams ship 6\u00d7 faster\n\nContent Delivery\n\nFast, scalable, and reliable\n\nFluid Compute\n\nServers, in serverless form\n\nObservability\n\nTrace every step\n\nSecurity\nBot Management\n\nScalable bot protection\n\nBotID\n\nInvisible CAPTCHA\n\nPlatform Security\n\nDDoS Protection, Firewall\n\nWeb Application Firewall\n\nGranular, custom protection\n\nResources\nCompany\nCustomers\n\nTrusted by the best teams\n\nBlog\n\nThe latest posts and changes\n\nChangelog\n\nSee what shipped\n\nPress\n\nRead the latest news\n\nEvents\n\nJoin us at an event\n\nLearn\nDocs\n\nVercel documentati"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "contact or request demo link",
+          "goal": "reach_contact_or_demo",
+          "status": "blocked",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [],
+            "failed_signals": [],
+            "delta_summary": [],
+            "failure_type": "captcha_required",
+            "llm_used": false
+          },
+          "evidence_delta": [],
+          "recovery_attempts": [],
+          "failure_type": "captcha_required",
+          "error": "CAPTCHA or human-verification wall active \u2014 manual intervention required",
+          "notes": [
+            "CAPTCHA or human-verification wall active \u2014 manual intervention required"
+          ],
+          "before_snapshot": {
+            "url": "https://vercel.com/",
+            "title": "Vercel: Build and deploy the best web experiences with the AI Cloud",
+            "text_snippet": "Skip to content\nProducts\nAI Cloud\nv0\n\nBuild applications with AI\n\nAI SDK\n\nThe AI Toolkit for TypeScript\n\nAI Gateway\n\nOne endpoint, all your models\n\nVercel Agent\n\nAn agent that knows your stack\n\nSandbox\n\nAI workflows in live environments\n\nCore Platform\nCI/CD\n\nHelping teams ship 6\u00d7 faster\n\nContent Delivery\n\nFast, scalable, and reliable\n\nFluid Compute\n\nServers, in serverless form\n\nObservability\n\nTrace every step\n\nSecurity\nBot Management\n\nScalable bot protection\n\nBotID\n\nInvisible CAPTCHA\n\nPlatform Security\n\nDDoS Protection, Firewall\n\nWeb Application Firewall\n\nGranular, custom protection\n\nResources\nCompany\nCustomers\n\nTrusted by the best teams\n\nBlog\n\nThe latest posts and changes\n\nChangelog\n\nSee what shipped\n\nPress\n\nRead the latest news\n\nEvents\n\nJoin us at an event\n\nLearn\nDocs\n\nVercel documentati"
+          },
+          "after_snapshot": {
+            "url": "https://vercel.com/",
+            "title": "Vercel: Build and deploy the best web experiences with the AI Cloud",
+            "text_snippet": "Skip to content\nProducts\nAI Cloud\nv0\n\nBuild applications with AI\n\nAI SDK\n\nThe AI Toolkit for TypeScript\n\nAI Gateway\n\nOne endpoint, all your models\n\nVercel Agent\n\nAn agent that knows your stack\n\nSandbox\n\nAI workflows in live environments\n\nCore Platform\nCI/CD\n\nHelping teams ship 6\u00d7 faster\n\nContent Delivery\n\nFast, scalable, and reliable\n\nFluid Compute\n\nServers, in serverless form\n\nObservability\n\nTrace every step\n\nSecurity\nBot Management\n\nScalable bot protection\n\nBotID\n\nInvisible CAPTCHA\n\nPlatform Security\n\nDDoS Protection, Firewall\n\nWeb Application Firewall\n\nGranular, custom protection\n\nResources\nCompany\nCustomers\n\nTrusted by the best teams\n\nBlog\n\nThe latest posts and changes\n\nChangelog\n\nSee what shipped\n\nPress\n\nRead the latest news\n\nEvents\n\nJoin us at an event\n\nLearn\nDocs\n\nVercel documentati"
+          },
+          "screenshot_path": null
+        }
+      ],
+      "analysis_limited": false,
+      "video_url": "/agentic-qa/9a02704b-c9e5-41ef-84fa-077da9161dc5/video",
+      "desktop_screenshot_url": "/agentic-qa/9a02704b-c9e5-41ef-84fa-077da9161dc5/screenshot/desktop",
+      "mobile_screenshot_url": "/agentic-qa/9a02704b-c9e5-41ef-84fa-077da9161dc5/screenshot/mobile",
+      "created_at": "2026-03-19T22:07:50.856977+00:00"
+    }
+  }
+]

@@ -1,5 +1,5 @@
 {
-  "audit_id": "6d5ba16f-4332-47e9-94cb-6a52cf75d863",
+  "audit_id": "2dff8044-0686-4b0b-b518-72f7b417481d",
   "status": "done",
   "url": "https://example.com",
   "tier": "fix",
@@ -15,11 +15,11 @@
       "confidence": null
     }
   ],
-  "summary": "The webpage appears to be visually correct and functional, with no obvious issues found. The page loads properly on both desktop and mobile devices, displaying the expected content without any errors.",
-  "bundled_fix_prompt": "Fix the web app's issues by modifying the HTML and CSS as follows: update the `body` CSS to set a maximum width for desktop screens (1280px) and ensure proper scaling on mobile devices (390px) by adding a meta tag for responsive design. Modify the `div` element containing the `h1` and `p` elements to have an ID, such as \"main-content\", and update its CSS to remove the opacity setting. Change the `a:link` and `a:visited` CSS to include hover and active states for better usability. Ensure the `h1` element has a clear font family and size for readability. For mobile devices, adjust the font size of the `h1` element to 1.2em and the `p` elements to 0.9em. Update the `a` element with the href \"https://iana.org/domains/example\" to have a clear ID, such as \"learn-more-link\", and modify its CSS to have a distinct color and hover effect. Lastly, add alt text to any missing images and ensure all interactive elements are accessible and navigable via keyboard input.",
+  "summary": "The webpage appears to be visually correct and functional, with no obvious issues found. The page loads properly on both desktop and mobile devices, displaying the expected content without any layout or accessibility problems.",
+  "bundled_fix_prompt": "Fix the web app by modifying the HTML and CSS to improve accessibility and responsiveness. First, add an ID to the div element containing the main content, such as \"main-content\", and update the CSS to target this ID instead of the generic div element. Update the CSS to include media queries for desktop (1280px) and mobile (390px) screen sizes. For desktop, set the font size of the h1 element to 2.5em and the line height to 1.2. For mobile, set the font size of the h1 element to 1.8em and the line height to 1.1. Additionally, update the a:link and a:visited CSS to include a hover effect, such as changing the text color to #666. Ensure the meta viewport tag is set to content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\" to prevent zooming on mobile devices. Update the nav_links, buttons, and forms arrays in the crawl data to include the newly added link with the text \"Learn more\". Finally, add alt text to any images that may be added in the future, and consider adding ARIA attributes to the a element to improve screen reader support.",
   "analysis_limited": false,
-  "video_url": "/agentic-qa/6d5ba16f-4332-47e9-94cb-6a52cf75d863/video",
-  "desktop_screenshot_url": "/agentic-qa/6d5ba16f-4332-47e9-94cb-6a52cf75d863/screenshot/desktop",
-  "mobile_screenshot_url": "/agentic-qa/6d5ba16f-4332-47e9-94cb-6a52cf75d863/screenshot/mobile",
-  "created_at": "2026-03-19T14:15:06.408731+00:00"
+  "video_url": "/agentic-qa/2dff8044-0686-4b0b-b518-72f7b417481d/video",
+  "desktop_screenshot_url": "/agentic-qa/2dff8044-0686-4b0b-b518-72f7b417481d/screenshot/desktop",
+  "mobile_screenshot_url": "/agentic-qa/2dff8044-0686-4b0b-b518-72f7b417481d/screenshot/mobile",
+  "created_at": "2026-03-19T15:01:37.018707+00:00"
 }

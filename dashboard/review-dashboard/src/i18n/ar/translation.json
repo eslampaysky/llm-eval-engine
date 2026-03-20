@@ -1,0 +1,539 @@
+{
+  "common": {
+    "appName": "AiBreaker",
+    "appTagline": "طبقة الاعتمادية",
+    "language": "اللغة",
+    "copied": "تم النسخ!",
+    "copy": "نسخ",
+    "unknown": "غير معروف",
+    "unknownUrl": "رابط غير معروف",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "remove": "إزالة",
+    "actions": "الإجراءات",
+    "date": "التاريخ",
+    "status": "الحالة",
+    "summary": "الملخص",
+    "search": "بحث",
+    "view": "عرض",
+    "desktop": "سطح المكتب",
+    "mobile": "الجوال",
+    "current": "الحالي",
+    "active": "نشط",
+    "upgrade": "ترقية"
+  },
+  "navigation": {
+    "public": {
+      "demo": "التجربة",
+      "pricing": "الأسعار",
+      "login": "تسجيل الدخول",
+      "getStarted": "ابدأ الآن"
+    },
+    "app": {
+      "core": "الأساسيات",
+      "history": "السجل",
+      "account": "الحساب",
+      "overview": "نظرة عامة",
+      "vibeCheck": "فحص سريع",
+      "webAudit": "تحليل عميق",
+      "agentAudit": "إصلاح وتحقق",
+      "audits": "الفحوصات",
+      "monitoring": "المراقبة",
+      "apiKeys": "مفاتيح API",
+      "settings": "الإعدادات",
+      "logout": "تسجيل الخروج",
+      "admin": "مشرف",
+      "freePlan": "الخطة المجانية"
+    }
+  },
+  "auth": {
+    "errors": {
+      "registrationFailed": "فشل إنشاء الحساب.",
+      "loginFailed": "فشل تسجيل الدخول.",
+      "invalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة."
+    },
+    "login": {
+      "title": "مرحبًا بعودتك",
+      "subtitle": "سجّل الدخول إلى حسابك في AiBreaker.",
+      "google": "المتابعة باستخدام Google",
+      "googleSoon": "تسجيل Google قريبًا. استخدم البريد الإلكتروني الآن.",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "you@company.com",
+      "password": "كلمة المرور",
+      "passwordPlaceholder": "كلمة المرور",
+      "forgotPassword": "هل نسيت كلمة المرور؟",
+      "submit": "تسجيل الدخول",
+      "submitting": "جارٍ تسجيل الدخول...",
+      "noAccount": "ليس لديك حساب؟",
+      "signup": "إنشاء حساب"
+    },
+    "signup": {
+      "title": "أنشئ حسابك",
+      "subtitle": "انضم إلى أكثر من 200 مؤسس يطلقون منتجاتهم بثقة.",
+      "google": "المتابعة باستخدام Google",
+      "googleSoon": "تسجيل Google قريبًا. استخدم التسجيل بالبريد الإلكتروني الآن.",
+      "name": "الاسم",
+      "namePlaceholder": "اسمك",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "you@company.com",
+      "password": "كلمة المرور",
+      "passwordPlaceholder": "8 أحرف على الأقل",
+      "submit": "إنشاء الحساب",
+      "submitting": "جارٍ إنشاء الحساب...",
+      "hasAccount": "لديك حساب بالفعل؟",
+      "login": "تسجيل الدخول",
+      "demoFirst": "شاهد التجربة أولًا"
+    },
+    "forgotPassword": {
+      "title": "إعادة تعيين كلمة المرور",
+      "subtitle": "أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين.",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "you@company.com",
+      "submit": "إرسال رابط إعادة التعيين",
+      "success": "تحقق من بريدك الوارد للحصول على رابط إعادة التعيين. إذا لم تجده، راجع الرسائل غير المرغوب فيها.",
+      "remembered": "تتذكر كلمة المرور؟",
+      "login": "تسجيل الدخول"
+    }
+  },
+  "public": {
+    "landing": {
+      "badge": "طبقة الاعتمادية للتطبيقات المبنية بالذكاء الاصطناعي",
+      "heroTitlePrefix": "أطلق تطبيقات مبنية بالذكاء الاصطناعي بدون",
+      "heroTitleAccent": "أعطال محرجة",
+      "heroSubtitle": "يراقب AiBreaker تطبيقك كمستخدم حقيقي، ويشغّل اختبارات ويب عدائية، ثم يمنحك موجه إصلاح يمكنك لصقه مباشرة في أداة البناء بالذكاء الاصطناعي.",
+      "primaryCta": "شغّل فحصًا مجانيًا",
+      "secondaryCta": "عرض الأسعار",
+      "footnote": "بدون بطاقة ائتمان · مجاني دائمًا · يمكنك الإلغاء في أي وقت",
+      "featuresEyebrow": "المزايا",
+      "featuresTitle": "كل ما تحتاجه للإطلاق بثقة",
+      "ctaTitle": "جاهز للتوقف عن شحن تطبيقات معطلة؟",
+      "ctaSubtitle": "جرّب AiBreaker مجانًا - لا حاجة للتسجيل لتجربة الديمو.",
+      "ctaButton": "جرّب الديمو",
+      "footer": "© 2026 AiBreaker · مبني للويب الذي يصنعه الذكاء الاصطناعي",
+      "socialProof": {
+        "appsAuditedValue": "2,100+",
+        "appsAuditedLabel": "تطبيق تم فحصه",
+        "bugsFoundValue": "14,000+",
+        "bugsFoundLabel": "مشكلة تم اكتشافها",
+        "foundersValue": "200+",
+        "foundersLabel": "مؤسس يستخدمه"
+      },
+      "features": {
+        "visionTitle": "تدقيق بصري بالذكاء الاصطناعي",
+        "visionDesc": "يرى تطبيقك كما يراه المستخدم الحقيقي ويكتشف العيوب البصرية والمسارات المكسورة والنقرات غير الفعالة.",
+        "promptsTitle": "موجهات إصلاح جاهزة للنسخ",
+        "promptsDesc": "كل خطأ يأتي مع موجه يمكنك لصقه مباشرة في Cursor أو Bolt أو Lovable.",
+        "vibeTitle": "فحص سريع خلال 60 ثانية",
+        "vibeDesc": "ألصق الرابط فقط. احصل على درجة اعتمادية خلال أقل من دقيقة بدون إعدادات أو تهيئة.",
+        "coverageTitle": "تغطية الجوال وسطح المكتب",
+        "coverageDesc": "يختبر كلا العرضين جنبًا إلى جنب ويكشف ما قد يفوته Chrome DevTools.",
+        "monitoringTitle": "مراقبة واكتشاف التراجعات",
+        "monitoringDesc": "اضبطه مرة واحدة وتلقَّ تنبيهًا فور انخفاض درجة الاعتمادية.",
+        "apiTitle": "جاهز لـ CI/CD وAPI",
+        "apiDesc": "شغّل الفحوصات من خط النشر لديك وأوقف الإصدارات التي تحمل مسارات مكسورة."
+      }
+    },
+    "demo": {
+      "eyebrow": "تجربة مباشرة",
+      "title": "شاهد AiBreaker أثناء العمل",
+      "subtitle": "شاهده يكتشف مشاكل حقيقية في تطبيق حقيقي مبني بالذكاء الاصطناعي. بدون تسجيل وبدون انتظار.",
+      "targetUrl": "الرابط المستهدف",
+      "watchDemo": "شاهد فحص الديمو",
+      "findings": "المشكلات ({{count}})",
+      "reliabilityScore": "درجة الاعتمادية: {{score}}",
+      "needsWork": "يحتاج عملًا",
+      "confidence": "الثقة {{value}}%",
+      "resultsSummary": "تم اكتشاف مشكلتين حرجتين و3 تحذيرات وملاحظة واحدة عبر عرضي سطح المكتب والجوال.",
+      "sessionReplay": "إعادة تشغيل الجلسة",
+      "sessionReplayLabel": "فشل مسار إتمام الشراء",
+      "copyFixPrompts": "نسخ جميع موجهات الإصلاح",
+      "ctaTitleLine1": "هذا كان تطبيق شخص آخر.",
+      "ctaTitleLine2Prefix": "ماذا عن",
+      "ctaTitleLine2Accent": "تطبيقك",
+      "ctaSubtitle": "سجّل مجانًا وشغّل فحصًا حقيقيًا لتطبيقك خلال 60 ثانية.",
+      "ctaButton": "افحص تطبيقي مجانًا",
+      "footnote": "بدون بطاقة ائتمان · مجاني دائمًا · يمكنك الإلغاء في أي وقت",
+      "loadingSteps": {
+        "launching": "جارٍ تشغيل المتصفح...",
+        "crawling": "جارٍ فحص الصفحات - سطح المكتب والجوال...",
+        "capturing": "جارٍ التقاط لقطات الشاشة...",
+        "sending": "جارٍ الإرسال إلى نموذج الرؤية...",
+        "generating": "جارٍ إنشاء موجهات الإصلاح..."
+      },
+      "findingsData": {
+        "checkoutTitle": "زر الدفع غير قابل للوصول على الجوال",
+        "checkoutDesc": "زر الدفع يقع خلف التذييل على الشاشات الأقل من 430 بكسل. لا يمكن للمستخدمين على iPhone إكمال الشراء.",
+        "signupTitle": "نموذج التسجيل يقبل بريدًا إلكترونيًا فارغًا",
+        "signupDesc": "يتم إرسال نموذج التسجيل بنجاح مع ترك حقل البريد الإلكتروني فارغًا، مما ينشئ حسابات غير صالحة.",
+        "heroOverflowTitle": "عنوان الهيرو يتجاوز العرض على التابلت",
+        "contrastTitle": "نسبة تباين زر الدعوة 2.1:1 - لا تحقق WCAG AA",
+        "pricingCollapseTitle": "جدول الأسعار ينهار بشكل خاطئ على التابلت",
+        "missingAltTitle": "3 صور تفتقد نصًا بديلًا"
+      }
+    },
+    "pricing": {
+      "eyebrow": "الأسعار",
+      "title": "أسعار بسيطة وواضحة",
+      "subtitle": "ابدأ مجانًا. قم بالترقية عندما تحتاج إلى فحوصات أعمق وإصلاحات مدعومة بالذكاء الاصطناعي.",
+      "mostPopular": "الأكثر شيوعًا",
+      "comparisonTitle": "مقارنة المزايا",
+      "faqTitle": "الأسئلة الشائعة",
+      "bottomCta": "ما زلت غير متأكد؟ شاهد الديمو أولًا.",
+      "watchDemo": "شاهد الديمو",
+      "currentPlan": "الحالية",
+      "tiers": {
+        "vibe": {
+          "name": "فحص سريع",
+          "price": "مجاني",
+          "period": "دائمًا",
+          "tagline": "فحص اعتمادية سريع",
+          "cta": "ابدأ مجانًا"
+        },
+        "deep": {
+          "name": "تحليل عميق",
+          "price": "$29",
+          "period": "/شهريًا",
+          "tagline": "فحص كامل مع إعادة تشغيل الفيديو",
+          "cta": "ابدأ التحليل العميق"
+        },
+        "fix": {
+          "name": "إصلاح وتحقق",
+          "price": "$79",
+          "period": "/شهريًا",
+          "tagline": "إصلاحات بالذكاء الاصطناعي مع التحقق",
+          "cta": "ابدأ الإصلاح"
+        }
+      },
+      "features": {
+        "fiveAudits": "5 فحوصات شهريًا",
+        "desktopMobile": "فحص سطح المكتب والجوال",
+        "score": "درجة اعتمادية (0-100)",
+        "topFindings": "أهم 5 مشكلات",
+        "copyPrompts": "موجهات إصلاح جاهزة للنسخ",
+        "shareLinks": "روابط مشاركة عامة",
+        "unlimited": "فحوصات غير محدودة",
+        "everythingVibe": "كل ما في الفحص السريع",
+        "videoReplay": "إعادة تشغيل جلسة الفيديو",
+        "journeyTesting": "اختبار مسارات المستخدم",
+        "screenshots": "مقارنة لقطات الشاشة",
+        "alerts": "المراقبة والتنبيهات",
+        "apiAccess": "وصول API",
+        "prioritySupport": "دعم أولوية",
+        "everythingDeep": "كل ما في التحليل العميق",
+        "aiFix": "توليد إصلاحات بالذكاء الاصطناعي",
+        "rerun": "إعادة تشغيل التحقق",
+        "sourceAnalysis": "تحليل الشيفرة المصدرية",
+        "ci": "تكامل CI/CD",
+        "customReporting": "تقارير مخصصة",
+        "dedicatedSupport": "دعم مخصص",
+        "sla": "ضمان SLA"
+      },
+      "comparisonHeaders": {
+        "feature": "الميزة",
+        "vibe": "فحص سريع",
+        "deep": "تحليل عميق",
+        "fix": "إصلاح وتحقق"
+      },
+      "comparison": {
+        "monthlyAudits": "الفحوصات الشهرية",
+        "reliabilityScore": "درجة الاعتمادية",
+        "fixPrompts": "موجهات الإصلاح",
+        "videoReplay": "إعادة تشغيل الفيديو",
+        "journeyTesting": "اختبار المسارات",
+        "monitoring": "المراقبة",
+        "aiFixGeneration": "توليد الإصلاحات بالذكاء الاصطناعي",
+        "sourceCodeAnalysis": "تحليل الشيفرة المصدرية",
+        "ciCd": "تكامل CI/CD",
+        "apiAccess": "وصول API",
+        "prioritySupport": "دعم أولوية",
+        "unlimited": "غير محدود"
+      },
+      "faqs": {
+        "testQ": "ماذا يختبر AiBreaker بالضبط؟",
+        "testA": "يقوم AiBreaker بتصفح تطبيقك كمستخدم حقيقي على سطح المكتب والجوال. ويفحص المسارات المكسورة والنقرات المعطلة والعيوب البصرية ومشكلات الوصول وأخطاء المنطق، ثم يقدّم موجه إصلاح لكل مشكلة.",
+        "installQ": "هل أحتاج إلى تثبيت أي شيء؟",
+        "installA": "لا. فقط ألصق الرابط العام واضغط \"تشغيل الفحص\". يستخدم AiBreaker متصفحًا رأسيًا خاصًا به - بدون SDK أو تعديل للشيفرة أو نشر إضافي.",
+        "differenceQ": "كيف يختلف هذا عن Lighthouse أو Playwright؟",
+        "differenceA": "Lighthouse يقيس الأداء، وPlaywright يتطلب كتابة سكربتات. أما AiBreaker فينفذ اختبارًا بصريًا وسلوكيًا باستخدام الذكاء الاصطناعي بدون كتابة سكربتات، ويولّد موجهات إصلاح تلقائيًا.",
+        "cancelQ": "هل يمكنني الإلغاء في أي وقت؟",
+        "cancelA": "نعم. لا توجد عقود أو ارتباط طويل. يمكنك الإلغاء من إعدادات الفوترة وتنتهي الخطة في دورة الفوترة التالية، بينما يظل سجل الفحوصات متاحًا في الخطة المجانية.",
+        "securityQ": "هل بيانات موقعي آمنة؟",
+        "securityA": "نحن نفحص الصفحات المتاحة للعامة فقط. يتم تشفير لقطات الشاشة والتسجيلات أثناء التخزين وحذفها بعد 30 يومًا. ولا نصل إلى الشيفرة المصدرية إلا إذا قمت بلصقها صراحةً في باقة إصلاح وتحقق."
+      }
+    },
+    "report": {
+      "eyebrow": "تقرير عام",
+      "findings": "المشكلات ({{count}})",
+      "cta": "هل تريد فحص تطبيقك؟",
+      "ctaButton": "ابدأ مجانًا"
+    }
+  },
+  "dashboard": {
+    "overview": {
+      "eyebrow": "لوحة التحكم",
+      "title": "نظرة عامة",
+      "subtitle": "مقاييس الاعتمادية لديك في لمحة.",
+      "stats": {
+        "totalAudits": "إجمالي الفحوصات",
+        "avgReliability": "متوسط الاعتمادية",
+        "bugsThisWeek": "المشكلات هذا الأسبوع",
+        "sitesMonitored": "المواقع المراقبة"
+      },
+      "scoreTrend": "اتجاه الدرجة - آخر 10 فحوصات",
+      "latestAudit": "أحدث فحص",
+      "viewReport": "عرض التقرير",
+      "emptyTitle": "لا توجد فحوصات بعد",
+      "emptySubtitle": "شغّل أول فحص سريع لرؤية النتائج هنا.",
+      "startVibeCheck": "ابدأ الفحص السريع",
+      "quickActions": "إجراءات سريعة",
+      "runNewAudit": "تشغيل فحص جديد",
+      "viewAllAudits": "عرض كل الفحوصات",
+      "setUpMonitoring": "إعداد المراقبة"
+    }
+  },
+  "audit": {
+    "banner": {
+      "inProgress": "الفحص جارٍ{{suffix}}...",
+      "inProgressSuffix": " لـ {{url}}",
+      "ready": "الفحص جاهز!",
+      "viewResults": "عرض النتائج"
+    },
+    "tiers": {
+      "vibe": { "label": "فحص سريع", "desc": "فحص سريع" },
+      "deep": { "label": "تحليل عميق", "desc": "فحص كامل" },
+      "fix": { "label": "إصلاح وتحقق", "desc": "إصلاحات ذكية" }
+    },
+    "loadingSteps": {
+      "processing": "جارٍ المعالجة...",
+      "complete": "مكتمل"
+    },
+    "list": {
+      "eyebrow": "السجل",
+      "title": "الفحوصات",
+      "subtitle": "كل نتائج الفحص في مكان واحد.",
+      "searchPlaceholder": "ابحث بالرابط...",
+      "countBadge": "{{count}}x",
+      "realUserBacklog": "قائمة انتظار المستخدمين الحقيقيين",
+      "backlogSubtitle": "أكثر الخطوات الفاشلة تكرارًا مجمعة حسب نوع التطبيق ونوع الفشل.",
+      "liveTuningLoop": "حلقة تحسين مباشرة",
+      "lastSeen": "آخر ظهور {{date}}",
+      "recently": "مؤخرًا",
+      "exampleAudit": "فحص مثالي",
+      "noResultsTitle": "لا توجد نتائج",
+      "noResultsSubtitle": "جرّب مصطلح بحث مختلفًا.",
+      "emptyTitle": "لا توجد فحوصات بعد",
+      "emptySubtitle": "شغّل أول فحص لديك لرؤية النتائج هنا.",
+      "firstAudit": "شغّل أول فحص لك",
+      "table": {
+        "url": "الرابط",
+        "tier": "المستوى",
+        "score": "الدرجة",
+        "createdAt": "التاريخ",
+        "findings": "المشكلات",
+        "actions": "الإجراءات"
+      },
+      "tierLabels": {
+        "vibe": "سريع",
+        "deep": "عميق",
+        "fix": "إصلاح"
+      }
+    },
+    "detail": {
+      "pdfFailed": "فشل تنزيل ملف PDF.",
+      "errorPrefix": "خطأ:",
+      "notFound": "لم يتم العثور على الفحص.",
+      "progressTitle": "تقدم الفحص",
+      "stopping": "جارٍ الإيقاف...",
+      "stopAudit": "إيقاف الفحص",
+      "stop": "إيقاف",
+      "labels": {
+        "auditReport": "تقرير الفحص"
+      },
+      "reRun": "إعادة التشغيل",
+      "share": "مشاركة",
+      "sharing": "جارٍ المشاركة...",
+      "downloadPdf": "تنزيل PDF",
+      "downloading": "جارٍ التنزيل...",
+      "linkCopied": "تم نسخ الرابط إلى الحافظة",
+      "keyFailures": "أهم الإخفاقات",
+      "videoReplay": "إعادة تشغيل الفيديو",
+      "loadingVideo": "جارٍ تحميل إعادة تشغيل الفيديو...",
+      "screenshotAlt": "لقطة شاشة",
+      "journeyTimeline": "الجدول الزمني للرحلة",
+      "fixPlan": "خطة إصلاح مولدة بالذكاء الاصطناعي",
+      "copyFixPlan": "نسخ خطة الإصلاح",
+      "copyAllFixPrompts": "نسخ جميع موجهات الإصلاح",
+      "findingsTitle": "المشكلات ({{count}})"
+    }
+  },
+  "monitoring": {
+    "title": "مراقبة مستمرة",
+    "eyebrow": "المراقبة",
+    "subtitle": "يعيد اختبار تطبيقك تلقائيًا مع كل نشر أو حسب الجدول.",
+    "create": "إنشاء مراقبة",
+    "errors": {
+      "loadFailed": "فشل تحميل المراقبات",
+      "provideInputs": "قدّم 3 مدخلات اختبار على الأقل.",
+      "invalidHeaders": "يجب أن تكون الرؤوس JSON صالحًا.",
+      "createFailed": "فشل إنشاء المراقبة",
+      "runFailed": "فشل بدء فحص التراجع"
+    },
+    "messages": {
+      "created": "تم إنشاء المراقبة. جارٍ التقاط الأساس...",
+      "started": "بدأ فحص التراجع."
+    },
+    "empty": {
+      "title": "لا توجد مراقبات بعد",
+      "subtitle": "أنشئ أول مراقبة للحصول على فحوصات تراجع مستمرة."
+    },
+    "status": {
+      "pending": "معلق",
+      "ready": "جاهز",
+      "regression": "تراجع",
+      "ok": "جيد",
+      "failed": "فشل"
+    },
+    "baseline": "الأساس: {{capturedAt}} · {{count}} عينة",
+    "runCheck": "تشغيل فحص التراجع",
+    "copyRegressionFix": "نسخ إصلاح التراجع",
+    "lastChecked": "آخر فحص",
+    "form": {
+      "title": "إنشاء مراقبة",
+      "featureName": "اسم الميزة",
+      "featureNamePlaceholder": "مساعد الدفع",
+      "description": "الوصف",
+      "descriptionPlaceholder": "ما الذي يجب أن تفعله هذه الميزة...",
+      "schedule": "الجدول",
+      "alertWebhook": "Webhook التنبيه",
+      "targetType": "نوع الهدف",
+      "testInputs": "مدخلات الاختبار (سطر لكل مدخل، بحد أدنى 3)",
+      "testInputsPlaceholder": "ما هي سياسة الاسترجاع لديكم؟",
+      "create": "إنشاء مراقبة",
+      "creating": "جارٍ الإنشاء...",
+      "scheduleOptions": {
+        "daily": "يوميًا",
+        "hourly": "كل ساعة",
+        "onDeploy": "عند النشر"
+      },
+      "targetOptions": {
+        "webhook": "Webhook / REST API",
+        "openai": "متوافق مع OpenAI",
+        "huggingface": "HuggingFace",
+        "langchain": "LangChain"
+      },
+      "endpointUrl": "رابط نقطة النهاية",
+      "headers": "الرؤوس (JSON)",
+      "baseUrl": "الرابط الأساسي",
+      "model": "النموذج"
+    }
+  },
+  "developer": {
+    "apiKeys": {
+      "eyebrow": "المطور",
+      "title": "مفاتيح API",
+      "subtitle": "إدارة مفاتيح API للوصول البرمجي.",
+      "generate": "إنشاء مفتاح جديد",
+      "table": {
+        "name": "الاسم",
+        "key": "المفتاح",
+        "created": "تاريخ الإنشاء",
+        "lastUsed": "آخر استخدام",
+        "actions": "الإجراءات"
+      },
+      "copyKey": "نسخ المفتاح",
+      "revoke": "إبطال",
+      "usageExample": "مثال استخدام",
+      "modalTitle": "إنشاء مفتاح API",
+      "keyName": "اسم المفتاح",
+      "keyNamePlaceholder": "مثال: الإنتاج، خط CI",
+      "generateKey": "إنشاء المفتاح"
+    }
+  },
+  "settings": {
+    "tabs": {
+      "profile": "الملف الشخصي",
+      "security": "الأمان",
+      "billing": "الفوترة",
+      "workspace": "مساحة العمل"
+    },
+    "layout": {
+      "eyebrow": "الحساب",
+      "title": "الإعدادات"
+    },
+    "profile": {
+      "title": "الملف الشخصي",
+      "uploadAvatar": "رفع صورة رمزية",
+      "avatarHelp": "JPG وPNG. الحد الأقصى 2MB.",
+      "displayName": "الاسم المعروض",
+      "email": "البريد الإلكتروني",
+      "connectedViaGoogle": "متصل عبر Google",
+      "save": "حفظ التغييرات"
+    },
+    "security": {
+      "changePassword": "تغيير كلمة المرور",
+      "currentPassword": "كلمة المرور الحالية",
+      "newPassword": "كلمة المرور الجديدة",
+      "confirmPassword": "تأكيد كلمة المرور الجديدة",
+      "updatePassword": "تحديث كلمة المرور",
+      "password": "كلمة المرور",
+      "oauthMessage": "حسابك متصل عبر Google. تتم إدارة كلمة المرور من خلال حساب Google الخاص بك.",
+      "activeSessions": "الجلسات النشطة",
+      "device": "الجهاز",
+      "lastActive": "آخر نشاط",
+      "revoke": "إبطال",
+      "sessions": {
+        "chromeWindows": "Chrome على Windows",
+        "safariIphone": "Safari على iPhone",
+        "activeNow": "نشط الآن"
+      }
+    },
+    "billing": {
+      "currentPlan": "الخطة الحالية",
+      "freePlan": "فحص سريع - مجاني",
+      "auditsPerMonth": "5 فحوصات شهريًا",
+      "usage": "تم استخدام {{used}} من {{max}} فحوصات",
+      "changePlan": "تغيير الخطة",
+      "currentBadge": "الحالية",
+      "active": "نشطة",
+      "upgrade": "ترقية",
+      "checkoutSoon": "صفحة الدفع قادمة قريبًا! سنرسل لك الوصول عبر البريد الإلكتروني.",
+      "invoiceHistory": "سجل الفواتير",
+      "amount": "المبلغ",
+      "cancelPlan": "إلغاء الخطة",
+      "plans": {
+        "vibe": { "name": "فحص سريع", "price": "مجاني" },
+        "deep": { "name": "تحليل عميق", "price": "$29/شهريًا" },
+        "fix": { "name": "إصلاح وتحقق", "price": "$79/شهريًا" }
+      },
+      "invoiceStatusPaid": "مدفوعة"
+    },
+    "workspace": {
+      "visionKey": "مفتاح API للرؤية الذكية",
+      "visionHelp": "اربط مفتاح Gemini الخاص بك للحصول على حصة مخصصة. يمنحك هذا تحليلًا بصريًا غير محدود بدون مشاركة الحصة المجانية.",
+      "connected": "تم ربط مفتاح Gemini الخاص بك - لديك الآن حصة مخصصة خاصة بك",
+      "saveKey": "حفظ المفتاح",
+      "saving": "جارٍ الحفظ...",
+      "freeKey": "احصل على مفتاح مجاني",
+      "freeKeyHelp": "احصل على مفتاح API مجاني من Google AI Studio - يستغرق الأمر دقيقتين فقط.",
+      "saveFailed": "فشل الحفظ. يرجى التحقق من المفتاح.",
+      "defaultTier": "مستوى الفحص الافتراضي",
+      "defaultTierHelp": "سيتم اختيار هذا المستوى مسبقًا عند بدء فحوصات جديدة.",
+      "slack": "تكامل Slack",
+      "webhook": "رابط Webhook",
+      "testWebhook": "اختبار Webhook",
+      "emailNotifications": "إشعارات البريد الإلكتروني",
+      "notifyRegression": "عند اكتشاف تراجع",
+      "notifyComplete": "عند اكتمال الفحص",
+      "weeklySummary": "ملخص أسبوعي",
+      "saveWorkspace": "حفظ إعدادات مساحة العمل"
+    }
+  },
+  "finding": {
+    "severity": {
+      "critical": "حرج",
+      "warning": "تحذير",
+      "info": "معلومة"
+    },
+    "fixPrompt": "موجه الإصلاح"
+  }
+}

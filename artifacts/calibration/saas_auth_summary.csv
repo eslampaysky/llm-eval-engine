@@ -1,0 +1,5 @@
+group,name,url,expected_type,predicted_type,classification_correct,final_status,journey_result,journey_count,recovery_count,recovery_types,truth_over_exception_count,notes,audit_id
+saas_auth,The Internet Login,https://the-internet.herokuapp.com/login,saas_auth,saas_auth,True,done,register_login:PASSED,1,0,,1,Action error overruled by success signals: Could not resolve action candidate: sign in button,5dc848f4-4412-43ad-a049-4186bc60956b
+saas_auth,Practice Test Automation Login,https://practicetestautomation.com/practice-test-login/,saas_auth,saas_auth,True,done,register_login:PASSED,1,0,,1,Action error overruled by success signals: Could not resolve action candidate: sign in button,16b21fd7-ba29-4d38-ac36-7d501b33d7f5
+saas_auth,OrangeHRM Demo,https://opensource-demo.orangehrmlive.com/,saas_auth,saas_auth,True,done,register_login:PASSED,1,0,,1,Action error overruled by success signals: Could not resolve action candidate: sign in button,1c96666b-00a6-4fed-b88f-831a095ed1b6
+saas_auth,Applitools Demo,https://demo.applitools.com/,saas_auth,saas_auth,True,done,register_login:PASSED,1,0,,0,,67861788-e2cc-46d8-a039-ef817a34ca1a

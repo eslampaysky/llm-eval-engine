@@ -1,0 +1,539 @@
+{
+  "common": {
+    "appName": "AiBreaker",
+    "appTagline": "Reliability Layer",
+    "language": "Language",
+    "copied": "Copied!",
+    "copy": "Copy",
+    "unknown": "Unknown",
+    "unknownUrl": "Unknown URL",
+    "save": "Save",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "actions": "Actions",
+    "date": "Date",
+    "status": "Status",
+    "summary": "Summary",
+    "search": "Search",
+    "view": "View",
+    "desktop": "Desktop",
+    "mobile": "Mobile",
+    "current": "Current",
+    "active": "Active",
+    "upgrade": "Upgrade"
+  },
+  "navigation": {
+    "public": {
+      "demo": "Demo",
+      "pricing": "Pricing",
+      "login": "Login",
+      "getStarted": "Get Started"
+    },
+    "app": {
+      "core": "Core",
+      "history": "History",
+      "account": "Account",
+      "overview": "Overview",
+      "vibeCheck": "Vibe Check",
+      "webAudit": "Deep Dive",
+      "agentAudit": "Fix & Verify",
+      "audits": "Audits",
+      "monitoring": "Monitoring",
+      "apiKeys": "API Keys",
+      "settings": "Settings",
+      "logout": "Log out",
+      "admin": "Admin",
+      "freePlan": "Free plan"
+    }
+  },
+  "auth": {
+    "errors": {
+      "registrationFailed": "Registration failed.",
+      "loginFailed": "Login failed.",
+      "invalidCredentials": "Incorrect email or password."
+    },
+    "login": {
+      "title": "Welcome back",
+      "subtitle": "Log in to your AiBreaker account.",
+      "google": "Continue with Google",
+      "googleSoon": "Google OAuth coming soon! Use email login for now.",
+      "email": "Email",
+      "emailPlaceholder": "you@company.com",
+      "password": "Password",
+      "passwordPlaceholder": "Your password",
+      "forgotPassword": "Forgot password?",
+      "submit": "Sign In",
+      "submitting": "Signing in...",
+      "noAccount": "Don't have an account?",
+      "signup": "Sign up"
+    },
+    "signup": {
+      "title": "Create your account",
+      "subtitle": "Join 200+ founders who ship with confidence.",
+      "google": "Continue with Google",
+      "googleSoon": "Google OAuth coming soon! Use email signup for now.",
+      "name": "Name",
+      "namePlaceholder": "Your name",
+      "email": "Email",
+      "emailPlaceholder": "you@company.com",
+      "password": "Password",
+      "passwordPlaceholder": "Min 8 characters",
+      "submit": "Create Account",
+      "submitting": "Creating account...",
+      "hasAccount": "Already have an account?",
+      "login": "Log in",
+      "demoFirst": "See the demo first"
+    },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "subtitle": "Enter your email and we'll send you a reset link.",
+      "email": "Email",
+      "emailPlaceholder": "you@company.com",
+      "submit": "Send Reset Link",
+      "success": "Check your inbox for a password reset link. If you don't see it, check your spam folder.",
+      "remembered": "Remember your password?",
+      "login": "Log in"
+    }
+  },
+  "public": {
+    "landing": {
+      "badge": "The reliability layer for AI-built apps",
+      "heroTitlePrefix": "Ship AI-built apps without the",
+      "heroTitleAccent": "embarrassing breakage",
+      "heroSubtitle": "AiBreaker watches your app like a real user, runs adversarial web QA, and hands you a fix prompt you can paste back into your AI builder.",
+      "primaryCta": "Run a Free Vibe Check",
+      "secondaryCta": "See Pricing",
+      "footnote": "No credit card · Free forever · Cancel anytime",
+      "featuresEyebrow": "Features",
+      "featuresTitle": "Everything you need to ship with confidence",
+      "ctaTitle": "Ready to stop shipping broken apps?",
+      "ctaSubtitle": "Try AiBreaker free - no signup required for the demo.",
+      "ctaButton": "Try the Demo",
+      "footer": "© 2026 AiBreaker · Built for the AI-built web",
+      "socialProof": {
+        "appsAuditedValue": "2,100+",
+        "appsAuditedLabel": "Apps audited",
+        "bugsFoundValue": "14,000+",
+        "bugsFoundLabel": "Bugs found",
+        "foundersValue": "200+",
+        "foundersLabel": "Founders using it"
+      },
+      "features": {
+        "visionTitle": "AI Vision Audit",
+        "visionDesc": "Sees your app like a real user - catches visual bugs, broken flows, and dead clicks.",
+        "promptsTitle": "Copy-Paste Fix Prompts",
+        "promptsDesc": "Every bug comes with a prompt you can paste directly into Cursor, Bolt, or Lovable.",
+        "vibeTitle": "60-Second Vibe Check",
+        "vibeDesc": "Just paste a URL. Get a reliability score in under a minute - no config, no setup.",
+        "coverageTitle": "Mobile + Desktop Coverage",
+        "coverageDesc": "Tests both viewports side-by-side. Catches what Chrome DevTools misses.",
+        "monitoringTitle": "Monitoring & Regression",
+        "monitoringDesc": "Set it and forget it. Get alerted the moment your reliability score drops.",
+        "apiTitle": "CI/CD & API Ready",
+        "apiDesc": "Run audits from your pipeline. Block deploys that ship broken flows."
+      }
+    },
+    "demo": {
+      "eyebrow": "Live Demo",
+      "title": "See AiBreaker in action",
+      "subtitle": "Watch it find real bugs in a real AI-built app. No signup, no waiting.",
+      "targetUrl": "Target URL",
+      "watchDemo": "Watch Demo Audit",
+      "findings": "Findings ({{count}})",
+      "reliabilityScore": "Reliability Score: {{score}}",
+      "needsWork": "Needs Work",
+      "confidence": "{{value}}% confident",
+      "resultsSummary": "2 critical issues, 3 warnings, 1 informational finding detected across desktop and mobile viewports.",
+      "sessionReplay": "Session Replay",
+      "sessionReplayLabel": "Checkout Flow Failure",
+      "copyFixPrompts": "Copy All Fix Prompts",
+      "ctaTitleLine1": "That was someone else's app.",
+      "ctaTitleLine2Prefix": "What about",
+      "ctaTitleLine2Accent": "yours",
+      "ctaSubtitle": "Sign up free and run a real audit on your app in 60 seconds.",
+      "ctaButton": "Audit My App Free",
+      "footnote": "No credit card · Free forever · Cancel anytime",
+      "loadingSteps": {
+        "launching": "Launching browser...",
+        "crawling": "Crawling pages - desktop + mobile...",
+        "capturing": "Capturing screenshots...",
+        "sending": "Sending to AI vision model...",
+        "generating": "Generating fix prompts..."
+      },
+      "findingsData": {
+        "checkoutTitle": "Checkout button unreachable on mobile",
+        "checkoutDesc": "The checkout button is positioned behind the footer on screens below 430px. Users on iPhone cannot complete a purchase.",
+        "signupTitle": "Signup form accepts empty emails",
+        "signupDesc": "The signup form submits successfully with an empty email field, creating invalid user accounts.",
+        "heroOverflowTitle": "Hero headline overflows on tablet",
+        "contrastTitle": "CTA button contrast ratio 2.1:1 - fails WCAG AA",
+        "pricingCollapseTitle": "Pricing table collapses incorrectly on tablet",
+        "missingAltTitle": "3 images missing alt text"
+      }
+    },
+    "pricing": {
+      "eyebrow": "Pricing",
+      "title": "Simple, transparent pricing",
+      "subtitle": "Start free. Upgrade when you need deeper audits and AI-powered fixes.",
+      "mostPopular": "Most Popular",
+      "comparisonTitle": "Feature comparison",
+      "faqTitle": "Frequently asked questions",
+      "bottomCta": "Still not sure? Watch the demo first.",
+      "watchDemo": "Watch Demo",
+      "currentPlan": "Current",
+      "tiers": {
+        "vibe": {
+          "name": "Vibe Check",
+          "price": "Free",
+          "period": "forever",
+          "tagline": "Quick reliability scan",
+          "cta": "Get Started Free"
+        },
+        "deep": {
+          "name": "Deep Dive",
+          "price": "$29",
+          "period": "/month",
+          "tagline": "Full audit with video replay",
+          "cta": "Start Deep Dive"
+        },
+        "fix": {
+          "name": "Fix & Verify",
+          "price": "$79",
+          "period": "/month",
+          "tagline": "AI-powered fixes + verification",
+          "cta": "Start Fixing"
+        }
+      },
+      "features": {
+        "fiveAudits": "5 audits per month",
+        "desktopMobile": "Desktop + mobile scan",
+        "score": "Reliability score (0-100)",
+        "topFindings": "Top 5 findings",
+        "copyPrompts": "Copy-paste fix prompts",
+        "shareLinks": "Public share links",
+        "unlimited": "Unlimited audits",
+        "everythingVibe": "Everything in Vibe Check",
+        "videoReplay": "Video session replay",
+        "journeyTesting": "User journey testing",
+        "screenshots": "Screenshot comparisons",
+        "alerts": "Monitoring & alerts",
+        "apiAccess": "API access",
+        "prioritySupport": "Priority support",
+        "everythingDeep": "Everything in Deep Dive",
+        "aiFix": "AI fix generation",
+        "rerun": "Re-run verification",
+        "sourceAnalysis": "Source code analysis",
+        "ci": "CI/CD integration",
+        "customReporting": "Custom reporting",
+        "dedicatedSupport": "Dedicated support",
+        "sla": "SLA guarantee"
+      },
+      "comparisonHeaders": {
+        "feature": "Feature",
+        "vibe": "Vibe Check",
+        "deep": "Deep Dive",
+        "fix": "Fix & Verify"
+      },
+      "comparison": {
+        "monthlyAudits": "Monthly audits",
+        "reliabilityScore": "Reliability score",
+        "fixPrompts": "Fix prompts",
+        "videoReplay": "Video replay",
+        "journeyTesting": "Journey testing",
+        "monitoring": "Monitoring",
+        "aiFixGeneration": "AI fix generation",
+        "sourceCodeAnalysis": "Source code analysis",
+        "ciCd": "CI/CD integration",
+        "apiAccess": "API access",
+        "prioritySupport": "Priority support",
+        "unlimited": "Unlimited"
+      },
+      "faqs": {
+        "testQ": "What exactly does AiBreaker test?",
+        "testA": "AiBreaker crawls your app like a real user on both desktop and mobile. It screens for broken UI flows, dead clicks, visual bugs, accessibility issues, and logic errors - then hands you a fix prompt for each one.",
+        "installQ": "Do I need to install anything?",
+        "installA": "Nope. Just paste your public URL and hit \"Run Audit.\" AiBreaker uses its own headless browser - no SDK, no code changes, no deploys required.",
+        "differenceQ": "How is this different from Lighthouse or Playwright?",
+        "differenceA": "Lighthouse measures performance. Playwright requires you to write scripts. AiBreaker does visual + behavioral QA with AI - no script writing, and it generates fix prompts automatically.",
+        "cancelQ": "Can I cancel anytime?",
+        "cancelA": "Yes. No contracts, no lock-in. Cancel from your billing settings and your plan ends at the next billing cycle. Your audit history stays available on the free tier.",
+        "securityQ": "Is my site data secure?",
+        "securityA": "We only audit publicly accessible pages. Screenshots and recordings are encrypted at rest and deleted after 30 days. We never access your source code unless you explicitly paste it in the Fix & Verify tier."
+      }
+    },
+    "report": {
+      "eyebrow": "Public Report",
+      "findings": "Findings ({{count}})",
+      "cta": "Want to audit your own app?",
+      "ctaButton": "Get Started Free"
+    }
+  },
+  "dashboard": {
+    "overview": {
+      "eyebrow": "Dashboard",
+      "title": "Overview",
+      "subtitle": "Your reliability metrics at a glance.",
+      "stats": {
+        "totalAudits": "Total Audits",
+        "avgReliability": "Avg Reliability",
+        "bugsThisWeek": "Bugs This Week",
+        "sitesMonitored": "Sites Monitored"
+      },
+      "scoreTrend": "Score Trend - Last 10 Audits",
+      "latestAudit": "Latest Audit",
+      "viewReport": "View Report",
+      "emptyTitle": "No audits yet",
+      "emptySubtitle": "Run your first Vibe Check to see results here.",
+      "startVibeCheck": "Start Vibe Check",
+      "quickActions": "Quick Actions",
+      "runNewAudit": "Run New Audit",
+      "viewAllAudits": "View All Audits",
+      "setUpMonitoring": "Set Up Monitoring"
+    }
+  },
+  "audit": {
+    "banner": {
+      "inProgress": "Audit in progress{{suffix}}...",
+      "inProgressSuffix": " for {{url}}",
+      "ready": "Your audit is ready!",
+      "viewResults": "View results"
+    },
+    "tiers": {
+      "vibe": { "label": "Vibe Check", "desc": "Quick scan" },
+      "deep": { "label": "Deep Dive", "desc": "Full audit" },
+      "fix": { "label": "Fix & Verify", "desc": "AI fixes" }
+    },
+    "loadingSteps": {
+      "processing": "Processing...",
+      "complete": "Complete"
+    },
+    "list": {
+      "eyebrow": "History",
+      "title": "Audits",
+      "subtitle": "All your audit results in one place.",
+      "searchPlaceholder": "Search by URL...",
+      "countBadge": "{{count}}x",
+      "realUserBacklog": "Real-User Backlog",
+      "backlogSubtitle": "Top recurring failed steps grouped by app type and failure type.",
+      "liveTuningLoop": "Live tuning loop",
+      "lastSeen": "Last seen {{date}}",
+      "recently": "recently",
+      "exampleAudit": "Example audit",
+      "noResultsTitle": "No results found",
+      "noResultsSubtitle": "Try a different search term.",
+      "emptyTitle": "No audits yet",
+      "emptySubtitle": "Run your first audit to see results here.",
+      "firstAudit": "Run Your First Audit",
+      "table": {
+        "url": "URL",
+        "tier": "Tier",
+        "score": "Score",
+        "createdAt": "Date",
+        "findings": "Findings",
+        "actions": "Actions"
+      },
+      "tierLabels": {
+        "vibe": "Vibe",
+        "deep": "Deep",
+        "fix": "Fix"
+      }
+    },
+    "detail": {
+      "pdfFailed": "Failed to download PDF.",
+      "errorPrefix": "Error:",
+      "notFound": "Audit not found.",
+      "progressTitle": "Audit Progress",
+      "stopping": "Stopping...",
+      "stopAudit": "Stop Audit",
+      "stop": "Stop",
+      "labels": {
+        "auditReport": "Audit Report"
+      },
+      "reRun": "Re-run",
+      "share": "Share",
+      "sharing": "Sharing...",
+      "downloadPdf": "Download PDF",
+      "downloading": "Downloading...",
+      "linkCopied": "Link copied to clipboard",
+      "keyFailures": "Key Failures",
+      "videoReplay": "Video Replay",
+      "loadingVideo": "Loading video replay...",
+      "screenshotAlt": "Screenshot",
+      "journeyTimeline": "Journey Timeline",
+      "fixPlan": "AI-Generated Fix Plan",
+      "copyFixPlan": "Copy AI Fix Plan",
+      "copyAllFixPrompts": "Copy All Fix Prompts",
+      "findingsTitle": "Findings ({{count}})"
+    }
+  },
+  "monitoring": {
+    "title": "Continuous Monitoring",
+    "eyebrow": "Monitoring",
+    "subtitle": "Automatically re-tests your app on every deploy or schedule.",
+    "create": "Create Monitor",
+    "errors": {
+      "loadFailed": "Failed to load monitors",
+      "provideInputs": "Provide at least 3 test inputs.",
+      "invalidHeaders": "Headers must be valid JSON.",
+      "createFailed": "Failed to create monitor",
+      "runFailed": "Failed to start regression check"
+    },
+    "messages": {
+      "created": "Monitor created. Capturing baseline...",
+      "started": "Regression check started."
+    },
+    "empty": {
+      "title": "No monitors yet",
+      "subtitle": "Create your first monitor to get continuous regression checks."
+    },
+    "status": {
+      "pending": "Pending",
+      "ready": "Ready",
+      "regression": "Regression",
+      "ok": "OK",
+      "failed": "Failed"
+    },
+    "baseline": "Baseline: {{capturedAt}} · {{count}} samples",
+    "runCheck": "Run Regression Check",
+    "copyRegressionFix": "Copy Regression Fix",
+    "lastChecked": "Last checked",
+    "form": {
+      "title": "Create Monitor",
+      "featureName": "Feature Name",
+      "featureNamePlaceholder": "Checkout assistant",
+      "description": "Description",
+      "descriptionPlaceholder": "What this feature should do...",
+      "schedule": "Schedule",
+      "alertWebhook": "Alert Webhook",
+      "targetType": "Target Type",
+      "testInputs": "Test Inputs (one per line, min 3)",
+      "testInputsPlaceholder": "What is your refund policy?",
+      "create": "Create Monitor",
+      "creating": "Creating...",
+      "scheduleOptions": {
+        "daily": "Daily",
+        "hourly": "Hourly",
+        "onDeploy": "On deploy"
+      },
+      "targetOptions": {
+        "webhook": "Webhook / REST API",
+        "openai": "OpenAI-compatible",
+        "huggingface": "HuggingFace",
+        "langchain": "LangChain"
+      },
+      "endpointUrl": "Endpoint URL",
+      "headers": "Headers (JSON)",
+      "baseUrl": "Base URL",
+      "model": "Model"
+    }
+  },
+  "developer": {
+    "apiKeys": {
+      "eyebrow": "Developer",
+      "title": "API Keys",
+      "subtitle": "Manage API keys for programmatic access.",
+      "generate": "Generate New Key",
+      "table": {
+        "name": "Name",
+        "key": "Key",
+        "created": "Created",
+        "lastUsed": "Last Used",
+        "actions": "Actions"
+      },
+      "copyKey": "Copy key",
+      "revoke": "Revoke",
+      "usageExample": "Usage Example",
+      "modalTitle": "Generate API Key",
+      "keyName": "Key Name",
+      "keyNamePlaceholder": "e.g. Production, CI Pipeline",
+      "generateKey": "Generate Key"
+    }
+  },
+  "settings": {
+    "tabs": {
+      "profile": "Profile",
+      "security": "Security",
+      "billing": "Billing",
+      "workspace": "Workspace"
+    },
+    "layout": {
+      "eyebrow": "Account",
+      "title": "Settings"
+    },
+    "profile": {
+      "title": "Profile",
+      "uploadAvatar": "Upload avatar",
+      "avatarHelp": "JPG, PNG. Max 2MB.",
+      "displayName": "Display Name",
+      "email": "Email",
+      "connectedViaGoogle": "Connected via Google",
+      "save": "Save Changes"
+    },
+    "security": {
+      "changePassword": "Change Password",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm New Password",
+      "updatePassword": "Update Password",
+      "password": "Password",
+      "oauthMessage": "Your account is connected via Google. Password management is handled through your Google account.",
+      "activeSessions": "Active Sessions",
+      "device": "Device",
+      "lastActive": "Last Active",
+      "revoke": "Revoke",
+      "sessions": {
+        "chromeWindows": "Chrome on Windows",
+        "safariIphone": "Safari on iPhone",
+        "activeNow": "Active now"
+      }
+    },
+    "billing": {
+      "currentPlan": "Current Plan",
+      "freePlan": "Vibe Check - Free",
+      "auditsPerMonth": "5 audits per month",
+      "usage": "{{used}} of {{max}} audits used",
+      "changePlan": "Change Plan",
+      "currentBadge": "CURRENT",
+      "active": "Active",
+      "upgrade": "Upgrade",
+      "checkoutSoon": "Checkout coming soon! We will email you access.",
+      "invoiceHistory": "Invoice History",
+      "amount": "Amount",
+      "cancelPlan": "Cancel plan",
+      "plans": {
+        "vibe": { "name": "Vibe Check", "price": "Free" },
+        "deep": { "name": "Deep Dive", "price": "$29/mo" },
+        "fix": { "name": "Fix & Verify", "price": "$79/mo" }
+      },
+      "invoiceStatusPaid": "Paid"
+    },
+    "workspace": {
+      "visionKey": "AI Vision API Key",
+      "visionHelp": "Connect your own Gemini API key for dedicated quota. This gives you unlimited AI visual analysis without sharing the free pool.",
+      "connected": "Your Gemini key is connected - you have your own dedicated quota",
+      "saveKey": "Save Key",
+      "saving": "Saving...",
+      "freeKey": "Get a free key",
+      "freeKeyHelp": "Get a free API key from Google AI Studio - it only takes 2 minutes.",
+      "saveFailed": "Failed to save. Please check the key.",
+      "defaultTier": "Default Audit Tier",
+      "defaultTierHelp": "This tier will be pre-selected when starting new audits.",
+      "slack": "Slack Integration",
+      "webhook": "Webhook URL",
+      "testWebhook": "Test Webhook",
+      "emailNotifications": "Email Notifications",
+      "notifyRegression": "On regression detected",
+      "notifyComplete": "On audit complete",
+      "weeklySummary": "Weekly summary",
+      "saveWorkspace": "Save Workspace Settings"
+    }
+  },
+  "finding": {
+    "severity": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
+    "fixPrompt": "Fix Prompt"
+  }
+}

@@ -1,0 +1,4 @@
+group,name,url,expected_type,predicted_type,classification_correct,final_status,journey_result,journey_count,recovery_count,recovery_types,truth_over_exception_count,notes,audit_id
+edge_cases,Dynamic Loading,https://the-internet.herokuapp.com/dynamic_loading/2,generic,generic,True,done,core_navigation:FAILED,1,0,,0,Could not resolve action candidate: dashboard link,73ceec09-9183-4107-8f61-2ceeac2fbcec
+edge_cases,Frames,https://the-internet.herokuapp.com/frames,generic,generic,True,done,core_navigation:FAILED,1,0,,0,Could not resolve action candidate: dashboard link,179f5f16-f7b5-408f-b0c3-ebab992c9140
+edge_cases,AutoTrader,https://www.autotrader.co.uk/,blocked_by_bot_protection,generic,False,done,core_navigation:BLOCKED,1,0,,0,"Cloudflare or equivalent bot protection active — this is a site configuration issue, not an engine failure",7a53c8c6-b276-4278-9c08-d4580053d315

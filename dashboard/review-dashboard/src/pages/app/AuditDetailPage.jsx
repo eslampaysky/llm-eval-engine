@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { RotateCcw, Share2, Download, Monitor, Smartphone, Check, Loader, Shield, ChevronDown, AlertTriangle, Square } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getAuthHeader } from '../../context/AuthContext.jsx';
 import { api } from '../../services/api';
 import ScoreRing from '../../components/ScoreRing.jsx';
@@ -172,6 +173,7 @@ function EvidenceDiff({ stepResult }) {
 }
 
 export default function AuditDetailPage() {
+  const { t } = useTranslation();
   const { auditId } = useParams();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -273,7 +275,7 @@ export default function AuditDetailPage() {
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      setPdfError(err?.message || 'Failed to download PDF.');
+      setPdfError(err?.message || t('audit.detail.pdfFailed', 'Failed to download PDF.'));
     } finally {
       setPdfBusy(false);
     }
@@ -288,15 +290,15 @@ export default function AuditDetailPage() {
       setProgress(null);
       setError('');
     } catch (err) {
-      setError(err?.message || 'Failed to stop audit.');
+      setError(err?.message || t('audit.detail.stopAudit', 'Stop Audit'));
     } finally {
       setCancelBusy(false);
     }
   }
 
   if (loading) return <div className="page-container fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}><Loader size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent)' }} /></div>;
-  if (error) return <div className="page-container fade-in"><div className="error-box">Error: {error}</div></div>;
-  if (!report) return <div className="page-container fade-in"><div className="error-box">Audit not found.</div></div>;
+  if (error) return <div className="page-container fade-in"><div className="error-box">{t('audit.detail.errorPrefix', 'Error:')} {error}</div></div>;
+  if (!report) return <div className="page-container fade-in"><div className="error-box">{t('audit.detail.notFound', 'Audit not found.')}</div></div>;
 
   const findings = Array.isArray(report.findings) ? report.findings : [];
   const journeyTimeline = Array.isArray(report.journey_timeline) ? report.journey_timeline : [];
@@ -310,13 +312,13 @@ export default function AuditDetailPage() {
       {(report.status === 'processing' || report.status === 'queued') && (
         <div className="card" style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-            <div className="card-label" style={{ marginBottom: 0 }}>Audit Progress</div>
+            <div className="card-label" style={{ marginBottom: 0 }}>{t('audit.detail.progressTitle', 'Audit Progress')}</div>
             <button className="btn btn-ghost" onClick={handleCancel} disabled={cancelBusy} style={{ color: 'var(--red)', borderColor: 'rgba(255,107,107,0.2)' }}>
               <Square size={14} />
-              {cancelBusy ? 'Stopping...' : 'Stop Audit'}
+              {cancelBusy ? t('audit.detail.stopping', 'Stopping...') : t('audit.detail.stopAudit', 'Stop Audit')}
             </button>
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>{progress?.current_step || 'Processing...'}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>{progress?.current_step || t('audit.loadingSteps.processing', 'Processing...')}</div>
           <div style={{ height: 6, borderRadius: 'var(--radius-full)', background: 'var(--bg-surface)', overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${progress?.progress_pct || 0}%`, background: 'var(--accent)', transition: 'width 0.4s ease' }} />
           </div>
@@ -327,7 +329,7 @@ export default function AuditDetailPage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
           <ScoreRing score={overview.weightedScore} size={108} label="/100" />
           <div style={{ flex: 1, minWidth: 260 }}>
-            <div className="page-eyebrow">Audit Report</div>
+            <div className="page-eyebrow">{t('audit.detail.labels.auditReport', 'Audit Report')}</div>
             <h1 className="page-title" style={{ fontSize: 24, marginBottom: 8 }}>{report.url || 'Unknown URL'}</h1>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
               <span className="badge badge-blue">{tier}</span>
@@ -354,18 +356,18 @@ export default function AuditDetailPage() {
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
-        <button className="btn btn-ghost"><RotateCcw size={14} /> Re-run</button>
-        {canCancel && <button className="btn btn-ghost" onClick={handleCancel} disabled={cancelBusy} style={{ color: 'var(--red)', borderColor: 'rgba(255,107,107,0.2)' }}><Square size={14} /> {cancelBusy ? 'Stopping...' : 'Stop'}</button>}
-        <button className="btn btn-ghost" onClick={handleShare} disabled={shareBusy}><Share2 size={14} /> {shareBusy ? 'Sharing...' : 'Share'}</button>
-        <button className="btn btn-ghost" onClick={downloadPdf} disabled={pdfBusy}><Download size={14} /> {pdfBusy ? 'Downloading...' : 'Download PDF'}</button>
+        <button className="btn btn-ghost"><RotateCcw size={14} /> {t('audit.detail.reRun', 'Re-run')}</button>
+        {canCancel && <button className="btn btn-ghost" onClick={handleCancel} disabled={cancelBusy} style={{ color: 'var(--red)', borderColor: 'rgba(255,107,107,0.2)' }}><Square size={14} /> {cancelBusy ? t('audit.detail.stopping', 'Stopping...') : t('audit.detail.stop', 'Stop')}</button>}
+        <button className="btn btn-ghost" onClick={handleShare} disabled={shareBusy}><Share2 size={14} /> {shareBusy ? t('audit.detail.sharing', 'Sharing...') : t('audit.detail.share', 'Share')}</button>
+        <button className="btn btn-ghost" onClick={downloadPdf} disabled={pdfBusy}><Download size={14} /> {pdfBusy ? t('audit.detail.downloading', 'Downloading...') : t('audit.detail.downloadPdf', 'Download PDF')}</button>
       </div>
 
-      {shareToast && <div className="toast"><Check size={14} style={{ color: 'var(--green)' }} /> Link copied to clipboard</div>}
+      {shareToast && <div className="toast"><Check size={14} style={{ color: 'var(--green)' }} /> {t('audit.detail.linkCopied', 'Link copied to clipboard')}</div>}
       {pdfError && <div className="error-box">{pdfError}</div>}
 
       {overview.keyFailures.length > 0 && (
         <div className="card" style={cardStyle}>
-          <div className="card-label" style={{ marginBottom: 14 }}>Key Failures</div>
+          <div className="card-label" style={{ marginBottom: 14 }}>{t('audit.detail.keyFailures', 'Key Failures')}</div>
           <div style={{ display: 'grid', gap: 12 }}>
             {overview.keyFailures.map((step, index) => (
               <div key={`${step.goal || step.step_name}-${index}`} style={{ ...softPanel, border: '1px solid rgba(255,107,107,0.16)', background: 'rgba(255,107,107,0.06)' }}>
@@ -380,26 +382,26 @@ export default function AuditDetailPage() {
 
       {report.video_url && (
         <div className="card" style={cardStyle}>
-          <div className="card-label">Video Replay</div>
-          {mediaUrls.video ? <video controls src={mediaUrls.video} style={{ width: '100%', borderRadius: 'var(--radius-md)', background: '#000' }} /> : <div style={{ width: '100%', minHeight: 180, borderRadius: 'var(--radius-md)', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Loading video replay...</div>}
+          <div className="card-label">{t('audit.detail.videoReplay', 'Video Replay')}</div>
+          {mediaUrls.video ? <video controls src={mediaUrls.video} style={{ width: '100%', borderRadius: 'var(--radius-md)', background: '#000' }} /> : <div style={{ width: '100%', minHeight: 180, borderRadius: 'var(--radius-md)', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: 13 }}>{t('audit.detail.loadingVideo', 'Loading video replay...')}</div>}
         </div>
       )}
 
       <div className="card" style={cardStyle}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button className={viewport === 'desktop' ? 'btn btn-primary' : 'btn btn-ghost'} onClick={() => setViewport('desktop')} style={{ padding: '6px 14px', fontSize: 12 }}><Monitor size={14} /> Desktop</button>
-          <button className={viewport === 'mobile' ? 'btn btn-primary' : 'btn btn-ghost'} onClick={() => setViewport('mobile')} style={{ padding: '6px 14px', fontSize: 12 }}><Smartphone size={14} /> Mobile</button>
+          <button className={viewport === 'desktop' ? 'btn btn-primary' : 'btn btn-ghost'} onClick={() => setViewport('desktop')} style={{ padding: '6px 14px', fontSize: 12 }}><Monitor size={14} /> {t('common.desktop', 'Desktop')}</button>
+          <button className={viewport === 'mobile' ? 'btn btn-primary' : 'btn btn-ghost'} onClick={() => setViewport('mobile')} style={{ padding: '6px 14px', fontSize: 12 }}><Smartphone size={14} /> {t('common.mobile', 'Mobile')}</button>
         </div>
         <div style={{ background: 'var(--bg-deepest)', borderRadius: 'var(--radius-md)', height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--line)' }}>
-          {screenshotUrl ? <img src={screenshotUrl} alt="Screenshot" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }} /> : <span style={{ fontSize: 13, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{viewport === 'desktop' ? '1280x800' : '390x844'} screenshot</span>}
+          {screenshotUrl ? <img src={screenshotUrl} alt={t('audit.detail.screenshotAlt', 'Screenshot')} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }} /> : <span style={{ fontSize: 13, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{viewport === 'desktop' ? '1280x800' : '390x844'} screenshot</span>}
         </div>
       </div>
 
-      {report.summary && <div className="card" style={cardStyle}><div className="card-label">Summary</div><p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{report.summary}</p></div>}
+      {report.summary && <div className="card" style={cardStyle}><div className="card-label">{t('common.summary', 'Summary')}</div><p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{report.summary}</p></div>}
 
       {journeyTimeline.length > 0 && (
         <div className="card" style={cardStyle}>
-          <div className="card-label" style={{ marginBottom: 16 }}>Journey Timeline</div>
+          <div className="card-label" style={{ marginBottom: 16 }}>{t('audit.detail.journeyTimeline', 'Journey Timeline')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {journeyTimeline.map((journey, index) => {
               const journeyStatus = getStatusStyle(journey.status);
@@ -464,20 +466,20 @@ export default function AuditDetailPage() {
       {report.bundled_fix_prompt && findings.length === 0 ? (
         <div className="slide-up" style={{ marginBottom: 32 }}>
           <div style={{ background: 'linear-gradient(135deg, rgba(59, 180, 255, 0.08), rgba(52, 211, 153, 0.05))', border: '2px solid rgba(59, 180, 255, 0.2)', borderRadius: 'var(--radius-lg)', padding: 24, marginBottom: 16 }}>
-            <div className="card-label" style={{ color: 'var(--accent)', marginBottom: 16 }}>AI-Generated Fix Plan</div>
+            <div className="card-label" style={{ color: 'var(--accent)', marginBottom: 16 }}>{t('audit.detail.fixPlan', 'AI-Generated Fix Plan')}</div>
             <pre style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: 20, background: 'var(--bg-deepest)', padding: 16, borderRadius: 'var(--radius-md)' }}>{report.bundled_fix_prompt}</pre>
-            <CopyButton text={report.bundled_fix_prompt} label="Copy AI Fix Plan" size="lg" />
+            <CopyButton text={report.bundled_fix_prompt} label={t('audit.detail.copyFixPlan', 'Copy AI Fix Plan')} size="lg" />
           </div>
         </div>
-      ) : report.bundled_fix_prompt ? <div style={{ marginBottom: 24 }}><CopyButton text={report.bundled_fix_prompt} label="Copy All Fix Prompts" size="lg" /></div> : null}
+      ) : report.bundled_fix_prompt ? <div style={{ marginBottom: 24 }}><CopyButton text={report.bundled_fix_prompt} label={t('audit.detail.copyAllFixPrompts', 'Copy All Fix Prompts')} size="lg" /></div> : null}
 
       {findings.length > 0 && (
         <>
-          <div className="card-label" style={{ marginBottom: 12 }}>Findings ({findings.length})</div>
+          <div className="card-label" style={{ marginBottom: 12 }}>{t('audit.detail.findingsTitle', 'Findings ({{count}})', { count: findings.length })}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
             {findings.map((f, i) => <FindingCard key={i} severity={f.severity || 'info'} category={f.category} title={f.title || f.summary || 'Finding'} description={f.description} fixPrompt={f.fix_prompt || f.fixPrompt} />)}
           </div>
-          <CopyButton text={findings.filter((f) => f.fix_prompt || f.fixPrompt).map((f, i) => `${i + 1}. ${f.title || f.summary}\n${f.fix_prompt || f.fixPrompt}`).join('\n\n')} label="Copy All Fix Prompts" size="lg" />
+          <CopyButton text={findings.filter((f) => f.fix_prompt || f.fixPrompt).map((f, i) => `${i + 1}. ${f.title || f.summary}\n${f.fix_prompt || f.fixPrompt}`).join('\n\n')} label={t('audit.detail.copyAllFixPrompts', 'Copy All Fix Prompts')} size="lg" />
         </>
       )}
     </div>

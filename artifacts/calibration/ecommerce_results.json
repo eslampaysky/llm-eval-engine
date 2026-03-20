@@ -1,0 +1,1066 @@
+[
+  {
+    "group": "ecommerce",
+    "name": "SauceDemo",
+    "url": "https://www.saucedemo.com/",
+    "expected_type": "ecommerce",
+    "predicted_type": "ecommerce",
+    "classification_correct": true,
+    "final_status": "done",
+    "journey_result": "auth_first_direct_add_to_cart:FAILED / auth_first_detail_then_cart:FAILED",
+    "journey_count": 2,
+    "recovery_count": 0,
+    "recovery_types": "",
+    "truth_over_exception_count": 0,
+    "notes": "Could not resolve action candidate: sign in button | Could not resolve action candidate: sign in button",
+    "audit_id": "f2f76a37-33cf-4d47-ad94-70d56333e0a8",
+    "raw_status": {
+      "audit_id": "f2f76a37-33cf-4d47-ad94-70d56333e0a8",
+      "status": "done",
+      "url": "https://www.saucedemo.com/",
+      "tier": "deep",
+      "score": 96,
+      "confidence": 90,
+      "findings": [
+        {
+          "severity": "low",
+          "category": "content",
+          "title": "Console errors",
+          "description": "There are 2 console errors indicating failed resource loads with 401 status code. These should be resolved for optimal performance.",
+          "fix_prompt": "Investigate and fix the server-side issue causing 401 errors for resource loads.",
+          "confidence": 90
+        },
+        {
+          "severity": "low",
+          "category": "accessibility",
+          "title": "Missing form labels",
+          "description": "The form fields for username and password are missing labels, which can affect accessibility.",
+          "fix_prompt": "Add labels for username and password fields.",
+          "confidence": 90
+        }
+      ],
+      "summary": "The page appears to be mostly functional but has a few minor issues that should be addressed for better performance and accessibility.",
+      "bundled_fix_prompt": "I ran a reliability audit on https://www.saucedemo.com/ and found the following issues.\nPlease fix all of them:\n\n1. [LOW] Console errors\n   Fix: Investigate and fix the server-side issue causing 401 errors for resource loads.\n\n2. [LOW] Missing form labels\n   Fix: Add labels for username and password fields.\n\nAfter fixing all issues, make sure the site works correctly on both desktop (1280px) and mobile (390px) viewports.\n\nJourney context:\nState context: {\"base_url\": \"https://www.saucedemo.com/\", \"current_url\": \"https://www.saucedemo.com/\", \"auth\": {}, \"generated_credentials\": {}, \"inferred_context\": {\"app_type\": \"ecommerce\", \"features\": [\"login\", \"search\", \"cart\", \"checkout\"], \"primary_goal\": \"purchase item\", \"site_description\": \"Sauce Labs demo store with login and cart\", \"requires_auth_first\": true}, \"items\": {}, \"recovery_counters\": {}, \"step_history\": []}\nJourney: auth_first_direct_add_to_cart\n- Step login or sign in: failed | reason: Could not resolve action candidate: sign in button | delta: New text appeared: 'Epic sadface: Username is required'\nJourney: auth_first_detail_then_cart\n- Step login or sign in: failed | reason: Could not resolve action candidate: sign in button | delta: New text appeared: 'Epic sadface: Username is required'",
+      "journey_timeline": [
+        {
+          "journey": "auth_first_direct_add_to_cart",
+          "status": "FAILED",
+          "failed_step": "login or sign in",
+          "reason": "Could not resolve action candidate: sign in button",
+          "steps": [
+            {
+              "step": "login or sign in",
+              "status": "failed",
+              "failure_type": "action_resolution_failed",
+              "evidence_delta": [
+                "New text appeared: 'Epic sadface: Username is required'"
+              ],
+              "recovery_attempts": []
+            }
+          ]
+        },
+        {
+          "journey": "auth_first_detail_then_cart",
+          "status": "FAILED",
+          "failed_step": "login or sign in",
+          "reason": "Could not resolve action candidate: sign in button",
+          "steps": [
+            {
+              "step": "login or sign in",
+              "status": "failed",
+              "failure_type": "action_resolution_failed",
+              "evidence_delta": [
+                "New text appeared: 'Epic sadface: Username is required'"
+              ],
+              "recovery_attempts": []
+            }
+          ]
+        }
+      ],
+      "step_results": [
+        {
+          "step_name": "login or sign in",
+          "goal": "login",
+          "status": "failed",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [],
+            "failed_signals": [
+              {
+                "type": "expected_state_change",
+                "key": "is_logged_in",
+                "value": true,
+                "actual": null
+              }
+            ],
+            "delta_summary": [
+              "New text appeared: 'Epic sadface: Username is required'"
+            ],
+            "failure_type": "action_resolution_failed",
+            "llm_used": true
+          },
+          "evidence_delta": [
+            "New text appeared: 'Epic sadface: Username is required'"
+          ],
+          "recovery_attempts": [],
+          "failure_type": "action_resolution_failed",
+          "error": "Could not resolve action candidate: sign in button",
+          "notes": [],
+          "before_snapshot": {
+            "url": "https://www.saucedemo.com/",
+            "title": "Swag Labs",
+            "text_snippet": "Swag Labs\nAccepted usernames are:\nstandard_user\nlocked_out_user\nproblem_user\nperformance_glitch_user\nerror_user\nvisual_user\n\nPassword for all users:\nsecret_sauce"
+          },
+          "after_snapshot": {
+            "url": "https://www.saucedemo.com/",
+            "title": "Swag Labs",
+            "text_snippet": "Swag Labs\nEpic sadface: Username is required\nAccepted usernames are:\nstandard_user\nlocked_out_user\nproblem_user\nperformance_glitch_user\nerror_user\nvisual_user\n\nPassword for all users:\nsecret_sauce"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "login or sign in",
+          "goal": "login",
+          "status": "failed",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [],
+            "failed_signals": [
+              {
+                "type": "expected_state_change",
+                "key": "is_logged_in",
+                "value": true,
+                "actual": null
+              }
+            ],
+            "delta_summary": [
+              "New text appeared: 'Epic sadface: Username is required'"
+            ],
+            "failure_type": "action_resolution_failed",
+            "llm_used": true
+          },
+          "evidence_delta": [
+            "New text appeared: 'Epic sadface: Username is required'"
+          ],
+          "recovery_attempts": [],
+          "failure_type": "action_resolution_failed",
+          "error": "Could not resolve action candidate: sign in button",
+          "notes": [],
+          "before_snapshot": {
+            "url": "https://www.saucedemo.com/",
+            "title": "Swag Labs",
+            "text_snippet": "Swag Labs\nAccepted usernames are:\nstandard_user\nlocked_out_user\nproblem_user\nperformance_glitch_user\nerror_user\nvisual_user\n\nPassword for all users:\nsecret_sauce"
+          },
+          "after_snapshot": {
+            "url": "https://www.saucedemo.com/",
+            "title": "Swag Labs",
+            "text_snippet": "Swag Labs\nEpic sadface: Username is required\nAccepted usernames are:\nstandard_user\nlocked_out_user\nproblem_user\nperformance_glitch_user\nerror_user\nvisual_user\n\nPassword for all users:\nsecret_sauce"
+          },
+          "screenshot_path": null
+        }
+      ],
+      "analysis_limited": false,
+      "video_url": "/agentic-qa/f2f76a37-33cf-4d47-ad94-70d56333e0a8/video",
+      "desktop_screenshot_url": "/agentic-qa/f2f76a37-33cf-4d47-ad94-70d56333e0a8/screenshot/desktop",
+      "mobile_screenshot_url": "/agentic-qa/f2f76a37-33cf-4d47-ad94-70d56333e0a8/screenshot/mobile",
+      "created_at": "2026-03-20T02:48:35.896420+00:00"
+    }
+  },
+  {
+    "group": "ecommerce",
+    "name": "Automation Exercise",
+    "url": "https://automationexercise.com/",
+    "expected_type": "ecommerce",
+    "predicted_type": "ecommerce",
+    "classification_correct": true,
+    "final_status": "done",
+    "journey_result": "direct_add_to_cart:FAILED / detail_then_cart:FAILED",
+    "journey_count": 2,
+    "recovery_count": 7,
+    "recovery_types": "cookie_consent",
+    "truth_over_exception_count": 1,
+    "notes": "Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('Add to cart')\").first\n    - locator resolved to <a data-product-id=\"1\" class=\"btn btn-default add-to-cart\">\u2026</a>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - e | Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('Add to cart')\").first\n    - locator resolved to <a data-product-id=\"1\" class=\"btn btn-default add-to-cart\">\u2026</a>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - e | Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('View Details')\").first\n    - locator resolved to <a href=\"#\" tabindex=\"0\" role=\"button\" data-purpose-id=\"1\" class=\"fc-purpose-feature-more-info\" data-name=\"Store and/or access information on a device\" aria-label=",
+    "audit_id": "6820bd88-fea5-4016-ab67-f41e1c6032bd",
+    "raw_status": {
+      "audit_id": "6820bd88-fea5-4016-ab67-f41e1c6032bd",
+      "status": "done",
+      "url": "https://automationexercise.com/",
+      "tier": "deep",
+      "score": 90,
+      "confidence": 80,
+      "findings": [
+        {
+          "severity": "medium",
+          "category": "content",
+          "title": "Mixed Content Issues",
+          "description": "The page is loading resources over insecure HTTP protocol, which is causing mixed content warnings. This can lead to security issues and might block some resources from loading.",
+          "fix_prompt": "Update all HTTP links to HTTPS in the page's code, specifically for fonts.googleapis.com. Replace http://fonts.googleapis.com with https://fonts.googleapis.com in the stylesheet links.",
+          "confidence": 80
+        },
+        {
+          "severity": "low",
+          "category": "layout",
+          "title": "Cookie Consent Popup",
+          "description": "The cookie consent popup is covering part of the navigation menu and product listings, which can be intrusive and affect user experience.",
+          "fix_prompt": "Implement a more user-friendly cookie consent banner that does not cover critical page content. Consider a bottom or top banner that is less obstructive.",
+          "confidence": 80
+        },
+        {
+          "severity": "low",
+          "category": "accessibility",
+          "title": "Navigation and Link Text",
+          "description": "Some navigation links have unclear or missing text, which can affect accessibility for screen readers and users with visual impairments.",
+          "fix_prompt": "Ensure all navigation links have descriptive text. For example, the link with the text '' should be updated to have a descriptive label.",
+          "confidence": 80
+        }
+      ],
+      "summary": "The website has some issues with mixed content loading, a potentially intrusive cookie consent popup, and minor accessibility concerns with navigation links. Overall, the site functions but has areas for improvement in security, usability, and accessibility.",
+      "bundled_fix_prompt": "I ran a reliability audit on https://automationexercise.com/ and found the following issues.\nPlease fix all of them:\n\n1. [MEDIUM] Mixed Content Issues\n   Fix: Update all HTTP links to HTTPS in the page's code, specifically for fonts.googleapis.com. Replace http://fonts.googleapis.com with https://fonts.googleapis.com in the stylesheet links.\n\n2. [LOW] Cookie Consent Popup\n   Fix: Implement a more user-friendly cookie consent banner that does not cover critical page content. Consider a bottom or top banner that is less obstructive.\n\n3. [LOW] Navigation and Link Text\n   Fix: Ensure all navigation links have descriptive text. For example, the link with the text '' should be updated to have a descriptive label.\n\nAfter fixing all issues, make sure the site works correctly on both desktop (1280px) and mobile (390px) viewports.\n\nJourney context:\nState context: {\"base_url\": \"https://automationexercise.com/\", \"current_url\": \"https://automationexercise.com/\", \"auth\": {}, \"generated_credentials\": {}, \"inferred_context\": {\"app_type\": \"ecommerce\", \"features\": [\"login\", \"search\", \"cart\", \"checkout\"], \"primary_goal\": \"purchase item\", \"site_description\": \"E-commerce site with registration cart and checkout\", \"requires_auth_first\": false}, \"items\": {}, \"recovery_counters\": {}, \"step_history\": []}\nJourney: direct_add_to_cart\n- Step add to cart button on listing page: failed | reason: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('Add to cart')\").first\n    - locator resolved to <a data-product-id=\"1\" class=\"btn btn-default add-to-cart\">\u2026</a>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - e\nJourney: detail_then_cart\n- Step product detail link or view details button: passed\n- Step add to cart button on product detail page: failed | reason: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('Add to cart')\").first\n    - locator resolved to <a data-product-id=\"1\" class=\"btn btn-default add-to-cart\">\u2026</a>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - e",
+      "journey_timeline": [
+        {
+          "journey": "direct_add_to_cart",
+          "status": "FAILED",
+          "failed_step": "add to cart button on listing page",
+          "reason": "Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('Add to cart')\").first\n    - locator resolved to <a data-product-id=\"1\" class=\"btn btn-default add-to-cart\">\u2026</a>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - e",
+          "steps": [
+            {
+              "step": "add to cart button on listing page",
+              "status": "failed",
+              "failure_type": "action_resolution_failed",
+              "evidence_delta": [],
+              "recovery_attempts": [
+                {
+                  "choke_point": "before_action",
+                  "blocker_type": "cookie_consent",
+                  "action_taken": "clicked_close",
+                  "success": false,
+                  "selector_used": "[role='dialog'] button",
+                  "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+                },
+                {
+                  "choke_point": "after_failure",
+                  "blocker_type": "cookie_consent",
+                  "action_taken": "clicked_close",
+                  "success": false,
+                  "selector_used": "[role='dialog'] button",
+                  "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+                },
+                {
+                  "choke_point": "after_failure",
+                  "blocker_type": "cookie_consent",
+                  "action_taken": "clicked_close",
+                  "success": false,
+                  "selector_used": "[role='dialog'] button",
+                  "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "journey": "detail_then_cart",
+          "status": "FAILED",
+          "failed_step": "add to cart button on product detail page",
+          "reason": "Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('Add to cart')\").first\n    - locator resolved to <a data-product-id=\"1\" class=\"btn btn-default add-to-cart\">\u2026</a>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - e",
+          "steps": [
+            {
+              "step": "product detail link or view details button",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [],
+              "recovery_attempts": [
+                {
+                  "choke_point": "after_failure",
+                  "blocker_type": "cookie_consent",
+                  "action_taken": "clicked_close",
+                  "success": false,
+                  "selector_used": "[role='dialog'] button",
+                  "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+                }
+              ]
+            },
+            {
+              "step": "add to cart button on product detail page",
+              "status": "failed",
+              "failure_type": "action_resolution_failed",
+              "evidence_delta": [],
+              "recovery_attempts": [
+                {
+                  "choke_point": "before_action",
+                  "blocker_type": "cookie_consent",
+                  "action_taken": "clicked_close",
+                  "success": false,
+                  "selector_used": "[role='dialog'] button",
+                  "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+                },
+                {
+                  "choke_point": "after_failure",
+                  "blocker_type": "cookie_consent",
+                  "action_taken": "clicked_close",
+                  "success": false,
+                  "selector_used": "[role='dialog'] button",
+                  "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+                },
+                {
+                  "choke_point": "after_failure",
+                  "blocker_type": "cookie_consent",
+                  "action_taken": "clicked_close",
+                  "success": false,
+                  "selector_used": "[role='dialog'] button",
+                  "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "step_results": [
+        {
+          "step_name": "add to cart button on listing page",
+          "goal": "add_to_cart",
+          "status": "failed",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [
+              {
+                "type": "text_present",
+                "value": "cart",
+                "priority": "medium",
+                "required": false
+              },
+              {
+                "type": "text_present",
+                "value": "1",
+                "priority": "medium",
+                "required": false
+              },
+              {
+                "type": "element_visible",
+                "value": "Cart",
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [
+              {
+                "type": "expected_state_change",
+                "key": "cart_has_items",
+                "value": true,
+                "actual": null
+              }
+            ],
+            "delta_summary": [],
+            "failure_type": "action_resolution_failed",
+            "llm_used": false
+          },
+          "evidence_delta": [],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "[role='dialog'] button",
+              "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "[role='dialog'] button",
+              "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "[role='dialog'] button",
+              "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+            }
+          ],
+          "failure_type": "action_resolution_failed",
+          "error": "Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('Add to cart')\").first\n    - locator resolved to <a data-product-id=\"1\" class=\"btn btn-default add-to-cart\">\u2026</a>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - e",
+          "notes": [
+            "Cookie Consent detected but could not be fully cleared after 3 attempts"
+          ],
+          "before_snapshot": {
+            "url": "https://automationexercise.com/",
+            "title": "Automation Exercise",
+            "text_snippet": " Home\n\ue8f8 Products\n Cart\n Signup / Login\n Test Cases\n API Testing\n Video Tutorials\n Contact us\n  \nAutomationExercise\nFull-Fledged practice website for Automation Engineers\n\nAll QA engineers can use this website for automation practice and API testing either they are at beginner or advance level. This is for everybody to help them brush up their automation skills.\n\nTest Cases APIs list for practice\nCATEGORY\nWOMEN\nMEN\nKIDS\nBRANDS\n(6)\nPOLO\n(5)\nH&M\n(5)\nMADAME\n(3)\nMAST & HARBOUR\n(4)\nBABYHUG\n(3)\nALLEN SOLLY JUNIOR\n(3)\nKOOKIE KIDS\n(5)\nBIBA\nFEATURES ITEMS\nRs. 500\n\nBlue Top\n\nAdd to cart\nRs. 500\n\nBlue Top\n\nAdd to cart\nView Product\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nView Product\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nView Product\nR"
+          },
+          "after_snapshot": {
+            "url": "https://automationexercise.com/",
+            "title": "Automation Exercise",
+            "text_snippet": " Home\n\ue8f8 Products\n Cart\n Signup / Login\n Test Cases\n API Testing\n Video Tutorials\n Contact us\n  \nAutomationExercise\nFull-Fledged practice website for Automation Engineers\n\nAll QA engineers can use this website for automation practice and API testing either they are at beginner or advance level. This is for everybody to help them brush up their automation skills.\n\nTest Cases APIs list for practice\nCATEGORY\nWOMEN\nMEN\nKIDS\nBRANDS\n(6)\nPOLO\n(5)\nH&M\n(5)\nMADAME\n(3)\nMAST & HARBOUR\n(4)\nBABYHUG\n(3)\nALLEN SOLLY JUNIOR\n(3)\nKOOKIE KIDS\n(5)\nBIBA\nFEATURES ITEMS\nRs. 500\n\nBlue Top\n\nAdd to cart\nRs. 500\n\nBlue Top\n\nAdd to cart\nView Product\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nView Product\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nView Product\nR"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "product detail link or view details button",
+          "goal": "open_product",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": []
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [
+              {
+                "type": "element_visible",
+                "value": "Add to cart",
+                "priority": "medium",
+                "required": false
+              },
+              {
+                "type": "element_visible",
+                "value": "ADD TO CART",
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [],
+            "delta_summary": [],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [],
+          "recovery_attempts": [
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "[role='dialog'] button",
+              "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+            }
+          ],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Cookie Consent detected but could not be fully cleared after 3 attempts",
+            "Action error overruled by success signals: Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('View Details')\").first\n    - locator resolved to <a href=\"#\" tabindex=\"0\" role=\"button\" data-purpose-id=\"1\" class=\"fc-purpose-feature-more-info\" data-name=\"Store and/or access information on a device\" aria-label="
+          ],
+          "before_snapshot": {
+            "url": "https://automationexercise.com/",
+            "title": "Automation Exercise",
+            "text_snippet": " Home\n\ue8f8 Products\n Cart\n Signup / Login\n Test Cases\n API Testing\n Video Tutorials\n Contact us\n  \nAutomationExercise\nFull-Fledged practice website for Automation Engineers\n\nAll QA engineers can use this website for automation practice and API testing either they are at beginner or advance level. This is for everybody to help them brush up their automation skills.\n\nTest Cases APIs list for practice\nCATEGORY\nWOMEN\nMEN\nKIDS\nBRANDS\n(6)\nPOLO\n(5)\nH&M\n(5)\nMADAME\n(3)\nMAST & HARBOUR\n(4)\nBABYHUG\n(3)\nALLEN SOLLY JUNIOR\n(3)\nKOOKIE KIDS\n(5)\nBIBA\nFEATURES ITEMS\nRs. 500\n\nBlue Top\n\nAdd to cart\nRs. 500\n\nBlue Top\n\nAdd to cart\nView Product\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nView Product\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nView Product\nR"
+          },
+          "after_snapshot": {
+            "url": "https://automationexercise.com/",
+            "title": "Automation Exercise",
+            "text_snippet": " Home\n\ue8f8 Products\n Cart\n Signup / Login\n Test Cases\n API Testing\n Video Tutorials\n Contact us\n  \nAutomationExercise\nFull-Fledged practice website for Automation Engineers\n\nAll QA engineers can use this website for automation practice and API testing either they are at beginner or advance level. This is for everybody to help them brush up their automation skills.\n\nTest Cases APIs list for practice\nCATEGORY\nWOMEN\nMEN\nKIDS\nBRANDS\n(6)\nPOLO\n(5)\nH&M\n(5)\nMADAME\n(3)\nMAST & HARBOUR\n(4)\nBABYHUG\n(3)\nALLEN SOLLY JUNIOR\n(3)\nKOOKIE KIDS\n(5)\nBIBA\nFEATURES ITEMS\nRs. 500\n\nBlue Top\n\nAdd to cart\nRs. 500\n\nBlue Top\n\nAdd to cart\nView Product\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nView Product\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nView Product\nR"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "add to cart button on product detail page",
+          "goal": "add_to_cart_from_detail",
+          "status": "failed",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [
+              {
+                "type": "element_visible",
+                "value": "Cart",
+                "priority": "medium",
+                "required": false
+              },
+              {
+                "type": "text_present",
+                "value": "Cart",
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [
+              {
+                "type": "expected_state_change",
+                "key": "cart_has_items",
+                "value": true,
+                "actual": null
+              }
+            ],
+            "delta_summary": [],
+            "failure_type": "action_resolution_failed",
+            "llm_used": false
+          },
+          "evidence_delta": [],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "[role='dialog'] button",
+              "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "[role='dialog'] button",
+              "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "[role='dialog'] button",
+              "notes": "Cookie Consent detected but could not be fully cleared after 3 attempts"
+            }
+          ],
+          "failure_type": "action_resolution_failed",
+          "error": "Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('Add to cart')\").first\n    - locator resolved to <a data-product-id=\"1\" class=\"btn btn-default add-to-cart\">\u2026</a>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - e",
+          "notes": [
+            "Cookie Consent detected but could not be fully cleared after 3 attempts"
+          ],
+          "before_snapshot": {
+            "url": "https://automationexercise.com/",
+            "title": "Automation Exercise",
+            "text_snippet": " Home\n\ue8f8 Products\n Cart\n Signup / Login\n Test Cases\n API Testing\n Video Tutorials\n Contact us\n  \nAutomationExercise\nFull-Fledged practice website for Automation Engineers\n\nAll QA engineers can use this website for automation practice and API testing either they are at beginner or advance level. This is for everybody to help them brush up their automation skills.\n\nTest Cases APIs list for practice\nCATEGORY\nWOMEN\nMEN\nKIDS\nBRANDS\n(6)\nPOLO\n(5)\nH&M\n(5)\nMADAME\n(3)\nMAST & HARBOUR\n(4)\nBABYHUG\n(3)\nALLEN SOLLY JUNIOR\n(3)\nKOOKIE KIDS\n(5)\nBIBA\nFEATURES ITEMS\nRs. 500\n\nBlue Top\n\nAdd to cart\nRs. 500\n\nBlue Top\n\nAdd to cart\nView Product\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nView Product\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nView Product\nR"
+          },
+          "after_snapshot": {
+            "url": "https://automationexercise.com/",
+            "title": "Automation Exercise",
+            "text_snippet": " Home\n\ue8f8 Products\n Cart\n Signup / Login\n Test Cases\n API Testing\n Video Tutorials\n Contact us\n  \nAutomationExercise\nFull-Fledged practice website for Automation Engineers\n\nAll QA engineers can use this website for automation practice and API testing either they are at beginner or advance level. This is for everybody to help them brush up their automation skills.\n\nTest Cases APIs list for practice\nCATEGORY\nWOMEN\nMEN\nKIDS\nBRANDS\n(6)\nPOLO\n(5)\nH&M\n(5)\nMADAME\n(3)\nMAST & HARBOUR\n(4)\nBABYHUG\n(3)\nALLEN SOLLY JUNIOR\n(3)\nKOOKIE KIDS\n(5)\nBIBA\nFEATURES ITEMS\nRs. 500\n\nBlue Top\n\nAdd to cart\nRs. 500\n\nBlue Top\n\nAdd to cart\nView Product\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nView Product\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nView Product\nR"
+          },
+          "screenshot_path": null
+        }
+      ],
+      "analysis_limited": false,
+      "video_url": "/agentic-qa/6820bd88-fea5-4016-ab67-f41e1c6032bd/video",
+      "desktop_screenshot_url": "/agentic-qa/6820bd88-fea5-4016-ab67-f41e1c6032bd/screenshot/desktop",
+      "mobile_screenshot_url": "/agentic-qa/6820bd88-fea5-4016-ab67-f41e1c6032bd/screenshot/mobile",
+      "created_at": "2026-03-20T02:49:55.760141+00:00"
+    }
+  },
+  {
+    "group": "ecommerce",
+    "name": "Advantage Online Shopping",
+    "url": "https://www.advantageonlineshopping.com",
+    "expected_type": "ecommerce",
+    "predicted_type": "ecommerce",
+    "classification_correct": true,
+    "final_status": "done",
+    "journey_result": "direct_add_to_cart:FAILED / detail_then_cart:FAILED",
+    "journey_count": 2,
+    "recovery_count": 0,
+    "recovery_types": "",
+    "truth_over_exception_count": 1,
+    "notes": "Could not resolve action candidate: add to cart | Could not resolve action candidate: add to cart button | Action error overruled by success signals: Could not resolve action candidate: view details link",
+    "audit_id": "67854934-56e3-485b-932b-0f581f849630",
+    "raw_status": {
+      "audit_id": "67854934-56e3-485b-932b-0f581f849630",
+      "status": "done",
+      "url": "https://www.advantageonlineshopping.com",
+      "tier": "deep",
+      "score": 88,
+      "confidence": 90,
+      "findings": [
+        {
+          "severity": "low",
+          "category": "layout",
+          "title": "Inconsistent button styling",
+          "description": "Buttons have inconsistent styling, with some having a rectangular shape and others being circular or having different font sizes.",
+          "fix_prompt": "Standardize button styles to have a consistent shape, size, and font across the website.",
+          "confidence": 90
+        },
+        {
+          "severity": "medium",
+          "category": "functionality",
+          "title": "Failed network requests",
+          "description": "There are 3 failed network requests to Google Analytics, which may affect tracking and analytics.",
+          "fix_prompt": "Investigate and fix the failed network requests to Google Analytics to ensure proper tracking and analytics.",
+          "confidence": 90
+        },
+        {
+          "severity": "low",
+          "category": "content",
+          "title": "Missing alt text for images",
+          "description": "Some images are missing alt text, which may affect accessibility and SEO.",
+          "fix_prompt": "Add alt text to all images on the website to improve accessibility and SEO.",
+          "confidence": 90
+        },
+        {
+          "severity": "low",
+          "category": "accessibility",
+          "title": "Insufficient color contrast",
+          "description": "Some text and background colors may not have sufficient contrast, which may affect readability.",
+          "fix_prompt": "Ensure that all text and background colors have sufficient contrast to improve readability.",
+          "confidence": 90
+        }
+      ],
+      "summary": "The website has some minor issues with layout and functionality, but overall it looks professional and is functional. However, there are some areas for improvement to enhance user experience and accessibility.",
+      "bundled_fix_prompt": "I ran a reliability audit on https://www.advantageonlineshopping.com and found the following issues.\nPlease fix all of them:\n\n1. [LOW] Inconsistent button styling\n   Fix: Standardize button styles to have a consistent shape, size, and font across the website.\n\n2. [MEDIUM] Failed network requests\n   Fix: Investigate and fix the failed network requests to Google Analytics to ensure proper tracking and analytics.\n\n3. [LOW] Missing alt text for images\n   Fix: Add alt text to all images on the website to improve accessibility and SEO.\n\n4. [LOW] Insufficient color contrast\n   Fix: Ensure that all text and background colors have sufficient contrast to improve readability.\n\nAfter fixing all issues, make sure the site works correctly on both desktop (1280px) and mobile (390px) viewports.\n\nJourney context:\nState context: {\"base_url\": \"https://www.advantageonlineshopping.com\", \"current_url\": \"https://www.advantageonlineshopping.com\", \"auth\": {}, \"generated_credentials\": {}, \"inferred_context\": {\"app_type\": \"ecommerce\", \"features\": [\"login\", \"search\", \"cart\", \"checkout\"], \"primary_goal\": \"purchase item\", \"site_description\": \"Electronics store with category tiles product catalog and cart\", \"requires_auth_first\": false}, \"items\": {}, \"recovery_counters\": {}, \"step_history\": []}\nJourney: direct_add_to_cart\n- Step add to cart button on listing page: failed | reason: Could not resolve action candidate: add to cart | delta: New text appeared: 'ALL YOU WANT FROM A TABLET', New text appeared: 'CHAT WITH US', New text appeared: 'Category'\nJourney: detail_then_cart\n- Step product detail link or view details button: passed | delta: URL changed from https://www.advantageonlineshopping.com/ to https://www.advantageonlineshopping.com/#/\n- Step add to cart button on product detail page: failed | reason: Could not resolve action candidate: add to cart button | delta: New text appeared: 'CONTACT US', New text appeared: 'OUR PRODUCTS', New text appeared: 'POPULAR ITEMS'",
+      "journey_timeline": [
+        {
+          "journey": "direct_add_to_cart",
+          "status": "FAILED",
+          "failed_step": "add to cart button on listing page",
+          "reason": "Could not resolve action candidate: add to cart",
+          "steps": [
+            {
+              "step": "add to cart button on listing page",
+              "status": "failed",
+              "failure_type": "action_resolution_failed",
+              "evidence_delta": [
+                "New text appeared: 'ALL YOU WANT FROM A TABLET'",
+                "New text appeared: 'CHAT WITH US'",
+                "New text appeared: 'Category'"
+              ],
+              "recovery_attempts": []
+            }
+          ]
+        },
+        {
+          "journey": "detail_then_cart",
+          "status": "FAILED",
+          "failed_step": "add to cart button on product detail page",
+          "reason": "Could not resolve action candidate: add to cart button",
+          "steps": [
+            {
+              "step": "product detail link or view details button",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [
+                "URL changed from https://www.advantageonlineshopping.com/ to https://www.advantageonlineshopping.com/#/"
+              ],
+              "recovery_attempts": []
+            },
+            {
+              "step": "add to cart button on product detail page",
+              "status": "failed",
+              "failure_type": "action_resolution_failed",
+              "evidence_delta": [
+                "New text appeared: 'CONTACT US'",
+                "New text appeared: 'OUR PRODUCTS'",
+                "New text appeared: 'POPULAR ITEMS'"
+              ],
+              "recovery_attempts": []
+            }
+          ]
+        }
+      ],
+      "step_results": [
+        {
+          "step_name": "add to cart button on listing page",
+          "goal": "add_to_cart",
+          "status": "failed",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [
+              {
+                "type": "text_present",
+                "value": "1",
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [
+              {
+                "type": "expected_state_change",
+                "key": "cart_has_items",
+                "value": true,
+                "actual": null
+              }
+            ],
+            "delta_summary": [
+              "New text appeared: 'ALL YOU WANT FROM A TABLET'",
+              "New text appeared: 'CHAT WITH US'",
+              "New text appeared: 'Category'"
+            ],
+            "failure_type": "action_resolution_failed",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "New text appeared: 'ALL YOU WANT FROM A TABLET'",
+            "New text appeared: 'CHAT WITH US'",
+            "New text appeared: 'Category'"
+          ],
+          "recovery_attempts": [],
+          "failure_type": "action_resolution_failed",
+          "error": "Could not resolve action candidate: add to cart",
+          "notes": [],
+          "before_snapshot": {
+            "url": "https://www.advantageonlineshopping.com/#/",
+            "title": "\u00a0Advantage Shopping",
+            "text_snippet": " \n \n \n \n \n \nCONTACT US\n \nPOPULAR ITEMS\n \nSPECIAL OFFER\n \nOUR PRODUCTS\n dvantage DEMO"
+          },
+          "after_snapshot": {
+            "url": "https://www.advantageonlineshopping.com/#/",
+            "title": "\u00a0Advantage Shopping",
+            "text_snippet": " \n \n \n \n \n \nCONTACT US\n \nPOPULAR ITEMS\n \nSPECIAL OFFER\n \nOUR PRODUCTS\n dvantage DEMO\nSPEAKERS\nShop Now\n\t\nTABLETS\nShop Now\n\t\n\nLAPTOPS\nShop Now\n\t\nMICE\nShop Now\n\t\nHEADPHONES\nShop Now\nSPECIAL OFFER\n\t\nEXPLORE THE NEW DESIGN\nHP Pavilion 15z Touch Laptop\n\nSupremely thin, yet incredibly durable\n\nSEE OFFER\nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nEXPLORE OUR LATEST\nINNOVATIVE PRODUCTS\nEXPLORE NOW\nSTART EXPLORING HP NOTEBOOKS\nEXPLORE NOW\n \nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nPOPULAR ITEMS\n\nHP ELITEPAD 1000 G2 TABLET\n\nView Details\n\nHP ELITEBOOK FOLIO\n\nView Details\n\nHP ROAR PLUS WIRELESS SPEAKER\n\nView Details\nCHAT WITH US\n\t\nCONTACT US\nSelect Category\nLaptops\nHeadphones\nTablets\nSpeakers\nMice\nCategory\nSelect Product\nProduct\n*\nEmail\n \n*\nSubject\nSEND\nFOLLOW US\n  \n\u00a9 Advantage Inc, 2024. Release 3.3"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "product detail link or view details button",
+          "goal": "open_product",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": []
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [],
+            "failed_signals": [],
+            "delta_summary": [
+              "URL changed from https://www.advantageonlineshopping.com/ to https://www.advantageonlineshopping.com/#/"
+            ],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "URL changed from https://www.advantageonlineshopping.com/ to https://www.advantageonlineshopping.com/#/"
+          ],
+          "recovery_attempts": [],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Action error overruled by success signals: Could not resolve action candidate: view details link"
+          ],
+          "before_snapshot": {
+            "url": "https://www.advantageonlineshopping.com/",
+            "title": "\u00a0Advantage Shopping",
+            "text_snippet": " \n \n \n \n \n    \n dvantage DEMO"
+          },
+          "after_snapshot": {
+            "url": "https://www.advantageonlineshopping.com/#/",
+            "title": "\u00a0Advantage Shopping",
+            "text_snippet": " \n \n \n \n \n    \n dvantage DEMO"
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "add to cart button on product detail page",
+          "goal": "add_to_cart_from_detail",
+          "status": "failed",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [],
+            "failed_signals": [
+              {
+                "type": "expected_state_change",
+                "key": "cart_has_items",
+                "value": true,
+                "actual": null
+              }
+            ],
+            "delta_summary": [
+              "New text appeared: 'CONTACT US'",
+              "New text appeared: 'OUR PRODUCTS'",
+              "New text appeared: 'POPULAR ITEMS'"
+            ],
+            "failure_type": "action_resolution_failed",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "New text appeared: 'CONTACT US'",
+            "New text appeared: 'OUR PRODUCTS'",
+            "New text appeared: 'POPULAR ITEMS'"
+          ],
+          "recovery_attempts": [],
+          "failure_type": "action_resolution_failed",
+          "error": "Could not resolve action candidate: add to cart button",
+          "notes": [],
+          "before_snapshot": {
+            "url": "https://www.advantageonlineshopping.com/#/",
+            "title": "\u00a0Advantage Shopping",
+            "text_snippet": " \n \n \n \n \n    \n dvantage DEMO"
+          },
+          "after_snapshot": {
+            "url": "https://www.advantageonlineshopping.com/#/",
+            "title": "\u00a0Advantage Shopping",
+            "text_snippet": " \n \n \n \n \n \nCONTACT US\n \nPOPULAR ITEMS\n \nSPECIAL OFFER\n \nOUR PRODUCTS\n dvantage DEMO"
+          },
+          "screenshot_path": null
+        }
+      ],
+      "analysis_limited": false,
+      "video_url": "/agentic-qa/67854934-56e3-485b-932b-0f581f849630/video",
+      "desktop_screenshot_url": "/agentic-qa/67854934-56e3-485b-932b-0f581f849630/screenshot/desktop",
+      "mobile_screenshot_url": "/agentic-qa/67854934-56e3-485b-932b-0f581f849630/screenshot/mobile",
+      "created_at": "2026-03-20T02:53:09.294169+00:00"
+    }
+  },
+  {
+    "group": "ecommerce",
+    "name": "Demoblaze",
+    "url": "https://www.demoblaze.com",
+    "expected_type": "ecommerce",
+    "predicted_type": "ecommerce",
+    "classification_correct": true,
+    "final_status": "done",
+    "journey_result": "direct_add_to_cart:FAILED / detail_then_cart:FAILED",
+    "journey_count": 2,
+    "recovery_count": 0,
+    "recovery_types": "",
+    "truth_over_exception_count": 1,
+    "notes": "Could not resolve action candidate: add to cart | Could not resolve action candidate: add to cart button | Action error overruled by success signals: Could not resolve action candidate: view details link",
+    "audit_id": "6ddef2e6-ad5c-4985-ab6e-0f8cc8893baa",
+    "raw_status": {
+      "audit_id": "6ddef2e6-ad5c-4985-ab6e-0f8cc8893baa",
+      "status": "done",
+      "url": "https://www.demoblaze.com",
+      "tier": "deep",
+      "score": 92,
+      "confidence": 90,
+      "findings": [
+        {
+          "severity": "low",
+          "category": "layout",
+          "title": "Inconsistent product description truncation",
+          "description": "Product descriptions are truncated, but some descriptions are cut off in the middle of a sentence, while others end with a period.",
+          "fix_prompt": "Standardize product description truncation to end with a period or ellipsis.",
+          "confidence": 90
+        },
+        {
+          "severity": "low",
+          "category": "content",
+          "title": "Typo in product description",
+          "description": "The Nexus 6 product description is cut off and contains 'is powered by 2.7GHz quad-core Qualcomm Snapdragon' which seems incomplete.",
+          "fix_prompt": "Complete the Nexus 6 product description.",
+          "confidence": 90
+        },
+        {
+          "severity": "low",
+          "category": "accessibility",
+          "title": "Missing alt text for images",
+          "description": "No alt text is provided for product images, which can affect screen reader users.",
+          "fix_prompt": "Add alt text to all product images.",
+          "confidence": 90
+        },
+        {
+          "severity": "low",
+          "category": "layout",
+          "title": "Inconsistent spacing between elements",
+          "description": "There are inconsistent spacings between elements on the page, which can affect readability.",
+          "fix_prompt": "Standardize spacing between elements.",
+          "confidence": 90
+        }
+      ],
+      "summary": "The website has some minor issues with layout and content, but overall it looks professional. There are some inconsistencies in product descriptions and spacing between elements.",
+      "bundled_fix_prompt": "I ran a reliability audit on https://www.demoblaze.com and found the following issues.\nPlease fix all of them:\n\n1. [LOW] Inconsistent product description truncation\n   Fix: Standardize product description truncation to end with a period or ellipsis.\n\n2. [LOW] Typo in product description\n   Fix: Complete the Nexus 6 product description.\n\n3. [LOW] Missing alt text for images\n   Fix: Add alt text to all product images.\n\n4. [LOW] Inconsistent spacing between elements\n   Fix: Standardize spacing between elements.\n\nAfter fixing all issues, make sure the site works correctly on both desktop (1280px) and mobile (390px) viewports.\n\nJourney context:\nState context: {\"base_url\": \"https://www.demoblaze.com\", \"current_url\": \"https://www.demoblaze.com\", \"auth\": {}, \"generated_credentials\": {}, \"inferred_context\": {\"app_type\": \"ecommerce\", \"features\": [\"login\", \"search\", \"cart\", \"checkout\"], \"primary_goal\": \"purchase item\", \"site_description\": \"Simple JavaScript store with product catalog cart and checkout\", \"requires_auth_first\": false}, \"items\": {}, \"recovery_counters\": {}, \"step_history\": []}\nJourney: direct_add_to_cart\n- Step add to cart button on listing page: failed | reason: Could not resolve action candidate: add to cart | delta: New text appeared: '$360', New text appeared: '$650', New text appeared: '$800'\nJourney: detail_then_cart\n- Step product detail link or view details button: passed | delta: New text appeared: '$360', New text appeared: '$650', New text appeared: '$800'\n- Step add to cart button on product detail page: failed | reason: Could not resolve action candidate: add to cart button",
+      "journey_timeline": [
+        {
+          "journey": "direct_add_to_cart",
+          "status": "FAILED",
+          "failed_step": "add to cart button on listing page",
+          "reason": "Could not resolve action candidate: add to cart",
+          "steps": [
+            {
+              "step": "add to cart button on listing page",
+              "status": "failed",
+              "failure_type": "action_resolution_failed",
+              "evidence_delta": [
+                "New text appeared: '$360'",
+                "New text appeared: '$650'",
+                "New text appeared: '$800'"
+              ],
+              "recovery_attempts": []
+            }
+          ]
+        },
+        {
+          "journey": "detail_then_cart",
+          "status": "FAILED",
+          "failed_step": "add to cart button on product detail page",
+          "reason": "Could not resolve action candidate: add to cart button",
+          "steps": [
+            {
+              "step": "product detail link or view details button",
+              "status": "passed",
+              "failure_type": null,
+              "evidence_delta": [
+                "New text appeared: '$360'",
+                "New text appeared: '$650'",
+                "New text appeared: '$800'"
+              ],
+              "recovery_attempts": []
+            },
+            {
+              "step": "add to cart button on product detail page",
+              "status": "failed",
+              "failure_type": "action_resolution_failed",
+              "evidence_delta": [],
+              "recovery_attempts": []
+            }
+          ]
+        }
+      ],
+      "step_results": [
+        {
+          "step_name": "add to cart button on listing page",
+          "goal": "add_to_cart",
+          "status": "failed",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [
+              {
+                "type": "text_present",
+                "value": "cart",
+                "priority": "medium",
+                "required": false
+              },
+              {
+                "type": "text_present",
+                "value": "1",
+                "priority": "medium",
+                "required": false
+              },
+              {
+                "type": "element_visible",
+                "value": "Cart",
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [
+              {
+                "type": "expected_state_change",
+                "key": "cart_has_items",
+                "value": true,
+                "actual": null
+              }
+            ],
+            "delta_summary": [
+              "New text appeared: '$360'",
+              "New text appeared: '$650'",
+              "New text appeared: '$800'"
+            ],
+            "failure_type": "action_resolution_failed",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "New text appeared: '$360'",
+            "New text appeared: '$650'",
+            "New text appeared: '$800'"
+          ],
+          "recovery_attempts": [],
+          "failure_type": "action_resolution_failed",
+          "error": "Could not resolve action candidate: add to cart",
+          "notes": [],
+          "before_snapshot": {
+            "url": "https://www.demoblaze.com/",
+            "title": "STORE",
+            "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nPrevious\nNext\nAbout Us\n\nWe believe performance needs to be validated at every stage of the software development cycle and our open source compatible, massively scalable platform makes that a reality.\n\nGet in Touch\n\nAddress: 2390 El Camino Real\n\nPhone: +440 123456\n\nEmail: demo@blazemeter.com\n\n PRODUCT STORE\n\nCopyright \u00a9 Product Store"
+          },
+          "after_snapshot": {
+            "url": "https://www.demoblaze.com/",
+            "title": "STORE",
+            "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nSamsung galaxy s6\n$360\n\nThe Samsung Galaxy S6 is powered by 1.5GHz octa-core Samsung Exynos 7420 processor and it comes with 3GB of RAM. The phone packs 32GB of internal storage cannot be expanded.\n\nNokia lumia 1520\n$820\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nNexus 6\n$650\n\nThe Motorola Google Nexus 6 is powered by 2.7GHz quad-core Qualcomm Snapdragon 805 processor and it comes with 3GB of RAM.\n\nSamsung galaxy s7\n$800\n\nThe Samsung Galaxy S7 is powered by 1.6GHz octa-core it comes with 4GB of RAM. The phone packs 32GB of internal storage that can be expanded up to 200GB via a microSD card.\n\nIphone 6 "
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "product detail link or view details button",
+          "goal": "open_product",
+          "status": "passed",
+          "chosen_action": {
+            "sequence": []
+          },
+          "verification": {
+            "success": true,
+            "passed_signals": [],
+            "failed_signals": [],
+            "delta_summary": [
+              "New text appeared: '$360'",
+              "New text appeared: '$650'",
+              "New text appeared: '$800'"
+            ],
+            "failure_type": "none",
+            "llm_used": false
+          },
+          "evidence_delta": [
+            "New text appeared: '$360'",
+            "New text appeared: '$650'",
+            "New text appeared: '$800'"
+          ],
+          "recovery_attempts": [],
+          "failure_type": null,
+          "error": null,
+          "notes": [
+            "Action error overruled by success signals: Could not resolve action candidate: view details link"
+          ],
+          "before_snapshot": {
+            "url": "https://www.demoblaze.com/",
+            "title": "STORE",
+            "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nPrevious\nNext\nAbout Us\n\nWe believe performance needs to be validated at every stage of the software development cycle and our open source compatible, massively scalable platform makes that a reality.\n\nGet in Touch\n\nAddress: 2390 El Camino Real\n\nPhone: +440 123456\n\nEmail: demo@blazemeter.com\n\n PRODUCT STORE\n\nCopyright \u00a9 Product Store"
+          },
+          "after_snapshot": {
+            "url": "https://www.demoblaze.com/",
+            "title": "STORE",
+            "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nSamsung galaxy s6\n$360\n\nThe Samsung Galaxy S6 is powered by 1.5GHz octa-core Samsung Exynos 7420 processor and it comes with 3GB of RAM. The phone packs 32GB of internal storage cannot be expanded.\n\nNokia lumia 1520\n$820\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nNexus 6\n$650\n\nThe Motorola Google Nexus 6 is powered by 2.7GHz quad-core Qualcomm Snapdragon 805 processor and it comes with 3GB of RAM.\n\nSamsung galaxy s7\n$800\n\nThe Samsung Galaxy S7 is powered by 1.6GHz octa-core it comes with 4GB of RAM. The phone packs 32GB of internal storage that can be expanded up to 200GB via a microSD card.\n\nIphone 6 "
+          },
+          "screenshot_path": null
+        },
+        {
+          "step_name": "add to cart button on product detail page",
+          "goal": "add_to_cart_from_detail",
+          "status": "failed",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [
+              {
+                "type": "element_visible",
+                "value": "Cart",
+                "priority": "medium",
+                "required": false
+              },
+              {
+                "type": "text_present",
+                "value": "Cart",
+                "priority": "medium",
+                "required": false
+              }
+            ],
+            "failed_signals": [
+              {
+                "type": "expected_state_change",
+                "key": "cart_has_items",
+                "value": true,
+                "actual": null
+              }
+            ],
+            "delta_summary": [],
+            "failure_type": "action_resolution_failed",
+            "llm_used": false
+          },
+          "evidence_delta": [],
+          "recovery_attempts": [],
+          "failure_type": "action_resolution_failed",
+          "error": "Could not resolve action candidate: add to cart button",
+          "notes": [],
+          "before_snapshot": {
+            "url": "https://www.demoblaze.com/",
+            "title": "STORE",
+            "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nSamsung galaxy s6\n$360\n\nThe Samsung Galaxy S6 is powered by 1.5GHz octa-core Samsung Exynos 7420 processor and it comes with 3GB of RAM. The phone packs 32GB of internal storage cannot be expanded.\n\nNokia lumia 1520\n$820\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nNexus 6\n$650\n\nThe Motorola Google Nexus 6 is powered by 2.7GHz quad-core Qualcomm Snapdragon 805 processor and it comes with 3GB of RAM.\n\nSamsung galaxy s7\n$800\n\nThe Samsung Galaxy S7 is powered by 1.6GHz octa-core it comes with 4GB of RAM. The phone packs 32GB of internal storage that can be expanded up to 200GB via a microSD card.\n\nIphone 6 "
+          },
+          "after_snapshot": {
+            "url": "https://www.demoblaze.com/",
+            "title": "STORE",
+            "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nSamsung galaxy s6\n$360\n\nThe Samsung Galaxy S6 is powered by 1.5GHz octa-core Samsung Exynos 7420 processor and it comes with 3GB of RAM. The phone packs 32GB of internal storage cannot be expanded.\n\nNokia lumia 1520\n$820\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nNexus 6\n$650\n\nThe Motorola Google Nexus 6 is powered by 2.7GHz quad-core Qualcomm Snapdragon 805 processor and it comes with 3GB of RAM.\n\nSamsung galaxy s7\n$800\n\nThe Samsung Galaxy S7 is powered by 1.6GHz octa-core it comes with 4GB of RAM. The phone packs 32GB of internal storage that can be expanded up to 200GB via a microSD card.\n\nIphone 6 "
+          },
+          "screenshot_path": null
+        }
+      ],
+      "analysis_limited": false,
+      "video_url": "/agentic-qa/6ddef2e6-ad5c-4985-ab6e-0f8cc8893baa/video",
+      "desktop_screenshot_url": "/agentic-qa/6ddef2e6-ad5c-4985-ab6e-0f8cc8893baa/screenshot/desktop",
+      "mobile_screenshot_url": "/agentic-qa/6ddef2e6-ad5c-4985-ab6e-0f8cc8893baa/screenshot/mobile",
+      "created_at": "2026-03-20T02:54:24.261924+00:00"
+    }
+  }
+]

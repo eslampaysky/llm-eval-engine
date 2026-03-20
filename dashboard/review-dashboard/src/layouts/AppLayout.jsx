@@ -1,42 +1,45 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Zap, Search, Wrench, History, Radio,
   Key, Settings, ChevronRight, Menu, X, LogOut
 } from 'lucide-react';
 import AuditBanner from '../components/AuditBanner.jsx';
-
-const NAV_SECTIONS = [
-  {
-    label: 'Core',
-    items: [
-      { to: '/app/overview', label: 'Overview', icon: LayoutDashboard },
-      { to: '/app/vibe-check', label: 'Vibe Check', icon: Zap },
-      { to: '/app/web-audit', label: 'Deep Dive', icon: Search },
-      { to: '/app/agent-audit', label: 'Fix & Verify', icon: Wrench },
-    ],
-  },
-  {
-    label: 'History',
-    items: [
-      { to: '/app/audits', label: 'Audits', icon: History },
-      { to: '/app/monitoring', label: 'Monitoring', icon: Radio },
-    ],
-  },
-  {
-    label: 'Account',
-    items: [
-      { to: '/app/api-keys', label: 'API Keys', icon: Key },
-      { to: '/app/settings', label: 'Settings', icon: Settings },
-    ],
-  },
-];
+import LanguageSwitcher from '../components/LanguageSwitcher.jsx';
 
 export default function AppLayout() {
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isRtl = i18n.dir() === 'rtl';
+  const navSections = [
+    {
+      label: t('navigation.app.core', 'Core'),
+      items: [
+        { to: '/app/overview', label: t('navigation.app.overview', 'Overview'), icon: LayoutDashboard },
+        { to: '/app/vibe-check', label: t('navigation.app.vibeCheck', 'Vibe Check'), icon: Zap },
+        { to: '/app/web-audit', label: t('navigation.app.webAudit', 'Deep Dive'), icon: Search },
+        { to: '/app/agent-audit', label: t('navigation.app.agentAudit', 'Fix & Verify'), icon: Wrench },
+      ],
+    },
+    {
+      label: t('navigation.app.history', 'History'),
+      items: [
+        { to: '/app/audits', label: t('navigation.app.audits', 'Audits'), icon: History },
+        { to: '/app/monitoring', label: t('navigation.app.monitoring', 'Monitoring'), icon: Radio },
+      ],
+    },
+    {
+      label: t('navigation.app.account', 'Account'),
+      items: [
+        { to: '/app/api-keys', label: t('navigation.app.apiKeys', 'API Keys'), icon: Key },
+        { to: '/app/settings', label: t('navigation.app.settings', 'Settings'), icon: Settings },
+      ],
+    },
+  ];
 
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
@@ -79,7 +82,7 @@ export default function AppLayout() {
           fontWeight: 700,
           color: 'var(--text-primary)',
         }}>
-          AiBreaker
+          {t('common.appName', 'AiBreaker')}
         </span>
         <div style={{ width: 30 }} />
       </header>
@@ -145,7 +148,7 @@ export default function AppLayout() {
                 letterSpacing: '-0.02em',
                 lineHeight: 1,
               }}>
-                AiBreaker
+                {t('common.appName', 'AiBreaker')}
               </div>
               <div style={{
                 fontFamily: 'var(--font-mono)',
@@ -155,10 +158,11 @@ export default function AppLayout() {
                 textTransform: 'uppercase',
                 marginTop: 2,
               }}>
-                Reliability Layer
+                {t('common.appTagline', 'Reliability Layer')}
               </div>
             </div>
           </Link>
+          <LanguageSwitcher />
           <button
             className="app-sidebar-close"
             onClick={() => setSidebarOpen(false)}
@@ -176,7 +180,7 @@ export default function AppLayout() {
 
         {/* Navigation */}
         <nav style={{ flex: 1, padding: '12px 12px' }}>
-          {NAV_SECTIONS.map((section) => (
+          {navSections.map((section) => (
             <div key={section.label} style={{ marginBottom: 16 }}>
               <div style={{
                 fontFamily: 'var(--font-mono)',
@@ -221,7 +225,7 @@ export default function AppLayout() {
                     {isActive && (
                       <div style={{
                         position: 'absolute',
-                        left: 0,
+                        [isRtl ? 'right' : 'left']: 0,
                         top: 8,
                         bottom: 8,
                         width: 2,
@@ -282,9 +286,9 @@ export default function AppLayout() {
                 color: 'var(--text-dim)',
               }}>
                 {user?.is_admin ? (
-                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Admin</span>
+                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{t('navigation.app.admin', 'Admin')}</span>
                 ) : (
-                  'Free plan'
+                  t('navigation.app.freePlan', 'Free plan')
                 )}
               </div>
             </div>
@@ -317,7 +321,7 @@ export default function AppLayout() {
             }}
           >
             <LogOut size={14} />
-            Log out
+            {t('navigation.app.logout', 'Log out')}
           </button>
         </div>
       </aside>
@@ -346,13 +350,13 @@ export default function AppLayout() {
           .app-sidebar {
             position: fixed !important;
             top: 0 !important;
-            left: 0 !important;
+            ${isRtl ? 'right: 0 !important;' : 'left: 0 !important;'}
             bottom: 0 !important;
             width: 280px !important;
             z-index: 100 !important;
-            transform: translateX(-100%) !important;
+            transform: ${isRtl ? 'translateX(100%)' : 'translateX(-100%)'} !important;
             transition: transform 0.25s ease !important;
-            box-shadow: 4px 0 24px rgba(0,0,0,0.4) !important;
+            box-shadow: ${isRtl ? '-4px 0 24px rgba(0,0,0,0.4)' : '4px 0 24px rgba(0,0,0,0.4)'} !important;
           }
           .app-sidebar.open {
             transform: translateX(0) !important;

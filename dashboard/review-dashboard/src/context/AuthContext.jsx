@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import i18n from '../i18n/index.js';
 
 function resolveApiBase() {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -89,7 +90,7 @@ export function AuthProvider({ children }) {
       setUser(data.user);
       return { success: true };
     } catch (err) {
-      const msg = err.message || 'Registration failed.';
+      const msg = err.message || i18n.t('auth.errors.registrationFailed', 'Registration failed.');
       setError(msg);
       return { success: false, error: msg };
     }
@@ -108,8 +109,8 @@ export function AuthProvider({ children }) {
       return { success: true };
     } catch (err) {
       const msg = err.status === 401
-        ? 'Incorrect email or password.'
-        : (err.message || 'Login failed.');
+        ? i18n.t('auth.errors.invalidCredentials', 'Incorrect email or password.')
+        : (err.message || i18n.t('auth.errors.loginFailed', 'Login failed.'));
       setError(msg);
       return { success: false, error: msg };
     }
