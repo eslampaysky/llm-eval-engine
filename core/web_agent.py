@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
-from playwright.async_api import async_playwright
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_playwright
 
 from core.models import (
     ActionCandidate,
@@ -416,8 +416,7 @@ def _classify_blocker_action(element_text: str, selector: str) -> str:
     return "clicked_close"
 
 
-async def dismiss_blockers(page, phase: str = "pre_action") -> list[RecoveryEvent]:
-    handled: list[RecoveryEvent] = []
+async def _find_visible_blocker(page) -> tuple[Any, str, str, str, str] | None:
     for selector in _BLOCKER_SELECTORS:
         try:
             locator = page.locator(selector).first
@@ -429,11 +428,10 @@ async def dismiss_blockers(page, phase: str = "pre_action") -> list[RecoveryEven
                     element_text = ""
                 context_text = element_text
                 try:
-                    # Prefer surrounding banner/modal text over the close button label itself.
                     context_text = await locator.evaluate(
                         """(el) => {
                             const container =
-                              el.closest('[role="dialog"], [aria-modal="true"], .modal, .popup, .banner, .cookie, .consent')
+                              el.closest('[role="dialog"], [aria-modal="true"], .modal, .popup, .banner, .cookie, .consent, .overlay, .backdrop')
                               || el.parentElement
                               || el;
                             return (container.innerText || el.innerText || '').trim();
@@ -443,39 +441,96 @@ async def dismiss_blockers(page, phase: str = "pre_action") -> list[RecoveryEven
                     context_text = element_text
                 action_taken = _classify_blocker_action(element_text, selector)
                 blocker_type = _classify_blocker(context_text or element_text, selector)
-                await locator.click(timeout=1200)
-                await page.wait_for_timeout(300)
-                still_visible = False
-                try:
-                    still_visible = await locator.is_visible(timeout=300)
-                except Exception:
-                    still_visible = False
-                if still_visible:
-                    try:
-                        await page.keyboard.press("Escape")
-                        await page.wait_for_timeout(300)
-                        still_visible = await locator.is_visible(timeout=300)
-                    except Exception:
-                        still_visible = True
-                success = not still_visible
-                handled.append(
-                    RecoveryEvent(
-                        choke_point=_PHASE_TO_CHOKE_POINT.get(phase, phase),
-                        blocker_type=blocker_type,
-                        action_taken=action_taken,
-                        success=success,
-                        selector_used=selector,
-                        notes=(
-                            f"{blocker_type.replace('_', ' ').title()} detected and dismissed before action"
-                            if success and phase == "pre_action"
-                            else f"{blocker_type.replace('_', ' ').title()} detected and cleared at { _PHASE_TO_CHOKE_POINT.get(phase, phase).replace('_', ' ') }"
-                            if success
-                            else f"{blocker_type.replace('_', ' ').title()} detected but could not be fully dismissed"
-                        ),
-                    )
-                )
+                return locator, selector, context_text, action_taken, blocker_type
         except Exception:
             continue
+
+    try:
+        for frame in page.frames:
+            if frame == page.main_frame:
+                continue
+            for selector in (
+                "button:has-text('Close')",
+                "button:has-text('×')",
+                "button:has-text('Accept')",
+                "button:has-text('Accept all')",
+                "[aria-label*='close' i]",
+            ):
+                try:
+                    locator = frame.locator(selector).first
+                    if await locator.count() and await locator.is_visible(timeout=400):
+                        element_text = ""
+                        try:
+                            element_text = ((await locator.inner_text(timeout=400)) or "").strip()
+                        except Exception:
+                            element_text = ""
+                        blocker_type = _classify_blocker(element_text, selector)
+                        action_taken = _classify_blocker_action(element_text, selector)
+                        return locator, f"iframe::{selector}", element_text, action_taken, blocker_type
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    return None
+
+
+async def dismiss_blockers(page, phase: str = "pre_action") -> list[RecoveryEvent]:
+    handled: list[RecoveryEvent] = []
+    dismissed_count = 0
+    last_blocker_type = "unknown_blocker"
+    last_action_taken = "clicked_close"
+    last_selector = ""
+    choke_point = _PHASE_TO_CHOKE_POINT.get(phase, phase)
+
+    for _attempt in range(3):
+        blocker = await _find_visible_blocker(page)
+        if not blocker:
+            break
+        locator, selector, context_text, action_taken, blocker_type = blocker
+        last_blocker_type = blocker_type
+        last_action_taken = action_taken
+        last_selector = selector
+        try:
+            await locator.click(timeout=1200)
+        except Exception:
+            try:
+                await page.keyboard.press("Escape")
+            except Exception:
+                pass
+        await page.wait_for_timeout(800)
+        dismissed_count += 1
+
+        try:
+            still_visible = await locator.is_visible(timeout=300)
+        except Exception:
+            still_visible = False
+        if still_visible:
+            try:
+                await page.keyboard.press("Escape")
+                await page.wait_for_timeout(400)
+            except Exception:
+                pass
+
+    if dismissed_count:
+        remaining = await _find_visible_blocker(page)
+        success = remaining is None
+        handled.append(
+            RecoveryEvent(
+                choke_point=choke_point,
+                blocker_type=last_blocker_type,
+                action_taken=last_action_taken,
+                success=success,
+                selector_used=last_selector,
+                notes=(
+                    f"{last_blocker_type.replace('_', ' ').title()} detected and dismissed before action"
+                    if success and phase == "pre_action"
+                    else f"{last_blocker_type.replace('_', ' ').title()} detected and cleared at {choke_point.replace('_', ' ')}"
+                    if success
+                    else f"{last_blocker_type.replace('_', ' ').title()} detected but could not be fully cleared after {dismissed_count} attempts"
+                ),
+            )
+        )
     return handled
 
 
@@ -1157,6 +1212,15 @@ async def run_web_audit(
                 resp = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
             result["status_code"] = resp.status if resp else None
             result["title"] = await page.title()
+
+            try:
+                await page.wait_for_selector(
+                    ".product, .product-item, .product-card, .categoryCell, [class*='product'], a[href*='product'], a[href*='#/product/']",
+                    timeout=3000,
+                    state="visible",
+                )
+            except PlaywrightTimeoutError:
+                pass
 
             # Text content
             try:

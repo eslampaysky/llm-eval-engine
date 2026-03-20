@@ -430,6 +430,8 @@ def _login_step() -> JourneyStep:
                 type="fill",
                 intent="username or email field",
                 selectors=[
+                    "input[data-test='username']",
+                    "input[data-test='user-name']",
                     "input[name='username']",
                     "input[name='login']",
                     "input[name='user']",
@@ -460,6 +462,7 @@ def _login_step() -> JourneyStep:
                 type="fill",
                 intent="password field",
                 selectors=[
+                    "input[data-test='password']",
                     "input[type='password']",
                     "input[name='password']",
                     "input[name='pass']",
@@ -477,6 +480,7 @@ def _login_step() -> JourneyStep:
                 type="click",
                 intent="login button",
                 selectors=[
+                    "input[data-test='login-button']",
                     "button[type='submit']",
                     "input[type='submit']",
                     "button:has-text('Login')",

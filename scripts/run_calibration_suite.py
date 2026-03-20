@@ -26,6 +26,7 @@ class Target:
     tier: str
     site_description: str
     credentials: dict[str, str] | None = None
+    skip_reason: str | None = None
 
 
 def _env(name: str, default: str | None = None) -> str:
@@ -140,6 +141,9 @@ def run_group(group: str, *, base_url: str, email: str, password: str, api_key: 
     json_path = output_dir / f"{group}_results.json"
 
     for index, target in enumerate(targets, start=1):
+        if target.skip_reason:
+            print(f"[{group} {index}/{len(targets)}] Skipping {target.name} -> {target.url}: {target.skip_reason}")
+            continue
         print(f"[{group} {index}/{len(targets)}] Starting {target.name} -> {target.url}")
         start = _request(
             f"{base_url}/agentic-qa/start",

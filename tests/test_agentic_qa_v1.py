@@ -351,6 +351,20 @@ def test_calibration_manifest_has_four_saas_targets_with_credentials() -> None:
     assert all(target.get("credentials", {}).get("password") for target in saas_targets)
 
 
+def test_calibration_manifest_skips_blocked_ecommerce_targets_and_adds_replacements() -> None:
+    manifest_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "configs", "calibration_targets.json"))
+    with open(manifest_path, encoding="utf-8") as fh:
+        manifest = json.load(fh)
+
+    ecommerce_targets = manifest["groups"]["ecommerce"]
+    skipped = [target for target in ecommerce_targets if target.get("skip_reason")]
+    names = [target["name"] for target in ecommerce_targets]
+
+    assert {target["name"] for target in skipped} == {"OpenCart Demo", "Magento Demo"}
+    assert "Demoblaze" in names
+    assert "Fake Store API Products" in names
+
+
 def test_login_page_classifies_as_saas_auth_not_generic() -> None:
     crawl = {
         "title": "Login",
@@ -385,7 +399,18 @@ def test_password_field_candidate_is_prioritized_for_login_step() -> None:
     step = _login_step()
     password_candidate = step.action_candidates[1]
 
-    assert password_candidate.selectors[0] == "input[type='password']"
+    assert password_candidate.selectors[0] == "input[data-test='password']"
+
+
+def test_saucedemo_data_test_selectors_are_prioritized_for_login_step() -> None:
+    step = _login_step()
+    username_candidate = step.action_candidates[0]
+    password_candidate = step.action_candidates[1]
+    submit_candidate = step.action_candidates[2]
+
+    assert username_candidate.selectors[0] == "input[data-test='username']"
+    assert password_candidate.selectors[0] == "input[data-test='password']"
+    assert submit_candidate.selectors[0] == "input[data-test='login-button']"
 
 
 def test_orangehrm_dashboard_index_matches_auth_success_signals() -> None:
@@ -531,3 +556,48 @@ def test_discovery_timeout_falls_back_to_description_classification() -> None:
     context = discover_site(crawl, description="OpenCart demo store with product catalog and checkout")
 
     assert context["app_type"] == AppType.ECOMMERCE.value
+
+
+def test_advantage_after_hydration_classifies_as_ecommerce() -> None:
+    crawl = {
+        "title": "Advantage Shopping",
+        "text_snippet": "tablets laptops speakers popular items view details shopping cart",
+        "nav_links": [{"text": "ShoppingCart", "href": "https://example.com/#/shoppingCart"}],
+        "buttons": ["Shop Now", "View Details"],
+        "forms": [{"id": "loginModal", "action": "/login", "fields": 2}],
+        "page_html": """
+            <main>
+              <div class='categoryCell'></div>
+              <div class='categoryCell'></div>
+              <div class='categoryCell'></div>
+              <div class='categoryCell'></div>
+              <div class='productName'></div>
+              <div class='productName'></div>
+              <a href='#/product/1'>View Details</a>
+              <a href='#/product/2'>View Details</a>
+              <a href='#/shoppingCart'>Cart</a>
+              <input type='password' />
+            </main>
+        """,
+        "structural_signals": {"auth_form_is_visible": False},
+    }
+
+    context = discover_site(crawl, description="Electronics store with category tiles product catalog and cart")
+
+    assert context["app_type"] == AppType.ECOMMERCE.value
+
+
+def test_hydration_wait_changes_do_not_break_auth_classification() -> None:
+    crawl = {
+        "title": "Login",
+        "text_snippet": "login username password",
+        "nav_links": [],
+        "buttons": ["Login"],
+        "forms": [{"id": "login", "action": "/login", "fields": 2}],
+        "page_html": "<form action='/login'><input type='text' name='username'><input type='password' name='password'></form>",
+        "structural_signals": {"auth_form_is_visible": True},
+    }
+
+    context = discover_site(crawl, description="Simple auth page")
+
+    assert context["app_type"] == AppType.SAAS_AUTH.value

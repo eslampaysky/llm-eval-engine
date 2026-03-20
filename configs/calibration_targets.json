@@ -112,28 +112,30 @@
         "url": "https://demo.opencart.com/",
         "expected_type": "ecommerce",
         "tier": "deep",
-        "site_description": "OpenCart demo store with catalog and checkout"
+        "site_description": "OpenCart demo store with product catalog and checkout",
+        "skip_reason": "Cloudflare blocking - deferred"
       },
       {
         "name": "SauceDemo",
         "url": "https://www.saucedemo.com/",
         "expected_type": "ecommerce",
         "tier": "deep",
-        "site_description": "Demo ecommerce store with auth and checkout"
+        "site_description": "Sauce Labs demo store with login and cart"
       },
       {
         "name": "Magento Demo",
         "url": "https://magento.softwaretestingboard.com/",
         "expected_type": "ecommerce",
         "tier": "deep",
-        "site_description": "Magento demo store with product catalog"
+        "site_description": "Magento demo store",
+        "skip_reason": "SSL 526 error - deferred"
       },
       {
         "name": "Automation Exercise",
         "url": "https://automationexercise.com/",
         "expected_type": "ecommerce",
         "tier": "deep",
-        "site_description": "Ecommerce demo site with overlays and cart flow"
+        "site_description": "E-commerce site with registration cart and checkout"
       },
       {
         "name": "Advantage Online Shopping",
@@ -141,6 +143,20 @@
         "expected_type": "ecommerce",
         "tier": "deep",
         "site_description": "Electronics store with category tiles product catalog and cart"
+      },
+      {
+        "name": "Demoblaze",
+        "url": "https://www.demoblaze.com",
+        "expected_type": "ecommerce",
+        "tier": "deep",
+        "site_description": "Simple JavaScript store with product catalog cart and checkout"
+      },
+      {
+        "name": "Fake Store API Products",
+        "url": "https://fakestoreapi.com/products",
+        "expected_type": "ecommerce",
+        "tier": "deep",
+        "site_description": "Fake store API with product catalog"
       }
     ],
     "edge_cases": [
