@@ -1,4 +1,5 @@
 {
-  "blocked_by_bot_protection": 1,
-  "action_resolution_failed": 3
+  "blocked_by_bot_protection": 2,
+  "action_resolution_failed": 11,
+  "captcha_required": 3
 }

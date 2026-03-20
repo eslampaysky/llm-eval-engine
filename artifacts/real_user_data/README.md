@@ -1,11 +1,12 @@
 # Real User Audit Data
-*Last Updated: 2026-03-20T21:16:47.695544*
+*Last Updated: 2026-03-20T22:56:42.501990*
 
 ## Overview
-- Total Runs: 12
-- Successful Runs: 12
+- Total Runs: 32
+- Successful Runs: 32
 - Success Rate: 100.0%
 
 ## Failure Categories
-- **action_resolution_failed**: 3
-- **blocked_by_bot_protection**: 1
+- **action_resolution_failed**: 11
+- **captcha_required**: 3
+- **blocked_by_bot_protection**: 2
