@@ -2,7 +2,7 @@ name: Real User Audit Data Collection
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/59 * * * *"
   workflow_dispatch:
     inputs:
       group:
