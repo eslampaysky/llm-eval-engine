@@ -1,5 +1,10 @@
 {
-  "blocked_by_bot_protection": 3,
   "action_resolution_failed": 19,
-  "captcha_required": 6
+  "captcha_required": 6,
+  "blocked_by_bot_protection": 3,
+  "ecommerce / action_resolution_failed / add to cart button on listing page": 2,
+  "saas / poll_timeout / ": 1,
+  "saas / blocked_by_bot_protection / open dashboard": 1,
+  "marketing / action_resolution_failed / pricing page link": 1,
+  "saas / action_resolution_failed / pricing page link": 1
 }

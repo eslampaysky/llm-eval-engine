@@ -49,3 +49,13 @@ Timestamp,Target,Group,Status,Score,AppType,AuditID
 2026-03-20T23:56:30.200385,Superhuman,N/A,done,90,unknown,b37b5be9-556d-46d6-bf1d-5d2db15760a9
 2026-03-20T23:57:52.346859,TLDraw,N/A,done,88,unknown,b8160a12-afc7-4640-a38c-9d67f60155d7
 2026-03-20T23:58:23.415176,Resend,N/A,done,0,unknown,95d1dc58-cc28-4ece-a880-35acf1e4d257
+2026-03-21T00:14:21.589121+00:00,20260321-001014,Slack,saas,https://slack.com,deep,5763f643-e26b-491e-ab49-0303f5a3569e,0,error,,False,,saas_auth,,0,0,0,False,False,poll_timeout,,,0,,0
+2026-03-21T00:17:35.992940+00:00,20260321-001014,Raycast,marketing,https://www.raycast.com,deep,2164c41c-3f1a-4e6b-9b8a-d2393793be9c,182,done,0,False,,marketing_site,,0,0,0,False,False,,,,0,,0
+2026-03-21T00:20:52.812658+00:00,20260321-001014,Miro,saas,https://miro.com,deep,07f065e8-080e-4d29-9341-d122b8fb8da9,184,done,0,False,,marketing_site,,0,0,0,False,False,,,,0,,0
+2026-03-21T00:21:15.727510+00:00,20260321-001014,Framer,marketing,https://www.framer.com,deep,9cde28e5-d586-4ab4-bd70-a4d40cef0aef,10,done,0,False,,marketing_site,,0,0,0,False,False,,,,0,,0
+2026-03-21T00:22:36.555433+00:00,20260321-001014,Webex,saas,https://www.webex.com,deep,ef109cb5-66df-46a3-843d-b575daff4741,68,done,94,False,core_navigation,saas_auth,False,1,0,1,True,False,blocked_by_bot_protection,open dashboard,,0,low,3
+2026-03-21T00:24:55.453936+00:00,20260321-001014,Demoblaze,ecommerce,https://www.demoblaze.com,deep,d86ecd37-c06c-45b0-8edd-fcb3a06e0f0e,126,done,88,False,direct_add_to_cart,ecommerce,False,2,0,2,False,False,action_resolution_failed,add to cart button on listing page,,0,low,4
+2026-03-21T00:28:09.644924+00:00,20260321-001014,Prisma,marketing,https://www.prisma.io,deep,7cc595b2-0c47-4aee-9084-18d686a80111,182,done,0,False,,marketing_site,,0,0,0,False,False,,,,0,,0
+2026-03-21T00:29:35.806839+00:00,20260321-001014,AdvantageShop,ecommerce,https://advantageonlineshopping.com,deep,fa723c0a-4228-4062-b5d5-0a15e769a96c,74,done,88,False,direct_add_to_cart,ecommerce,False,2,0,2,False,False,action_resolution_failed,add to cart button on listing page,,0,low,4
+2026-03-21T00:31:12.514155+00:00,20260321-001014,Tailwind,marketing,https://tailwindcss.com,deep,dc8b2e59-60f1-4bf4-a6d9-5f52a9ca31cb,84,done,100,False,pricing_navigation,marketing_site,False,3,2,1,False,False,action_resolution_failed,pricing page link,,0,,0
+2026-03-21T00:33:05.112494+00:00,20260321-001014,Grammarly,saas,https://www.grammarly.com,deep,1695a0e9-3468-424a-bb17-3342b8b8cda7,100,done,94,False,pricing_navigation,marketing_site,False,3,2,1,False,False,action_resolution_failed,pricing page link,,0,low,3
