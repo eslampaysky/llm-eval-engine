@@ -1,27 +1,27 @@
 # AiBreaker — Real User Audit Results
 
-Last updated: 2026-03-21 22:53 UTC
+Last updated: 2026-03-22 01:31 UTC
 
 ## Summary
 | Metric | Value |
 |--------|-------|
-| Total audits | 15 |
+| Total audits | 2 |
 | Errors / timeouts | 0 |
-| Bot blocked | 1 |
+| Bot blocked | 0 |
 | CAPTCHA hit | 0 |
-| Avg score (non-blocked) | 75.6 |
-| Classification accuracy | 2/14 |
+| Avg score (non-blocked) | 92.0 |
+| Classification accuracy | 0/2 |
 
 ## By Group
 | Group | Runs | Bot blocked | CAPTCHA | Errors |
 |-------|------|-------------|---------|--------|
-| ecommerce | 15 | 1 | 0 | 0 |
+| ecommerce | 2 | 0 | 0 | 0 |
 
 ## Top Failure Patterns
 
 | Pattern | Count |
 |---------|-------|
-| `ecommerce / action_resolution_failed / add to cart button on listing page` | 23 |
+| `ecommerce / action_resolution_failed / add to cart button on listing page` | 24 |
 | `action_resolution_failed` | 19 |
 | `captcha_required` | 6 |
 | `ecommerce / action_resolution_failed / open dashboard` | 6 |
@@ -30,13 +30,5 @@ Last updated: 2026-03-21 22:53 UTC
 ## Last 10 Runs
 | Name | Group | Score | Duration | Bot | Failure |
 |------|-------|-------|----------|-----|---------|
-| Chewy | ecommerce | 94 | 86s |  | action_resolution_failed |
-| IKEA | ecommerce | 0 | 32s |  |  |
-| Demoblaze | ecommerce | 88 | 128s |  | action_resolution_failed |
-| MagentoDemo | ecommerce | 90 | 82s |  | action_resolution_failed |
-| PolymerShop | ecommerce | 88 | 85s |  | action_resolution_failed |
-| AutoExercise | ecommerce | 90 | 102s |  |  |
-| Gymshark | ecommerce | 84 | 96s |  | action_resolution_failed |
-| AutoPractice | ecommerce | 90 | 82s |  |  |
-| Allbirds | ecommerce | 84 | 162s |  | action_resolution_failed |
-| SauceDemo | ecommerce | 96 | 79s |  | validation_failed |
+| SauceDemo | ecommerce | 96 | 18s |  | action_resolution_failed |
+| Demoblaze | ecommerce | 88 | 68s |  | action_resolution_failed |

@@ -611,6 +611,7 @@ def _login_step() -> JourneyStep:
             SuccessSignal(type="url_contains", value="/secure", priority="high", required=False),
             SuccessSignal(type="url_contains", value="/workspace", priority="high", required=False),
             SuccessSignal(type="url_contains", value="/portal", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="inventory.html", priority="high", required=False),
             SuccessSignal(type="url_matches", value=r"/app\.html", priority="high", required=False),
             SuccessSignal(type="url_matches", value=r"/index", priority="high", required=False),
             SuccessSignal(type="element_visible", value="Logout", priority="medium", required=False),
@@ -729,7 +730,7 @@ def _open_product_step() -> JourneyStep:
         step_type=StepType.CLICK.value,
         action_candidates=[
             ActionCandidate(type="click", intent="view details link", selectors=["a:has-text('View Details')", "a:has-text('View Product')", "a:has-text('See Details')"], role="link", name="View Details", text="View Details"),
-            ActionCandidate(type="click", intent="product item link", selectors=["a[href*='#/product/']", "a[href*='/product/']", "a[href*='/dp/']", "a[href*='/gp/product/']", ".s-result-item h2 a", "a.a-link-normal[href*='/dp/']", ".card-title a", ".product-item-link", ".productName a", ".product-card a:first-of-type", ".product-item a:first-of-type", ".categoryCell a", ".products-grid a:first-of-type", ".product-list a:first-of-type"], role="link", name="Product", text="Product"),
+            ActionCandidate(type="click", intent="product item link", selectors=["a[href*='prod.html']", "a[href*='#/product/']", "a[href*='/product/']", "a[href*='/dp/']", "a[href*='/gp/product/']", ".s-result-item h2 a", "a.a-link-normal[href*='/dp/']", ".card-title a", ".product-item-link", ".productName a", ".product-card a:first-of-type", ".product-item a:first-of-type", ".categoryCell a", ".products-grid a:first-of-type", ".product-list a:first-of-type"], role="link", name="Product", text="Product"),
             ActionCandidate(type="click", intent="shop now link", selectors=["a:has-text('Shop Now')", ".shop_now"], role="link", name="Shop Now", text="Shop Now"),
         ],
         success_signals=[
