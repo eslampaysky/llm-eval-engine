@@ -782,6 +782,11 @@ async def verify_action_success(
         )
         if any(marker in after_url for marker in auth_success_markers) or any(marker in after_text for marker in auth_text_markers):
             derived_state["is_logged_in"] = True
+
+    if step.goal in ("add_to_cart", "add_to_cart_from_detail"):
+        cart_success_markers = ("view basket", "view cart", "added to cart", "added to basket", " items")
+        if any(marker in after_text for marker in cart_success_markers):
+            derived_state["cart_has_items"] = True
     if step.goal == "create_record":
         expected_text = _resolve_state_reference(step.input_bindings.get("value"), state) or step.input_bindings.get("value")
         if expected_text and str(expected_text).lower() in after_text:

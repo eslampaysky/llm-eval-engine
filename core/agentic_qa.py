@@ -340,12 +340,22 @@ def _detect_pre_journey_blocker(crawl: dict[str, Any]) -> dict[str, str] | None:
             "we detected unusual activity from your device or network",
             "temporarily restricted",
             "unusual activity from your device or network",
+            "press & hold",
+            "confirm you are a human",
+            "before we continue",
         )
     ):
         return {
             "failure_type": "blocked_by_bot_protection",
             "summary": "Site access is temporarily restricted by bot protection.",
             "error": "Access temporarily restricted by bot protection",
+        }
+
+    if any(token in text for token in ("a shop is on its way", "explore back office")):
+        return {
+            "failure_type": "site_unavailable",
+            "summary": "The site is currently showing a demo splash page, so user journeys could not run.",
+            "error": "Site is currently showing a demo splash page",
         }
 
     if title == "application error" or (
@@ -663,7 +673,7 @@ def _cart_step() -> JourneyStep:
             ),
             ActionCandidate(
                 type="click",
-                intent="buy now button",
+                intent="buy now",
                 selectors=[
                     "button:has-text('Buy now')",
                     "button:has-text('Buy Now')",
@@ -672,6 +682,8 @@ def _cart_step() -> JourneyStep:
                     "a:has-text('Buy Now')",
                     "[data-test*='buy-now']",
                     "button[class*='buy-now']",
+                    "button:has-text('ADD TO BASKET')",
+                    "a:has-text('ADD TO BASKET')",
                 ],
                 role="button",
                 name="Buy now",
@@ -739,6 +751,9 @@ def _cart_from_detail_step() -> JourneyStep:
             SuccessSignal(type="element_visible", value="Cart", priority="medium", required=False),
             SuccessSignal(type="text_present", value="added", priority="medium", required=False),
             SuccessSignal(type="text_present", value="Cart", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="View Basket", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="View Cart", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="items", priority="medium", required=False),
             SuccessSignal(type="url_contains", value="cart", priority="high", required=False),
             SuccessSignal(type="state_assertion", value={"cart_has_items": True}, priority="medium", required=False),
         ],
