@@ -1,23 +1,23 @@
 # AiBreaker — Real User Audit Results
 
-Last updated: 2026-03-21 01:42 UTC
+Last updated: 2026-03-21 03:47 UTC
 
 ## Summary
 | Metric | Value |
 |--------|-------|
 | Total audits | 10 |
 | Errors / timeouts | 0 |
-| Bot blocked | 0 |
+| Bot blocked | 1 |
 | CAPTCHA hit | 0 |
-| Avg score (non-blocked) | 63.8 |
-| Classification accuracy | 0/7 |
+| Avg score (non-blocked) | 45.2 |
+| Classification accuracy | 0/5 |
 
 ## By Group
 | Group | Runs | Bot blocked | CAPTCHA | Errors |
 |-------|------|-------------|---------|--------|
-| ecommerce | 3 | 0 | 0 | 0 |
-| marketing | 3 | 0 | 0 | 0 |
-| saas | 4 | 0 | 0 | 0 |
+| ecommerce | 3 | 1 | 0 | 0 |
+| marketing | 5 | 0 | 0 | 0 |
+| saas | 2 | 0 | 0 | 0 |
 
 ## Top Failure Patterns
 
@@ -27,18 +27,18 @@ Last updated: 2026-03-21 01:42 UTC
 | `captcha_required` | 6 |
 | `blocked_by_bot_protection` | 3 |
 | `ecommerce / action_resolution_failed / add to cart button on listing page` | 3 |
-| `saas / action_resolution_failed / pricing page link` | 2 |
+| `ecommerce / action_resolution_failed / open dashboard` | 3 |
 
 ## Last 10 Runs
 | Name | Group | Score | Duration | Bot | Failure |
 |------|-------|-------|----------|-----|---------|
-| Stripe | marketing | 0 | 185s |  |  |
-| Slack | saas | 0 | 184s |  |  |
-| PrestaShop | ecommerce | 88 | 81s |  | action_resolution_failed |
-| Planetscale | marketing | 96 | 76s |  |  |
-| Allbirds | ecommerce | 84 | 151s |  | action_resolution_failed |
-| Loom | saas | 0 | 184s |  |  |
-| Temporal | marketing | 90 | 98s |  |  |
-| MagentoDemo | ecommerce | 88 | 70s |  | action_resolution_failed |
-| Dropbox | saas | 96 | 119s |  | action_resolution_failed |
-| Calendly | saas | 96 | 92s |  |  |
+| Planetscale | marketing | 94 | 78s |  |  |
+| Evernote | saas | 0 | 182s |  |  |
+| Sephora | ecommerce | 94 | 66s | 🚫 | blocked_by_bot_protection |
+| Arc | marketing | 0 | 182s |  |  |
+| AutoExercise | ecommerce | None | 193s |  |  |
+| MagentoDemo | ecommerce | 90 | 72s |  | action_resolution_failed |
+| Clerk | marketing | 0 | 182s |  |  |
+| Resend | marketing | 0 | 28s |  |  |
+| Zapier | saas | 90 | 138s |  |  |
+| Stripe | marketing | 88 | 150s |  |  |
