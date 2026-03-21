@@ -104,8 +104,6 @@ def load_targets(group_filter: str | None = None) -> list[dict]:
         if group_filter and grp != group_filter:
             continue
         for t in targets:
-            if "skip_reason" in t:
-                continue
             flat.append({**t, "_group": grp})
     return flat
 
@@ -153,12 +151,7 @@ def run_one_audit(target: dict, headers: dict, batch_id: str) -> dict:
     try:
         r = requests.post(f"{BASE}/agentic-qa/start",
             headers=headers,
-            json={
-                "url": url,
-                "tier": tier,
-                "site_description": desc,
-                "credentials": target.get("credentials")
-            },
+            json={"url": url, "tier": tier, "site_description": desc},
             timeout=20)
     except Exception as e:
         return _make_error(target, batch_id, f"start_failed:{e}")

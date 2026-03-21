@@ -1,0 +1,30 @@
+--- SauceDemo ---
+{
+  "step_name": "login or sign in",
+  "chosen_action": null,
+  "error": "Could not resolve action candidate: sign in button",
+  "notes": [],
+  "text_snippet": "Swag Labs\nAccepted usernames are:\nstandard_user\nlocked_out_user\nproblem_user\nperformance_glitch_user\nerror_user\nvisual_user\n\nPassword for all users:\nsecret_sauce"
+}
+{
+  "step_name": "login or sign in",
+  "chosen_action": null,
+  "error": "Could not resolve action candidate: sign in button",
+  "notes": [],
+  "text_snippet": "Swag Labs\nAccepted usernames are:\nstandard_user\nlocked_out_user\nproblem_user\nperformance_glitch_user\nerror_user\nvisual_user\n\nPassword for all users:\nsecret_sauce"
+}
+--- Demoblaze ---
+{
+  "step_name": "add to cart button on listing page",
+  "chosen_action": null,
+  "error": "Could not resolve action candidate: add to cart button",
+  "notes": [],
+  "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nPrevious\nNext\nAbout Us\n\nWe believe performance needs to be validated at every stage of the software development cycle and our open source compatible, massively scalable platform makes that a reality.\n\nGet in Touch\n\nAddress: 2390 El Camino Real\n\nPhone: +440 123456\n\nEmail: demo@blazemeter.com\n\n PRODUCT STORE\n\nCopyright \u00a9 Product Store"
+}
+{
+  "step_name": "add to cart button on product detail page",
+  "chosen_action": null,
+  "error": "Could not resolve action candidate: add to cart button",
+  "notes": [],
+  "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nSamsung galaxy s6\n$360\n\nThe Samsung Galaxy S6 is powered by 1.5GHz octa-core Samsung Exynos 7420 processor and it comes with 3GB of RAM. The phone packs 32GB of internal storage cannot be expanded.\n\nNokia lumia 1520\n$820\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nNexus 6\n$650\n\nThe Motorola Google Nexus 6 is powered by 2.7GHz quad-core Qualcomm Snapdragon 805 processor and it comes with 3GB of RAM.\n\nSamsung galaxy s7\n$800\n\nThe Samsung Galaxy S7 is powered by 1.6GHz octa-core it comes with 4GB of RAM. The phone packs 32GB of internal storage that can be expanded up to 200GB via a microSD card.\n\nIphone 6 "
+}

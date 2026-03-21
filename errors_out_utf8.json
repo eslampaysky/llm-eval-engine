@@ -1,0 +1,70 @@
+[
+  {
+    "site": "SauceDemo",
+    "pattern": "ecommerce / action_resolution_failed / login or sign in",
+    "step_result": {
+      "step_name": "login or sign in",
+      "error": "Could not resolve action candidate: sign in button",
+      "url": "https://www.saucedemo.com/"
+    }
+  },
+  {
+    "site": "Wayfair",
+    "pattern": "ecommerce / blocked_by_bot_protection / site access",
+    "step_result": {
+      "step_name": "site access",
+      "error": "Access temporarily restricted by bot protection",
+      "url": "https://www.wayfair.com"
+    }
+  },
+  {
+    "site": "Chewy",
+    "pattern": "ecommerce / action_resolution_failed / add to cart button on listing page",
+    "step_result": {
+      "step_name": "add to cart button on listing page",
+      "error": "Could not resolve action candidate: add to cart button",
+      "url": "https://www.chewy.com/"
+    }
+  },
+  {
+    "site": "PrestaShop",
+    "pattern": "ecommerce / site_unavailable / site access",
+    "step_result": {
+      "step_name": "site access",
+      "error": "Site is currently showing a demo splash page",
+      "url": "https://demo.prestashop.com"
+    }
+  },
+  {
+    "site": "Etsy",
+    "pattern": "ecommerce / action_resolution_failed / add to cart button on listing page",
+    "step_result": {
+      "step_name": "add to cart button on listing page",
+      "error": "Could not resolve action candidate: add to cart button",
+      "url": "https://www.etsy.com/"
+    }
+  },
+  {
+    "site": "Sephora",
+    "pattern": "ecommerce / blocked_by_bot_protection / main navigation or primary CTA",
+    "step_result": {}
+  },
+  {
+    "site": "OpenCart",
+    "pattern": "ecommerce / action_resolution_failed / add to cart button on listing page",
+    "step_result": {
+      "step_name": "add to cart button on listing page",
+      "error": "Could not resolve action candidate: add to cart button",
+      "url": "https://demo.opencart.com/?__cf_chl_rt_tk=83PPh3lREyvZweGkmtXRETEAVM9TzYICX4jOb65.lQw-1774121419-1.0.1.1-e41PQokqLga87nWhj2Vyhxhj0pwz.FNoeQy5AqCs_Mg"
+    }
+  },
+  {
+    "site": "Uniqlo",
+    "pattern": "ecommerce / action_resolution_failed / add to cart button on listing page",
+    "step_result": {
+      "step_name": "add to cart button on listing page",
+      "error": "Could not resolve action candidate: add to cart button",
+      "url": "https://www.uniqlo.com/us/en/"
+    }
+  }
+]

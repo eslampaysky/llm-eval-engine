@@ -1,0 +1,65 @@
+[
+  {
+    "site": "Demoblaze",
+    "pattern": "ecommerce / action_resolution_failed / add to cart button on listing page",
+    "step_result": {
+      "step_name": "add to cart button on listing page",
+      "error": "Could not resolve action candidate: add to cart button",
+      "url": "https://www.demoblaze.com/"
+    }
+  },
+  {
+    "site": "JuiceShop",
+    "pattern": "ecommerce / site_unavailable / site access",
+    "step_result": {
+      "step_name": "site access",
+      "error": "Site is currently unavailable",
+      "url": "https://juice-shop.herokuapp.com"
+    }
+  },
+  {
+    "site": "SauceDemo",
+    "pattern": "ecommerce / action_resolution_failed / login or sign in",
+    "step_result": {
+      "step_name": "login or sign in",
+      "error": "Could not resolve action candidate: sign in button",
+      "url": "https://www.saucedemo.com/"
+    }
+  },
+  {
+    "site": "Allbirds",
+    "pattern": "ecommerce / action_resolution_failed / add to cart button on listing page",
+    "step_result": {
+      "step_name": "add to cart button on listing page",
+      "error": "Could not resolve action candidate: add to cart button",
+      "url": "https://www.allbirds.com/"
+    }
+  },
+  {
+    "site": "Gymshark",
+    "pattern": "ecommerce / action_resolution_failed / add to cart button on listing page",
+    "step_result": {
+      "step_name": "add to cart button on listing page",
+      "error": "Could not resolve action candidate: add to cart button",
+      "url": "https://www.gymshark.com/"
+    }
+  },
+  {
+    "site": "PolymerShop",
+    "pattern": "ecommerce / action_resolution_failed / add to cart button on listing page",
+    "step_result": {
+      "step_name": "add to cart button on listing page",
+      "error": "Could not resolve action candidate: add to cart button",
+      "url": "https://shop.polymer-project.org/"
+    }
+  },
+  {
+    "site": "Chewy",
+    "pattern": "ecommerce / action_resolution_failed / add to cart button on listing page",
+    "step_result": {
+      "step_name": "add to cart button on listing page",
+      "error": "Could not resolve action candidate: add to cart button",
+      "url": "https://www.chewy.com/"
+    }
+  }
+]

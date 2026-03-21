@@ -1,0 +1,73 @@
+name: Real User Audit Suite
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      group:
+        description: "Target group (saas / marketing / ecommerce / leave empty for all)"
+        required: false
+        default: ""
+      batch_size:
+        description: "Number of random targets per batch (default 10)"
+        required: false
+        default: "10"
+
+jobs:
+  audit:
+    name: "Run 10 random audits"
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run audit batch (once, 10 random targets)
+        env:
+          AIBREAKER_API_BASE: ${{ secrets.AIBREAKER_API_BASE }}
+          AIBREAKER_EMAIL:    ${{ secrets.AIBREAKER_EMAIL }}
+          AIBREAKER_PASSWORD: ${{ secrets.AIBREAKER_PASSWORD }}
+          AIBREAKER_API_KEY:  ${{ secrets.AIBREAKER_API_KEY }}
+          AUDIT_POLL_TIMEOUT: "220"
+          AUDIT_BATCH_SIZE:   ${{ github.event.inputs.batch_size || '10' }}
+        run: |
+          CMD="python scripts/run_real_user_suite.py --once"
+
+          GROUP="${{ github.event.inputs.group }}"
+          [ -n "$GROUP" ] && CMD="$CMD --group $GROUP"
+
+          BATCH="${{ github.event.inputs.batch_size }}"
+          [ -n "$BATCH" ] && CMD="$CMD --batch-size $BATCH"
+
+          echo "Running: $CMD"
+          $CMD
+
+      - name: Commit results to repo
+        run: |
+          git config user.name  "aibreaker-bot"
+          git config user.email "bot@aibreaker.app"
+
+          git add artifacts/real_user_data/ || true
+
+          if git diff --cached --quiet; then
+            echo "No new results to commit."
+          else
+            TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M UTC')
+            JSON_COUNT=$(git diff --cached --name-only | grep -c '\.json$' || echo 0)
+            git commit -m "data: audit results ${TIMESTAMP} (${JSON_COUNT} runs)"
+            git push
+          fi
