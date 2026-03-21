@@ -1,7 +1,7 @@
 {
   "action_resolution_failed": 19,
+  "ecommerce / action_resolution_failed / add to cart button on listing page": 10,
   "captcha_required": 6,
-  "ecommerce / action_resolution_failed / add to cart button on listing page": 6,
   "ecommerce / action_resolution_failed / open dashboard": 6,
   "saas / action_resolution_failed / pricing page link": 4,
   "blocked_by_bot_protection": 3,
@@ -9,8 +9,11 @@
   "marketing / action_resolution_failed / pricing page link": 2,
   "ecommerce / blocked_by_bot_protection / open dashboard": 2,
   "marketing / action_resolution_failed / open dashboard": 2,
+  "ecommerce / action_resolution_failed / login or sign in": 2,
   "saas / poll_timeout / ": 1,
   "ecommerce / blocked_by_bot_protection / add to cart button on listing page": 1,
   "marketing / action_resolution_failed / add to cart button on listing page": 1,
-  "ecommerce / action_resolution_failed / login or sign in": 1
+  "ecommerce / blocked_by_bot_protection / site access": 1,
+  "ecommerce / site_unavailable / site access": 1,
+  "ecommerce / blocked_by_bot_protection / main navigation or primary CTA": 1
 }

@@ -570,6 +570,8 @@ def _login_step() -> JourneyStep:
                     "input[data-test='login-button']",
                     "*[data-test*='login']",
                     "input[type='submit']",
+                    "#login-button",
+                    "input[type='submit'][value='Login']",
                     "input[value='Login']",
                     "input[value='Sign in']",
                     "button[type='submit']",

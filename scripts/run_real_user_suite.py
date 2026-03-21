@@ -104,6 +104,8 @@ def load_targets(group_filter: str | None = None) -> list[dict]:
         if group_filter and grp != group_filter:
             continue
         for t in targets:
+            if "skip_reason" in t:
+                continue
             flat.append({**t, "_group": grp})
     return flat
 
