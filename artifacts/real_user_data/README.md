@@ -1,23 +1,23 @@
 # AiBreaker — Real User Audit Results
 
-Last updated: 2026-03-21 07:15 UTC
+Last updated: 2026-03-21 07:58 UTC
 
 ## Summary
 | Metric | Value |
 |--------|-------|
 | Total audits | 10 |
 | Errors / timeouts | 0 |
-| Bot blocked | 0 |
+| Bot blocked | 1 |
 | CAPTCHA hit | 0 |
-| Avg score (non-blocked) | 72.8 |
-| Classification accuracy | 0/8 |
+| Avg score (non-blocked) | 71.2 |
+| Classification accuracy | 0/7 |
 
 ## By Group
 | Group | Runs | Bot blocked | CAPTCHA | Errors |
 |-------|------|-------------|---------|--------|
-| ecommerce | 3 | 0 | 0 | 0 |
-| marketing | 3 | 0 | 0 | 0 |
-| saas | 4 | 0 | 0 | 0 |
+| ecommerce | 5 | 0 | 0 | 0 |
+| marketing | 2 | 0 | 0 | 0 |
+| saas | 3 | 1 | 0 | 0 |
 
 ## Top Failure Patterns
 
@@ -25,20 +25,20 @@ Last updated: 2026-03-21 07:15 UTC
 |---------|-------|
 | `action_resolution_failed` | 19 |
 | `captcha_required` | 6 |
-| `ecommerce / action_resolution_failed / add to cart button on listing page` | 5 |
-| `ecommerce / action_resolution_failed / open dashboard` | 4 |
-| `blocked_by_bot_protection` | 3 |
+| `ecommerce / action_resolution_failed / add to cart button on listing page` | 6 |
+| `ecommerce / action_resolution_failed / open dashboard` | 6 |
+| `saas / action_resolution_failed / pricing page link` | 4 |
 
 ## Last 10 Runs
 | Name | Group | Score | Duration | Bot | Failure |
 |------|-------|-------|----------|-----|---------|
-| IKEA | ecommerce | 0 | 32s |  |  |
-| Asana | saas | 90 | 145s |  |  |
-| Chewy | ecommerce | 94 | 80s |  | action_resolution_failed |
-| Airtable | saas | 90 | 124s |  |  |
-| Render | marketing | 90 | 140s |  |  |
-| Dropbox | saas | 94 | 156s |  | action_resolution_failed |
-| TLDraw | marketing | 90 | 75s |  | action_resolution_failed |
-| Framer | marketing | 92 | 97s |  |  |
-| Slack | saas | 0 | 182s |  |  |
-| AdvantageShop | ecommerce | 88 | 75s |  | action_resolution_failed |
+| Wayfair | ecommerce | 78 | 96s |  |  |
+| BookDepository | ecommerce | 78 | 80s |  | action_resolution_failed |
+| Webex | saas | 94 | 64s | 🚫 | blocked_by_bot_protection |
+| Demoblaze | ecommerce | 88 | 122s |  | action_resolution_failed |
+| AutoExercise | ecommerce | None | 192s |  |  |
+| Loom | saas | 90 | 133s |  |  |
+| Grammarly | saas | 94 | 106s |  | action_resolution_failed |
+| Temporal | marketing | 0 | 181s |  |  |
+| Planetscale | marketing | 94 | 74s |  |  |
+| LiteCart | ecommerce | 48 | 75s |  | action_resolution_failed |
