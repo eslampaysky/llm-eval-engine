@@ -569,8 +569,8 @@ def _login_step() -> JourneyStep:
                 selectors=[
                     "input[data-test='login-button']",
                     "*[data-test*='login']",
-                    "input[type='submit']",
                     "#login-button",
+                    "input[type='submit']",
                     "input[type='submit'][value='Login']",
                     "input[value='Login']",
                     "input[value='Sign in']",
@@ -588,6 +588,8 @@ def _login_step() -> JourneyStep:
                 type="click",
                 intent="sign in button",
                 selectors=[
+                    "input[type='submit']",
+                    "#login-button",
                     "button:has-text('Sign in')",
                     "button:has-text('Log in')",
                     "button:has-text('Login')",
@@ -732,6 +734,7 @@ def _open_product_step() -> JourneyStep:
         ],
         success_signals=[
             SuccessSignal(type="url_contains", value="product", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="prod.html", priority="high", required=False),
             SuccessSignal(type="element_visible", value="Add to cart", priority="medium", required=False),
             SuccessSignal(type="element_visible", value="ADD TO CART", priority="medium", required=False),
             SuccessSignal(type="text_present", value="View Details", priority="low", required=False),
@@ -747,7 +750,7 @@ def _cart_from_detail_step() -> JourneyStep:
         intent="add to cart button on product detail page",
         step_type=StepType.CLICK.value,
         action_candidates=[
-            ActionCandidate(type="click", intent="add to cart button", selectors=["button:has-text('Add to cart')", "button:has-text('ADD TO CART')", "button:has-text('Add To Cart')", "button:has-text('ADD TO BASKET')", "a:has-text('Add to cart')", "a:has-text('ADD TO BASKET')", "[onclick*='addToCart']", "[onclick*='add_to_cart']", ".btn-cart", "a[class*='add_to_cart_button']", "input[name='submit.add-to-cart']", "input[id='add-to-cart-button']", "#add-to-cart-button"], role="button", name="Add to cart", text="Add to cart"),
+            ActionCandidate(type="click", intent="add to cart button", selectors=["button:has-text('Add to cart')", "button:has-text('ADD TO CART')", "button:has-text('Add To Cart')", "button:has-text('ADD TO BASKET')", "a:has-text('Add to cart')", "a:has-text('ADD TO BASKET')", "[onclick*='addToCart']", "[onclick*='add_to_cart']", ".btn-cart", "a.btn-success", "a[class*='add_to_cart_button']", "input[name='submit.add-to-cart']", "input[id='add-to-cart-button']", "#add-to-cart-button"], role="button", name="Add to cart", text="Add to cart"),
         ],
         success_signals=[
             SuccessSignal(type="element_visible", value="Cart", priority="medium", required=False),
