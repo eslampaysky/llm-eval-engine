@@ -38,6 +38,7 @@ from pydantic import BaseModel, Field
 from api.database import (
     cancel_report,
     create_target,
+    delete_agentic_qa_reports_for_client,
     delete_report,
     delete_target,
     get_cached_test_suite,
@@ -3192,6 +3193,22 @@ def get_agentic_qa_history_route(
         client_name=auth_ctx.get("client_name"),
         limit=20,
     )
+
+
+@router.delete("/agentic-qa", status_code=200)
+@limiter.limit(LIMIT_DELETE)
+def delete_agentic_qa_history_route(
+    request: Request,
+    auth_ctx: dict[str, Any] = Depends(validate_api_key),
+) -> dict[str, Any]:
+    deleted = delete_agentic_qa_reports_for_client(
+        client_name=auth_ctx.get("client_name"),
+    )
+    return {
+        "deleted": True,
+        "deleted_count": deleted,
+        "scope": "agentic_qa_reports",
+    }
 
 
 def _derive_app_type_from_journeys(journey_timeline: list[dict[str, Any]] | None) -> str:

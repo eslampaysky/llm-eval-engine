@@ -1921,3 +1921,16 @@ def list_agentic_qa_reports_for_client(client_name: str | None, limit: int = 100
             (client_name, limit),
         )
         return [_row_to_dict(r) for r in cur.fetchall()]
+
+
+def delete_agentic_qa_reports_for_client(client_name: str | None) -> int:
+    with _get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            DELETE FROM agentic_qa_reports
+            WHERE client_name={_P}
+            """,
+            (client_name,),
+        )
+        return int(cur.rowcount or 0)
