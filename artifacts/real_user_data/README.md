@@ -1,23 +1,23 @@
 # AiBreaker — Real User Audit Results
 
-Last updated: 2026-03-21 05:20 UTC
+Last updated: 2026-03-21 06:10 UTC
 
 ## Summary
 | Metric | Value |
 |--------|-------|
 | Total audits | 10 |
 | Errors / timeouts | 0 |
-| Bot blocked | 2 |
+| Bot blocked | 1 |
 | CAPTCHA hit | 0 |
-| Avg score (non-blocked) | 46.5 |
-| Classification accuracy | 0/6 |
+| Avg score (non-blocked) | 69.8 |
+| Classification accuracy | 0/7 |
 
 ## By Group
 | Group | Runs | Bot blocked | CAPTCHA | Errors |
 |-------|------|-------------|---------|--------|
-| ecommerce | 3 | 1 | 0 | 0 |
-| marketing | 4 | 0 | 0 | 0 |
-| saas | 3 | 1 | 0 | 0 |
+| ecommerce | 2 | 1 | 0 | 0 |
+| marketing | 5 | 0 | 0 | 0 |
+| saas | 3 | 0 | 0 | 0 |
 
 ## Top Failure Patterns
 
@@ -32,13 +32,13 @@ Last updated: 2026-03-21 05:20 UTC
 ## Last 10 Runs
 | Name | Group | Score | Duration | Bot | Failure |
 |------|-------|-------|----------|-----|---------|
-| Canva | saas | 58 | 121s | 🚫 | blocked_by_bot_protection |
-| Framer | marketing | 0 | 233s |  |  |
-| Wayfair | ecommerce | 0 | 181s |  |  |
-| Retool | marketing | 96 | 84s |  |  |
-| Raycast | marketing | 0 | 182s |  |  |
-| NotionAI | marketing | 94 | 95s |  | action_resolution_failed |
-| OpenCart | ecommerce | 96 | 116s | 🚫 | blocked_by_bot_protection |
-| Demoblaze | ecommerce | 92 | 132s |  | action_resolution_failed |
-| Miro | saas | 0 | 225s |  |  |
-| Linear | saas | 90 | 143s |  |  |
+| TLDraw | marketing | 94 | 74s |  | action_resolution_failed |
+| Railway | marketing | 0 | 184s |  |  |
+| Sephora | ecommerce | 90 | 69s | 🚫 | blocked_by_bot_protection |
+| Tailwind | marketing | 100 | 85s |  | action_resolution_failed |
+| Airtable | saas | 90 | 121s |  |  |
+| Zapier | saas | 90 | 138s |  |  |
+| Webflow | marketing | 0 | 185s |  |  |
+| Planetscale | marketing | 90 | 74s |  |  |
+| Mailchimp | saas | None | 205s |  |  |
+| SauceDemo | ecommerce | 94 | 79s |  | action_resolution_failed |
