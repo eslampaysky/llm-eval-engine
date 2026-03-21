@@ -372,6 +372,9 @@ async def _run_user_journeys(page, journeys: list[dict]) -> list[dict]:
 
 
 _BLOCKER_SELECTORS = [
+    "[class*='fc-cta-consent']",
+    "[class*='fc-button-label']",
+    "[aria-label*='close' i]",
     "[aria-label='Close']",
     "[aria-label='Dismiss']",
     "[data-testid='close']",
@@ -379,12 +382,16 @@ _BLOCKER_SELECTORS = [
     "button[aria-label*='dismiss' i]",
     "button:has-text('Accept')",
     "button:has-text('Accept all')",
+    "button:has-text('Allow all')",
+    "button:has-text('Allow All')",
+    "button:has-text('I Accept')",
     "button:has-text('I agree')",
+    "button:has-text('Agree')",
+    "button:has-text('Consent')",
     "button:has-text('Got it')",
     "button:has-text('Close')",
     "button:has-text('Dismiss')",
     "button:has-text('No thanks')",
-    "[role='dialog'] button",
 ]
 _BLOCKER_TYPE_SIGNALS = {
     # Specific content-based classes first. First match wins.

@@ -261,7 +261,6 @@ def _has_product_catalog(text: str) -> bool:
     return any(
         token in text
         for token in (
-            "product",
             "products",
             "shop",
             "collections",
@@ -328,6 +327,37 @@ def _has_login_first_commerce(text: str, has_visible_auth_form: bool) -> bool:
         )
     )
     return has_visible_auth_form and commerce_intent
+
+
+def _detect_pre_journey_blocker(crawl: dict[str, Any]) -> dict[str, str] | None:
+    title = str(crawl.get("title") or "").strip().lower()
+    text = _combined_text(crawl)
+
+    if any(
+        token in text
+        for token in (
+            "access is temporarily restricted",
+            "we detected unusual activity from your device or network",
+            "temporarily restricted",
+            "unusual activity from your device or network",
+        )
+    ):
+        return {
+            "failure_type": "blocked_by_bot_protection",
+            "summary": "Site access is temporarily restricted by bot protection.",
+            "error": "Access temporarily restricted by bot protection",
+        }
+
+    if title == "application error" or (
+        "application error" in text and not any(token in text for token in ("cart", "checkout", "login", "product"))
+    ):
+        return {
+            "failure_type": "site_unavailable",
+            "summary": "The site is currently returning an application error page, so user journeys could not run.",
+            "error": "Site is currently unavailable",
+        }
+
+    return None
 
 
 def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]:
@@ -444,6 +474,15 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
                 inferred["app_type"] = AppType.MARKETING.value
                 inferred["features"] = ["pricing", "features", "contact"]
                 inferred["primary_goal"] = "explore marketing paths"
+        if (
+            inferred.get("app_type") == AppType.ECOMMERCE.value
+            and not has_cart_or_checkout
+            and not structural.get("has_add_to_cart_button")
+            and any(t in desc_lower for t in ("waitlist", "contact sales", "marketing", "landing page", "email client"))
+        ):
+            inferred["app_type"] = AppType.MARKETING.value
+            inferred["features"] = ["pricing", "features", "contact"]
+            inferred["primary_goal"] = "explore marketing paths"
 
     anthropic_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
     if anthropic_key:
@@ -594,13 +633,21 @@ def _cart_step() -> JourneyStep:
                     "button:has-text('Add to Bag')",
                     "button:has-text('Add to basket')",
                     "button:has-text('Add to Basket')",
+                    "button:has-text('ADD TO BASKET')",
                     "a:has-text('Add to cart')",
                     "a:has-text('Add to Cart')",
+                    "a:has-text('ADD TO BASKET')",
                     "button[class*='add-to-cart']",
                     "button[class*='addtocart']",
                     "button[class*='add_to_cart']",
                     "button[class*='atc']",
                     "button[class*='btn-cart']",
+                    "a[class*='add_to_cart_button']",
+                    "button[name='add-to-cart']",
+                    "input[name='add-to-cart']",
+                    "input[name='submit.add-to-cart']",
+                    "input[id='add-to-cart-button']",
+                    "#add-to-cart-button",
                     ".btn-cart",
                     "button[id*='add-to-cart']",
                     "button[id*='addtocart']",
@@ -666,7 +713,7 @@ def _open_product_step() -> JourneyStep:
         step_type=StepType.CLICK.value,
         action_candidates=[
             ActionCandidate(type="click", intent="view details link", selectors=["a:has-text('View Details')", "a:has-text('View Product')", "a:has-text('See Details')"], role="link", name="View Details", text="View Details"),
-            ActionCandidate(type="click", intent="product item link", selectors=["a[href*='#/product/']", "a[href*='/product/']", ".card-title a", ".product-item-link", ".productName a", ".product-card a:first-of-type", ".product-item a:first-of-type", ".categoryCell a", ".products-grid a:first-of-type", ".product-list a:first-of-type"], role="link", name="Product", text="Product"),
+            ActionCandidate(type="click", intent="product item link", selectors=["a[href*='#/product/']", "a[href*='/product/']", "a[href*='/dp/']", "a[href*='/gp/product/']", ".s-result-item h2 a", "a.a-link-normal[href*='/dp/']", ".card-title a", ".product-item-link", ".productName a", ".product-card a:first-of-type", ".product-item a:first-of-type", ".categoryCell a", ".products-grid a:first-of-type", ".product-list a:first-of-type"], role="link", name="Product", text="Product"),
             ActionCandidate(type="click", intent="shop now link", selectors=["a:has-text('Shop Now')", ".shop_now"], role="link", name="Shop Now", text="Shop Now"),
         ],
         success_signals=[
@@ -686,7 +733,7 @@ def _cart_from_detail_step() -> JourneyStep:
         intent="add to cart button on product detail page",
         step_type=StepType.CLICK.value,
         action_candidates=[
-            ActionCandidate(type="click", intent="add to cart button", selectors=["button:has-text('Add to cart')", "button:has-text('ADD TO CART')", "button:has-text('Add To Cart')", "a:has-text('Add to cart')", "[onclick*='addToCart']", ".btn-cart"], role="button", name="Add to cart", text="Add to cart"),
+            ActionCandidate(type="click", intent="add to cart button", selectors=["button:has-text('Add to cart')", "button:has-text('ADD TO CART')", "button:has-text('Add To Cart')", "button:has-text('ADD TO BASKET')", "a:has-text('Add to cart')", "a:has-text('ADD TO BASKET')", "[onclick*='addToCart']", "[onclick*='add_to_cart']", ".btn-cart", "a[class*='add_to_cart_button']", "input[name='submit.add-to-cart']", "input[id='add-to-cart-button']", "#add-to-cart-button"], role="button", name="Add to cart", text="Add to cart"),
         ],
         success_signals=[
             SuccessSignal(type="element_visible", value="Cart", priority="medium", required=False),
@@ -1156,6 +1203,59 @@ def run_agentic_qa(
     journey_timeline: list[dict] | None = None
     step_results: list[dict] | None = None
     discovery_context = discover_site(crawl, description=site_description)
+    hard_blocker = _detect_pre_journey_blocker(crawl)
+    if hard_blocker:
+        blocker_snapshot = {
+            "url": crawl.get("url") or url,
+            "title": crawl.get("title") or "",
+            "text_snippet": crawl.get("text_snippet") or "",
+        }
+        return AgenticQAResult(
+            url=url,
+            tier=tier,
+            score=0,
+            confidence=0,
+            findings=[],
+            summary=hard_blocker["summary"],
+            journey_timeline=[{
+                "journey": "site_access",
+                "app_type": discovery_context.get("app_type"),
+                "status": "FAILED",
+                "failed_step": "site access",
+                "reason": hard_blocker["error"],
+                "steps": [{
+                    "step": "site access",
+                    "status": "failed",
+                    "failure_type": hard_blocker["failure_type"],
+                    "evidence_delta": [],
+                    "recovery_attempts": [],
+                }],
+            }],
+            step_results=[{
+                "step_name": "site access",
+                "goal": "site_access",
+                "status": "failed",
+                "chosen_action": None,
+                "verification": {
+                    "success": False,
+                    "passed_signals": [],
+                    "failed_signals": [],
+                    "delta_summary": [],
+                    "failure_type": hard_blocker["failure_type"],
+                    "llm_used": False,
+                },
+                "evidence_delta": [],
+                "recovery_attempts": [],
+                "failure_type": hard_blocker["failure_type"],
+                "error": hard_blocker["error"],
+                "notes": [],
+                "before_snapshot": blocker_snapshot,
+                "after_snapshot": blocker_snapshot,
+                "screenshot_path": None,
+            }],
+            error=hard_blocker["error"],
+            analysis_limited=True,
+        )
 
     if tier in ("deep", "fix"):
         _raise_if_canceled()

@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from core.agentic_qa import _cart_step, _login_step, _open_product_step, discover_site, plan_journeys
+from core.agentic_qa import _cart_from_detail_step, _cart_step, _login_step, _open_product_step, discover_site, plan_journeys
 from core.models import ActionCandidate, AppType, JourneyPlan, JourneyStep, RecoveryEvent, SessionState, StepResult, StepType, SuccessSignal
 from core.report_builder import build_journey_timeline
 
@@ -527,6 +527,18 @@ def test_description_boost_overrides_marketing_to_saas():
     assert ctx["app_type"] == "saas_auth"
 
 
+def test_waitlist_marketing_site_does_not_fall_into_ecommerce():
+    crawl = {
+        "title": "Superhuman",
+        "text_snippet": "product enterprise pricing contact sales sign up",
+        "nav_links": [{"text": "Pricing", "href": "/pricing"}],
+        "buttons": ["Get Superhuman", "Sign up"],
+        "page_html": "",
+    }
+    ctx = discover_site(crawl, description="Email client with waitlist form")
+    assert ctx["app_type"] == AppType.MARKETING.value
+
+
 def test_cart_step_has_broad_selectors():
     step = _cart_step()
     all_selectors = []
@@ -537,6 +549,15 @@ def test_cart_step_has_broad_selectors():
     assert "data-testid" in s
     assert "form[action*='cart']" in s
     assert "addtocart" in s.lower()
+    assert "add-to-cart-button" in s
+    assert "ADD TO BASKET" in s
+
+
+def test_detail_cart_step_has_amazon_and_basket_selectors():
+    selectors = " ".join(_cart_from_detail_step().action_candidates[0].selectors)
+    assert "add-to-cart-button" in selectors
+    assert "submit.add-to-cart" in selectors
+    assert "ADD TO BASKET" in selectors
 
 
 def test_saucedemo_login_first_commerce_routes_to_ecommerce() -> None:
@@ -714,6 +735,7 @@ def test_open_product_has_advantage_and_demoblaze_candidates() -> None:
 
     assert any("product/" in selector for selector in selectors)
     assert any("card-title" in selector for selector in selectors)
+    assert any("/dp/" in selector for selector in selectors)
 
 
 def test_detail_then_cart_success_signals_cover_cart_confirmation() -> None:
@@ -741,6 +763,15 @@ def test_agentic_qa_job_runner_uses_cancel_callback() -> None:
     assert "def _is_canceled() -> bool:" in routes_source
     assert "should_cancel=_is_canceled" in routes_source
     assert "except AuditCanceledError:" in routes_source
+
+
+def test_agentic_qa_routes_persist_screenshots_to_files() -> None:
+    routes_source = Path("api/routes.py").read_text(encoding="utf-8")
+
+    assert "def _persist_agentic_qa_screenshot(" in routes_source
+    assert "desktop_screenshot_path = _persist_agentic_qa_screenshot(" in routes_source
+    assert "mobile_screenshot_path = _persist_agentic_qa_screenshot(" in routes_source
+    assert "if screenshot_path.exists():" in routes_source
 
 
 def test_frontend_exposes_agentic_qa_cancel_api() -> None:

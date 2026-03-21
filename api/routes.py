@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -221,6 +222,7 @@ logger = _log
 _DATA_DIR         = Path(os.getenv("DATA_DIR", "/app/data"))
 REPORT_DIR        = _DATA_DIR / "reports"
 REVIEW_RULES_PATH = _DATA_DIR / "review_rules.json"
+AGENTIC_QA_MEDIA_DIR = _DATA_DIR / "agentic_qa_media"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 GROQ_JUDGE_MODEL = "llama-3.3-70b-versatile"
@@ -342,6 +344,20 @@ def _finish_progress(report_id: str, status: str) -> None:
     if not entry:
         return
     entry["status"] = status
+
+
+def _persist_agentic_qa_screenshot(audit_id: str, kind: str, payload_b64: str | None) -> str | None:
+    if not payload_b64:
+        return None
+    try:
+        raw = base64.b64decode(payload_b64)
+    except Exception:
+        return None
+    folder = AGENTIC_QA_MEDIA_DIR / audit_id
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{kind}.png"
+    path.write_bytes(raw)
+    return str(path)
 
 
 def _resolve_plan_for_client(client_name: str | None) -> tuple[str, dict[str, Any]]:
@@ -3528,11 +3544,10 @@ def get_agentic_qa_screenshot_desktop(
     b64 = row.get("desktop_ss_b64")
     if not b64:
         raise HTTPException(status_code=404, detail="Desktop screenshot not available")
-    import base64 as b64mod
-    return Response(
-        content=b64mod.b64decode(b64),
-        media_type="image/png",
-    )
+    screenshot_path = Path(str(b64))
+    if screenshot_path.exists():
+        return FileResponse(screenshot_path, media_type="image/png")
+    return Response(content=base64.b64decode(b64), media_type="image/png")
 
 
 @router.get("/agentic-qa/{audit_id}/screenshot/mobile")
@@ -3549,11 +3564,10 @@ def get_agentic_qa_screenshot_mobile(
     b64 = row.get("mobile_ss_b64")
     if not b64:
         raise HTTPException(status_code=404, detail="Mobile screenshot not available")
-    import base64 as b64mod
-    return Response(
-        content=b64mod.b64decode(b64),
-        media_type="image/png",
-    )
+    screenshot_path = Path(str(b64))
+    if screenshot_path.exists():
+        return FileResponse(screenshot_path, media_type="image/png")
+    return Response(content=base64.b64decode(b64), media_type="image/png")
 
 
 def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, credentials, client_name, user_api_key=None):
@@ -3597,6 +3611,12 @@ def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, credent
             }
             for f in result.findings
         ]
+        desktop_screenshot_path = _persist_agentic_qa_screenshot(
+            audit_id, "desktop", result.desktop_screenshot_b64
+        )
+        mobile_screenshot_path = _persist_agentic_qa_screenshot(
+            audit_id, "mobile", result.mobile_screenshot_b64
+        )
 
         finalize_agentic_qa_success(
             audit_id=audit_id,
@@ -3608,8 +3628,8 @@ def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, credent
             journey_timeline_json=json.dumps(result.journey_timeline, ensure_ascii=False) if result.journey_timeline is not None else None,
             step_results_json=json.dumps(result.step_results, ensure_ascii=False) if result.step_results is not None else None,
             video_path=result.video_path,
-            desktop_ss_b64=result.desktop_screenshot_b64,
-            mobile_ss_b64=result.mobile_screenshot_b64,
+            desktop_ss_b64=desktop_screenshot_path,
+            mobile_ss_b64=mobile_screenshot_path,
         )
         _finish_progress(audit_id, "done")
 
