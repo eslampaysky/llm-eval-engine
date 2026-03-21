@@ -41,11 +41,11 @@ class BreakerClient:
             num_tests=20,
         )
 
-        print(report)
         if not report.passed:
-            for f in report.failures:
-                print(f"  ✗ {f.question}")
-            raise SystemExit(1)
+            failed_questions = [f.question for f in report.failures]
+            raise RuntimeError(
+                f"Model failed {len(failed_questions)} checks: {failed_questions}"
+            )
     """
 
     def __init__(
