@@ -412,6 +412,39 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
         "requires_auth_first": has_login_first_commerce,
     }
 
+    # Description-based boost - user hint overrides structural classifier
+    # when structural signals are weak (generic fallback)
+    if description:
+        desc_lower = description.lower()
+        if any(t in desc_lower for t in (
+            "shop", "store", "cart", "checkout", "buy",
+            "ecommerce", "e-commerce", "product catalog"
+        )):
+            if inferred.get("app_type") == AppType.GENERIC.value:
+                inferred["app_type"] = AppType.ECOMMERCE.value
+                inferred["features"] = ["search", "cart", "checkout"]
+                inferred["primary_goal"] = "purchase item"
+        elif (
+            any(t in desc_lower for t in ("login", "sign in", "dashboard", "saas"))
+            or (
+                any(t in desc_lower for t in ("workspace", "app", "platform"))
+                and not any(t in desc_lower for t in ("marketing", "pricing", "landing page", "product page"))
+            )
+        ):
+            if inferred.get("app_type") in (
+                AppType.GENERIC.value, AppType.MARKETING.value
+            ):
+                inferred["app_type"] = AppType.SAAS_AUTH.value
+                inferred["features"] = ["login", "dashboard", "navigation"]
+                inferred["primary_goal"] = "reach dashboard"
+        elif any(t in desc_lower for t in (
+            "marketing", "pricing", "landing page", "product page"
+        )):
+            if inferred.get("app_type") == AppType.GENERIC.value:
+                inferred["app_type"] = AppType.MARKETING.value
+                inferred["features"] = ["pricing", "features", "contact"]
+                inferred["primary_goal"] = "explore marketing paths"
+
     anthropic_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
     if anthropic_key:
         try:
@@ -548,15 +581,34 @@ def _cart_step() -> JourneyStep:
         action_candidates=[
             ActionCandidate(
                 type="click",
-                intent="add to cart",
+                intent="add to cart button",
                 selectors=[
+                    "[data-test*='add-to-cart']",
+                    "[data-testid*='add-to-cart']",
+                    "[data-cy*='add-to-cart']",
                     "button:has-text('Add to cart')",
                     "button:has-text('ADD TO CART')",
                     "button:has-text('Add To Cart')",
+                    "button:has-text('Add to Cart')",
                     "button:has-text('Add to bag')",
-                    "[data-test*='add-to-cart']",
-                    "button[class*='add-to-cart']",
+                    "button:has-text('Add to Bag')",
+                    "button:has-text('Add to basket')",
+                    "button:has-text('Add to Basket')",
                     "a:has-text('Add to cart')",
+                    "a:has-text('Add to Cart')",
+                    "button[class*='add-to-cart']",
+                    "button[class*='addtocart']",
+                    "button[class*='add_to_cart']",
+                    "button[class*='atc']",
+                    "button[class*='btn-cart']",
+                    ".btn-cart",
+                    "button[id*='add-to-cart']",
+                    "button[id*='addtocart']",
+                    "[data-action*='cart']",
+                    "[onclick*='addToCart']",
+                    "[onclick*='add_to_cart']",
+                    "form[action*='cart'] button[type='submit']",
+                    "form[action*='cart'] input[type='submit']",
                 ],
                 role="button",
                 name="Add to cart",
@@ -564,11 +616,34 @@ def _cart_step() -> JourneyStep:
             ),
             ActionCandidate(
                 type="click",
-                intent="buy now",
-                selectors=["button:has-text('Buy now')", "a:has-text('Buy now')"],
+                intent="buy now button",
+                selectors=[
+                    "button:has-text('Buy now')",
+                    "button:has-text('Buy Now')",
+                    "button:has-text('BUY NOW')",
+                    "a:has-text('Buy now')",
+                    "a:has-text('Buy Now')",
+                    "[data-test*='buy-now']",
+                    "button[class*='buy-now']",
+                ],
                 role="button",
                 name="Buy now",
                 text="Buy now",
+            ),
+            ActionCandidate(
+                type="click",
+                intent="shop now or first product",
+                selectors=[
+                    "a:has-text('Shop now')",
+                    "a:has-text('Shop Now')",
+                    "button:has-text('Shop now')",
+                    ".product-item a:first-of-type",
+                    ".product-card a:first-of-type",
+                    "a[href*='/product/']:first-of-type",
+                ],
+                role="link",
+                name="Shop now",
+                text="Shop now",
             ),
         ],
         success_signals=[
@@ -626,19 +701,60 @@ def _cart_from_detail_step() -> JourneyStep:
     )
 
 
-def _dashboard_step() -> JourneyStep:
+def _generic_explore_step() -> JourneyStep:
     return JourneyStep(
-        goal="reach_dashboard",
-        intent="open dashboard",
+        goal="explore_main_content",
+        intent="main navigation or primary CTA",
         action_candidates=[
-            ActionCandidate(type="click", intent="dashboard link", role="link", name="Dashboard", text="Dashboard"),
-            ActionCandidate(type="click", intent="get started", role="button", name="Get started", text="Get started"),
+            ActionCandidate(
+                type="click",
+                intent="get started CTA",
+                selectors=[
+                    "a:has-text('Get started')",
+                    "button:has-text('Get started')",
+                    "a:has-text('Start for free')",
+                    "button:has-text('Start free')",
+                    "a:has-text('Try free')",
+                    "a:has-text('Try it free')",
+                ],
+                role="button", name="Get started", text="Get started",
+            ),
+            ActionCandidate(
+                type="click",
+                intent="sign up CTA",
+                selectors=[
+                    "a:has-text('Sign up')",
+                    "button:has-text('Sign up')",
+                    "a:has-text('Create account')",
+                ],
+                role="button", name="Sign up", text="Sign up",
+            ),
+            ActionCandidate(
+                type="click",
+                intent="learn more link",
+                selectors=[
+                    "a:has-text('Learn more')",
+                    "a:has-text('See how')",
+                    "a:has-text('See features')",
+                ],
+                role="link", name="Learn more", text="Learn more",
+            ),
+            ActionCandidate(
+                type="click",
+                intent="first nav link",
+                selectors=[
+                    "nav a:not([href='/']):not([href='#']):first-of-type",
+                    "header a:not([href='/']):not([href='#']):first-of-type",
+                ],
+                role="link", name="Nav", text="",
+            ),
         ],
         success_signals=[
-            SuccessSignal(type="url_contains", value="dashboard", priority="high"),
-            SuccessSignal(type="text_present", value="dashboard", priority="medium", required=False),
+            SuccessSignal(type="url_regex", value=r".+/.+", priority="high", required=False),
+            SuccessSignal(type="text_present", value="welcome", priority="low", required=False),
+            SuccessSignal(type="text_present", value="features", priority="low", required=False),
         ],
-        failure_hints=["Dashboard did not load"],
+        failure_hints=["no navigation succeeded"],
         expected_state_change={},
         allow_soft_recovery=True,
     )
@@ -801,7 +917,7 @@ def plan_journeys(context: dict[str, Any]) -> list[JourneyPlan]:
             JourneyPlan(name="features_navigation", app_type=AppType.MARKETING.value, steps=[_marketing_features_step()]),
             JourneyPlan(name="contact_navigation", app_type=AppType.MARKETING.value, steps=[_marketing_contact_step()]),
         ]
-    return [JourneyPlan(name="core_navigation", app_type="generic", steps=[_dashboard_step()])]
+    return [JourneyPlan(name="core_exploration", app_type="generic", steps=[_generic_explore_step()])]
 
 
 def _coerce_structured_journeys(journeys: list[dict] | None, context: dict[str, Any]) -> tuple[list[JourneyPlan] | None, list[dict] | None]:

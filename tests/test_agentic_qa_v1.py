@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from core.agentic_qa import _login_step, _open_product_step, discover_site, plan_journeys
+from core.agentic_qa import _cart_step, _login_step, _open_product_step, discover_site, plan_journeys
 from core.models import ActionCandidate, AppType, JourneyPlan, JourneyStep, RecoveryEvent, SessionState, StepResult, StepType, SuccessSignal
 from core.report_builder import build_journey_timeline
 
@@ -497,6 +497,46 @@ def test_saas_auth_plan_is_login_only() -> None:
 
     assert len(journeys) == 1
     assert [step.goal for step in journeys[0].steps] == ["login"]
+
+
+def test_generic_fallback_uses_explore_not_dashboard():
+    plans = plan_journeys({"app_type": "generic"})
+    assert len(plans) == 1
+    assert plans[0].name == "core_exploration"
+    assert plans[0].steps[0].goal == "explore_main_content"
+    goals = [s.goal for s in plans[0].steps]
+    assert "reach_dashboard" not in goals
+
+
+def test_description_boost_overrides_generic_to_ecommerce():
+    crawl = {
+        "title": "Shop", "text_snippet": "welcome",
+        "nav_links": [], "buttons": [], "page_html": ""
+    }
+    ctx = discover_site(crawl, description="online store with cart and checkout")
+    assert ctx["app_type"] == "ecommerce"
+
+
+def test_description_boost_overrides_marketing_to_saas():
+    crawl = {
+        "title": "Product", "text_snippet": "pricing features",
+        "nav_links": [{"text": "pricing", "href": "/pricing"}],
+        "buttons": [], "page_html": ""
+    }
+    ctx = discover_site(crawl, description="SaaS app with login and dashboard")
+    assert ctx["app_type"] == "saas_auth"
+
+
+def test_cart_step_has_broad_selectors():
+    step = _cart_step()
+    all_selectors = []
+    for candidate in step.action_candidates:
+        all_selectors.extend(candidate.selectors)
+    s = " ".join(all_selectors)
+    assert "data-test" in s
+    assert "data-testid" in s
+    assert "form[action*='cart']" in s
+    assert "addtocart" in s.lower()
 
 
 def test_saucedemo_login_first_commerce_routes_to_ecommerce() -> None:
