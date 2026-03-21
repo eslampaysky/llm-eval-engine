@@ -1,13 +1,350 @@
 {
   "meta": {
-    "description": "Targeted verification for SauceDemo and Demoblaze",
-    "purpose": "Confirm V1 fixes explicitly",
-    "batch_size": 2,
+    "description": "60 real-world audit targets for failure pattern discovery",
+    "purpose": "Surface real failure patterns across SaaS, marketing, ecommerce",
+    "batch_size": 10,
     "pick_strategy": "random",
     "tier": "deep"
   },
   "groups": {
+    "saas": [
+      {
+        "name": "Notion",
+        "url": "https://www.notion.so",
+        "tier": "deep",
+        "site_description": "Workspace SaaS with signup and dashboard",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Slack",
+        "url": "https://slack.com",
+        "tier": "deep",
+        "site_description": "Team messaging SaaS with workspace login",
+        "expected_type": "saas_auth"
+      },
+      {
+        "name": "Canva",
+        "url": "https://www.canva.com",
+        "tier": "deep",
+        "site_description": "Design SaaS with signup and template selection",
+        "expected_type": "saas_auth"
+      },
+      {
+        "name": "Figma",
+        "url": "https://www.figma.com",
+        "tier": "deep",
+        "site_description": "Design tool SaaS with login and file dashboard",
+        "expected_type": "saas_auth"
+      },
+      {
+        "name": "Dropbox",
+        "url": "https://www.dropbox.com",
+        "tier": "deep",
+        "site_description": "Cloud storage SaaS with login and file list",
+        "expected_type": "saas_auth"
+      },
+      {
+        "name": "Linear",
+        "url": "https://linear.app",
+        "tier": "deep",
+        "site_description": "Project management SaaS with login wall",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Airtable",
+        "url": "https://www.airtable.com",
+        "tier": "deep",
+        "site_description": "Database SaaS with signup and base creation",
+        "expected_type": "saas_auth"
+      },
+      {
+        "name": "Zapier",
+        "url": "https://zapier.com",
+        "tier": "deep",
+        "site_description": "Automation SaaS with onboarding flow",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Intercom",
+        "url": "https://www.intercom.com",
+        "tier": "deep",
+        "site_description": "Customer messaging SaaS with demo request flow",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "HubSpot",
+        "url": "https://www.hubspot.com",
+        "tier": "deep",
+        "site_description": "CRM SaaS with multi-step high-friction signup",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Asana",
+        "url": "https://asana.com",
+        "tier": "deep",
+        "site_description": "Project management SaaS with task creation and login",
+        "expected_type": "saas_auth"
+      },
+      {
+        "name": "Monday",
+        "url": "https://monday.com",
+        "tier": "deep",
+        "site_description": "Work OS SaaS with onboarding and board creation",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Loom",
+        "url": "https://www.loom.com",
+        "tier": "deep",
+        "site_description": "Video messaging SaaS with signup and recording flow",
+        "expected_type": "saas_auth"
+      },
+      {
+        "name": "Miro",
+        "url": "https://miro.com",
+        "tier": "deep",
+        "site_description": "Whiteboard SaaS with signup and board creation",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Typeform",
+        "url": "https://www.typeform.com",
+        "tier": "deep",
+        "site_description": "Form builder SaaS with signup and form creation",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Calendly",
+        "url": "https://calendly.com",
+        "tier": "deep",
+        "site_description": "Scheduling SaaS with signup and calendar setup",
+        "expected_type": "saas_auth"
+      },
+      {
+        "name": "Mailchimp",
+        "url": "https://mailchimp.com",
+        "tier": "deep",
+        "site_description": "Email marketing SaaS with signup and audience creation",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Grammarly",
+        "url": "https://www.grammarly.com",
+        "tier": "deep",
+        "site_description": "Writing assistant SaaS with signup and editor flow",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Evernote",
+        "url": "https://evernote.com",
+        "tier": "deep",
+        "site_description": "Note taking SaaS with signup and notebook creation",
+        "expected_type": "saas_auth"
+      },
+      {
+        "name": "Webex",
+        "url": "https://www.webex.com",
+        "tier": "deep",
+        "site_description": "Video conferencing SaaS with login and meeting creation",
+        "expected_type": "saas_auth"
+      }
+    ],
+    "marketing": [
+      {
+        "name": "Stripe",
+        "url": "https://stripe.com",
+        "tier": "deep",
+        "site_description": "Payments infrastructure with pricing and start now CTA",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Webflow",
+        "url": "https://webflow.com",
+        "tier": "deep",
+        "site_description": "No-code website builder with pricing navigation",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Framer",
+        "url": "https://www.framer.com",
+        "tier": "deep",
+        "site_description": "Website builder with start for free CTA",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Vercel",
+        "url": "https://vercel.com",
+        "tier": "deep",
+        "site_description": "Developer platform with signup navigation",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "NotionAI",
+        "url": "https://www.notion.so/product/ai",
+        "tier": "deep",
+        "site_description": "Notion AI product page with CTA interaction",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Superhuman",
+        "url": "https://superhuman.com",
+        "tier": "deep",
+        "site_description": "Email client with waitlist form",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "TLDraw",
+        "url": "https://www.tldraw.com",
+        "tier": "deep",
+        "site_description": "Interactive canvas tool with dynamic content",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Resend",
+        "url": "https://resend.com",
+        "tier": "deep",
+        "site_description": "Email API for developers with CTA",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Raycast",
+        "url": "https://www.raycast.com",
+        "tier": "deep",
+        "site_description": "Productivity tool with download CTA",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Arc",
+        "url": "https://arc.net",
+        "tier": "deep",
+        "site_description": "Browser with gated download flow",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Supabase",
+        "url": "https://supabase.com",
+        "tier": "deep",
+        "site_description": "Open source Firebase alternative with pricing and docs",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Retool",
+        "url": "https://retool.com",
+        "tier": "deep",
+        "site_description": "Internal tool builder with pricing and demo CTA",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Clerk",
+        "url": "https://clerk.com",
+        "tier": "deep",
+        "site_description": "Auth platform for developers with pricing and docs",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Tailwind",
+        "url": "https://tailwindcss.com",
+        "tier": "deep",
+        "site_description": "CSS framework documentation with get started CTA",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Prisma",
+        "url": "https://www.prisma.io",
+        "tier": "deep",
+        "site_description": "Database ORM with docs and get started CTA",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Railway",
+        "url": "https://railway.app",
+        "tier": "deep",
+        "site_description": "Cloud deployment platform with pricing and deploy CTA",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Render",
+        "url": "https://render.com",
+        "tier": "deep",
+        "site_description": "Cloud hosting with pricing and deploy CTA",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Temporal",
+        "url": "https://temporal.io",
+        "tier": "deep",
+        "site_description": "Workflow orchestration platform with docs and get started",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Fly",
+        "url": "https://fly.io",
+        "tier": "deep",
+        "site_description": "App deployment platform with pricing and launch CTA",
+        "expected_type": "marketing_site"
+      },
+      {
+        "name": "Planetscale",
+        "url": "https://planetscale.com",
+        "tier": "deep",
+        "site_description": "Serverless MySQL platform with branching and pricing",
+        "expected_type": "marketing_site"
+      }
+    ],
     "ecommerce": [
+      {
+        "name": "IKEA",
+        "url": "https://www.ikea.com/us/en",
+        "tier": "deep",
+        "site_description": "Furniture store with complex add to cart UI",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "Etsy",
+        "url": "https://www.etsy.com",
+        "tier": "deep",
+        "site_description": "Marketplace with product variations and add to cart",
+        "expected_type": "ecommerce",
+        "skip_reason": "bot_protected_major_retailer"
+      },
+      {
+        "name": "Sephora",
+        "url": "https://www.sephora.com",
+        "tier": "deep",
+        "site_description": "Beauty retailer with product selection and add to basket",
+        "expected_type": "ecommerce",
+        "skip_reason": "bot_protected_major_retailer"
+      },
+      {
+        "name": "Wayfair",
+        "url": "https://www.wayfair.com",
+        "tier": "deep",
+        "site_description": "Home goods store with product filtering and add to cart",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "Chewy",
+        "url": "https://www.chewy.com",
+        "tier": "deep",
+        "site_description": "Pet supplies store with subscription and add to cart",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "Uniqlo",
+        "url": "https://www.uniqlo.com/us/en",
+        "tier": "deep",
+        "site_description": "Japanese fashion retailer with size selection and add to bag",
+        "expected_type": "ecommerce",
+        "skip_reason": "bot_protected_major_retailer"
+      },
+      {
+        "name": "OpenCart",
+        "url": "https://demo.opencart.com",
+        "tier": "deep",
+        "site_description": "OpenCart demo store with product catalog and checkout",
+        "expected_type": "ecommerce",
+        "skip_reason": "cloudflare_blocking"
+      },
       {
         "name": "SauceDemo",
         "url": "https://www.saucedemo.com",
@@ -24,6 +361,83 @@
         "url": "https://www.demoblaze.com",
         "tier": "deep",
         "site_description": "Simple JS demo store with product catalog and cart",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "Gymshark",
+        "url": "https://www.gymshark.com",
+        "tier": "deep",
+        "site_description": "Fitness apparel store with product catalog and add to cart",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "Allbirds",
+        "url": "https://www.allbirds.com",
+        "tier": "deep",
+        "site_description": "Sustainable footwear store with size selection and add to cart",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "MagentoDemo",
+        "url": "https://magento.softwaretestingboard.com",
+        "tier": "deep",
+        "site_description": "Magento demo store with full e-commerce flow",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "AutoExercise",
+        "url": "https://www.automationexercise.com",
+        "tier": "deep",
+        "site_description": "Purpose-built automation practice e-commerce site",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "AdvantageShop",
+        "url": "https://advantageonlineshopping.com",
+        "tier": "deep",
+        "site_description": "Demo shopping site for automation and testing",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "PolymerShop",
+        "url": "https://shop.polymer-project.org",
+        "tier": "deep",
+        "site_description": "Simple Shopify-powered demo store",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "BookDepository",
+        "url": "https://www.bookdepository.com",
+        "tier": "deep",
+        "site_description": "Accessible book store with product catalog integration",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "PrestaShop",
+        "url": "https://demo.prestashop.com",
+        "tier": "deep",
+        "site_description": "PrestaShop demo store with catalog and cart",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "LiteCart",
+        "url": "https://litecart.net/en",
+        "tier": "deep",
+        "site_description": "Lightweight ecommerce demo platform",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "JuiceShop",
+        "url": "https://juice-shop.herokuapp.com",
+        "tier": "deep",
+        "site_description": "OWASP Juice Shop security demo e-commerce site",
+        "expected_type": "ecommerce"
+      },
+      {
+        "name": "AutoPractice",
+        "url": "https://practice.automationtesting.in",
+        "tier": "deep",
+        "site_description": "E-commerce practice site for automation testing",
         "expected_type": "ecommerce"
       }
     ]

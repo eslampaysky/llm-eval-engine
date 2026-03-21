@@ -1,10 +1,10 @@
 {
-  "ecommerce / action_resolution_failed / add to cart button on listing page": 24,
+  "ecommerce / action_resolution_failed / add to cart button on listing page": 25,
   "action_resolution_failed": 19,
   "captcha_required": 6,
   "ecommerce / action_resolution_failed / open dashboard": 6,
+  "ecommerce / action_resolution_failed / login or sign in": 5,
   "saas / action_resolution_failed / pricing page link": 4,
-  "ecommerce / action_resolution_failed / login or sign in": 4,
   "blocked_by_bot_protection": 3,
   "saas / blocked_by_bot_protection / open dashboard": 3,
   "ecommerce / site_unavailable / site access": 3,
