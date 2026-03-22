@@ -731,7 +731,7 @@ def test_detail_first_journey_exists_in_ecommerce_template() -> None:
 
 
 def test_open_product_has_advantage_and_demoblaze_candidates() -> None:
-    selectors = _open_product_step().action_candidates[1].selectors
+    selectors = _open_product_step().action_candidates[0].selectors
 
     assert any("product/" in selector for selector in selectors)
     assert any("card-title" in selector for selector in selectors)
