@@ -125,6 +125,7 @@ def build_journey_timeline(journey_results: list[dict] | None) -> list[dict]:
         timeline.append(
             {
                 "journey": journey.get("journey") or journey.get("name") or "Unnamed Journey",
+                "app_type": journey.get("app_type"),
                 "status": journey.get("status") or (
                     "FAILED" if failed_step else "PASSED"
                 ),
