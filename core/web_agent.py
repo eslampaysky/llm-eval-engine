@@ -1031,7 +1031,7 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
                     before_snapshot,
                     after_snapshot,
                 )
-                if verification_result.success:
+                if verification_result.success and action_trace:
                     note = f"Action error overruled by success signals: {error_text}"
                     notes.append(note)
                     _update_state_after_step(
@@ -1151,6 +1151,16 @@ async def run_structured_journeys(
             await page.goto(url, timeout=25000, wait_until="networkidle")
         except Exception:
             await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+
+        # Wait for product catalog elements if it's an ecommerce site
+        try:
+            await page.wait_for_selector(
+                ".product, .product-item, .product-card, .card-title, .card-block, a[href*='prod.html'], a[href*='#/product/']",
+                timeout=6000,
+                state="visible",
+            )
+        except Exception:
+            pass  # Site might not have these specific selectors or is not ecommerce
 
         parsed = [
             journey if isinstance(journey, JourneyPlan) else JourneyPlan.from_dict(journey)
