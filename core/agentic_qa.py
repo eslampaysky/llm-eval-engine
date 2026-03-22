@@ -404,7 +404,7 @@ Input Data:
 
 Return JSON only with this exact shape:
 {{
-  "app_type": "ecommerce|saas_auth|task_manager|dom_mutation|marketing|generic",
+  "app_type": "ecommerce|saas_auth|task_manager|dom_mutation|marketing_site|generic",
   "requires_auth_first": true|false,
   "confidence": 0-100,
   "reasoning": "one sentence"
@@ -422,7 +422,7 @@ Return JSON only with this exact shape:
             parsed = json.loads(text)
             
             app_type = parsed.get("app_type", "generic").lower()
-            if app_type not in ("ecommerce", "saas_auth", "task_manager", "dom_mutation", "marketing", "generic"):
+            if app_type not in ("ecommerce", "saas_auth", "task_manager", "dom_mutation", "marketing_site", "generic"):
                 app_type = "generic"
                 
             features = []
@@ -439,7 +439,7 @@ Return JSON only with this exact shape:
             elif app_type == "saas_auth":
                 features = ["login", "dashboard", "navigation"]
                 primary_goal = "reach dashboard"
-            elif app_type == "marketing":
+            elif app_type == "marketing_site":
                 features = ["pricing", "features", "contact"]
                 primary_goal = "explore marketing paths"
                 
