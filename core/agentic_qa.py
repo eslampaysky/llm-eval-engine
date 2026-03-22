@@ -374,9 +374,7 @@ def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]
     groq_key = os.getenv("GROQ_API_KEY", "").strip()
     if groq_key:
         try:
-            from src.test_generator import GroqJudgeClient
-            client = GroqJudgeClient(api_key=groq_key)
-            
+            import requests
             nav_links = crawl.get("nav_links") or []
             nav_info = []
             for item in nav_links:
@@ -420,7 +418,17 @@ Return JSON only with this exact shape:
   "reasoning": "one sentence"
 }}
 """
-            raw_response = client.generate(prompt)
+            response = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "temperature": 0.0,
+                    "messages": [{"role": "user", "content": prompt}]
+                },
+                timeout=30,
+            )
+            raw_response = response.json()["choices"][0]["message"]["content"]
             
             # Simple JSON parsing handling potential markdown blocks
             text = raw_response.strip()
