@@ -730,7 +730,7 @@ def _open_product_step() -> JourneyStep:
         step_type=StepType.CLICK.value,
         action_candidates=[
             ActionCandidate(type="click", intent="view details link", selectors=["a:has-text('View Details')", "a:has-text('View Product')", "a:has-text('See Details')", "a:has-text('More Info')"], role="link", name="View Details", text="View Details"),
-            ActionCandidate(type="click", intent="product item link", selectors=["a[href*='prod.html']", "a[href*='product']", "a[href*='item']", "a[href*='/dp/']", ".card-title a", ".product-item-link", ".product-name a", ".product-title a", "h2 a", "h3 a", ".product-card a", ".product-item a"], role="link", name="Product", text="Product"),
+            ActionCandidate(type="click", intent="product item link", selectors=["a[href*='prod.html']", "a[href*='/product/']", "a[href*='product']", "a[href*='item']", "a[href*='/dp/']", ".card-title a", ".product-item-link", ".product-name a", ".product-title a", "h2 a", "h3 a", ".product-card a", ".product-item a"], role="link", name="Product", text="Product"),
             ActionCandidate(type="click", intent="shop now link", selectors=["a:has-text('Shop Now')", ".shop_now", "a:has-text('Explore')"], role="link", name="Shop Now", text="Shop Now"),
         ],
         success_signals=[
