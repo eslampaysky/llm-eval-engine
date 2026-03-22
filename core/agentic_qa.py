@@ -371,6 +371,94 @@ def _detect_pre_journey_blocker(crawl: dict[str, Any]) -> dict[str, str] | None:
 
 
 def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]:
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    if groq_key:
+        try:
+            from src.test_generator import GroqJudgeClient
+            client = GroqJudgeClient(api_key=groq_key)
+            
+            nav_links = crawl.get("nav_links") or []
+            nav_info = []
+            for item in nav_links:
+                if isinstance(item, dict):
+                    t = str(item.get("text") or "").strip()
+                    h = str(item.get("href") or "").strip()
+                    if t or h:
+                        nav_info.append(f"{t} ({h})")
+            
+            forms = crawl.get("forms") or []
+            form_actions = [str(item.get("action") or "").strip() for item in forms if isinstance(item, dict)]
+            
+            prompt = f"""You are an expert web application classifier.
+Analyze the following webpage data and return exactly valid JSON containing the app type and auth requirement.
+
+Input Data:
+- Title: {crawl.get('title', '')}
+- Description provided by user: {description or 'None'}
+- Text Snippet (first 500 chars): {str(crawl.get('text_snippet') or '')[:500]}
+- Nav Links: {', '.join(nav_info[:15])}
+- Buttons: {', '.join([str(b) for b in (crawl.get('buttons') or [])[:15]])}
+- Form count: {len(forms)}, Actions: {', '.join(form_actions)}
+- HTML Snippet (first 2000 chars):
+{str(crawl.get('page_html') or '')[:2000]}
+
+Return JSON only with this exact shape:
+{{
+  "app_type": "ecommerce|saas_auth|task_manager|dom_mutation|marketing|generic",
+  "requires_auth_first": true|false,
+  "confidence": 0-100,
+  "reasoning": "one sentence"
+}}
+"""
+            raw_response = client.generate(prompt)
+            
+            # Simple JSON parsing handling potential markdown blocks
+            text = raw_response.strip()
+            import re
+            match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+            if match:
+                text = match.group(0)
+                
+            parsed = json.loads(text)
+            
+            app_type = parsed.get("app_type", "generic").lower()
+            if app_type not in ("ecommerce", "saas_auth", "task_manager", "dom_mutation", "marketing", "generic"):
+                app_type = "generic"
+                
+            features = []
+            primary_goal = "explore site"
+            if app_type == "ecommerce":
+                features = ["login", "search", "cart", "checkout"] if parsed.get("requires_auth_first") else ["search", "cart", "checkout"]
+                primary_goal = "purchase item"
+            elif app_type == "task_manager":
+                features = ["create", "edit", "delete"]
+                primary_goal = "manage records"
+            elif app_type == "dom_mutation":
+                features = ["add", "remove"]
+                primary_goal = "mutate DOM elements"
+            elif app_type == "saas_auth":
+                features = ["login", "dashboard", "navigation"]
+                primary_goal = "reach dashboard"
+            elif app_type == "marketing":
+                features = ["pricing", "features", "contact"]
+                primary_goal = "explore marketing paths"
+                
+            return {
+                "app_type": app_type,
+                "features": features,
+                "primary_goal": primary_goal,
+                "site_description": description,
+                "requires_auth_first": bool(parsed.get("requires_auth_first", False)),
+                "confidence": parsed.get("confidence", 0),
+                "reasoning": parsed.get("reasoning", "")
+            }
+        except Exception:
+            pass
+
+    return _discover_site_fallback(crawl, description)
+
+
+def _discover_site_fallback(crawl: dict, description: str | None = None) -> dict[str, Any]:
     nav_texts = _nav_texts(crawl)
     text = _combined_text(crawl, description)
     structural = _structural_counts(crawl)

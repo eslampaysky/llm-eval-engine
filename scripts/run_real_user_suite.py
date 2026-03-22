@@ -458,25 +458,36 @@ def update_readme(history: list[dict]):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--group",      help="Only pick from this group")
     ap.add_argument("--batch-size", type=int, default=DEFAULT_BATCH,
                     help=f"Targets per batch (default {DEFAULT_BATCH})")
     ap.add_argument("--once",       action="store_true")
     ap.add_argument("--dry-run",    action="store_true")
-    ap.add_argument("--interval",   type=int, default=INTERVAL_MIN)
+    ap.add_argument("--tier", default=None, help="Force tier for all targets")
+    ap.add_argument("--group", help="Only run targets from this group")
+    ap.add_argument("--targets", help="Comma-separated target names to run")
     args = ap.parse_args()
 
-    all_targets = load_targets()
-    if not all_targets:
-        err("No targets loaded — check configs/real_user_targets.json")
+    targets_to_run = load_targets(args.group)
+
+    if args.targets:
+        target_names = [t.strip().lower() for t in args.targets.split(",")]
+        targets_to_run = [t for t in targets_to_run if t["name"].lower() in target_names]
+        args.once = True
+        args.batch_size = len(targets_to_run)
+    if not targets_to_run:
+        err(f"No targets found (group: {args.group or 'all'})")
         sys.exit(1)
 
+    if args.tier:
+        for t in targets_to_run:
+            t["tier"] = args.tier
+
     if args.dry_run:
-        batch = pick_batch(all_targets, args.batch_size, args.group)
+        batch = pick_batch(targets_to_run, args.batch_size)
         print(f"\n{C.BOLD}Would run {len(batch)} targets:{C.E}")
         for t in batch:
             print(f"  [{t['_group']:12}] {t['name']:15} {t['url']}")
-        print(f"\n{C.D}(60 total, {args.batch_size} random per batch){C.E}")
+        print(f"\n{C.D}({len(targets_to_run)} total, {args.batch_size} random per batch){C.E}")
         return
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -493,12 +504,12 @@ def main():
     while True:
         batch_num += 1
         batch_id  = datetime.now().strftime("%Y%m%d-%H%M%S")
-        batch     = pick_batch(all_targets, args.batch_size, args.group)
+        batch     = pick_batch(targets_to_run, args.batch_size)
 
         print()
         print(f"{C.BOLD}{'═'*62}{C.E}")
         print(f"{C.BOLD}  Batch #{batch_num} — {datetime.now().strftime('%Y-%m-%d %H:%M')}  "
-              f"({len(batch)} random targets from 60){C.E}")
+              f"({len(batch)} random targets from {len(targets_to_run)}){C.E}")
         print(f"{C.BOLD}{'═'*62}{C.E}")
         dim("  " + "  ".join(f"[{t['_group'][0].upper()}]{t['name']}" for t in batch))
 
