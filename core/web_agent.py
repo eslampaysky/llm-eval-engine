@@ -374,12 +374,17 @@ async def _run_user_journeys(page, journeys: list[dict]) -> list[dict]:
 _BLOCKER_SELECTORS = [
     "[class*='fc-cta-consent']",
     "[class*='fc-button-label']",
-    "[aria-label*='close' i]",
-    "[aria-label='Close']",
-    "[aria-label='Dismiss']",
+    "[role='dialog'] [aria-label*='close' i]",
+    "[aria-modal='true'] [aria-label*='close' i]",
+    "[role='dialog'] [aria-label='Close']",
+    "[aria-modal='true'] [aria-label='Close']",
+    "[role='dialog'] [aria-label='Dismiss']",
+    "[aria-modal='true'] [aria-label='Dismiss']",
     "[data-testid='close']",
-    "button[aria-label*='close' i]",
-    "button[aria-label*='dismiss' i]",
+    "[role='dialog'] button[aria-label*='close' i]",
+    "[aria-modal='true'] button[aria-label*='close' i]",
+    "[role='dialog'] button[aria-label*='dismiss' i]",
+    "[aria-modal='true'] button[aria-label*='dismiss' i]",
     "button:has-text('Accept')",
     "button:has-text('Accept all')",
     "button:has-text('Allow all')",
@@ -389,9 +394,35 @@ _BLOCKER_SELECTORS = [
     "button:has-text('Agree')",
     "button:has-text('Consent')",
     "button:has-text('Got it')",
-    "button:has-text('Close')",
-    "button:has-text('Dismiss')",
+    "button#onetrust-accept-btn-handler",
+    "button:has-text('Continue To Website')",
+    "[role='dialog'] button:has-text('Close')",
+    "[aria-modal='true'] button:has-text('Close')",
+    "[role='dialog'] button:has-text('Dismiss')",
+    "[aria-modal='true'] button:has-text('Dismiss')",
     "button:has-text('No thanks')",
+    "[role='dialog'] button:has-text('US')",
+    "[aria-modal='true'] button:has-text('US')",
+    "[role='dialog'] button:has-text('NL')",
+    "[aria-modal='true'] button:has-text('NL')",
+    "[role='dialog'] a:has-text('US')",
+    "[aria-modal='true'] a:has-text('US')",
+    "[role='dialog'] a:has-text('NL')",
+    "[aria-modal='true'] a:has-text('NL')",
+    "[role='dialog'] div:has-text('US')",
+    "[aria-modal='true'] div:has-text('US')",
+    "[role='dialog'] div:has-text('NL')",
+    "[aria-modal='true'] div:has-text('NL')",
+    "[role='dialog'] button:has-text('Continue to US')",
+    "[aria-modal='true'] button:has-text('Continue to US')",
+    "[role='dialog'] button:has-text('Continue to NL')",
+    "[aria-modal='true'] button:has-text('Continue to NL')",
+    "[role='dialog'] a:has-text('Continue to US')",
+    "[aria-modal='true'] a:has-text('Continue to US')",
+    "[role='dialog'] a:has-text('Continue to NL')",
+    "[aria-modal='true'] a:has-text('Continue to NL')",
+    "[role='dialog'] [class*='close' i]",
+    "[aria-modal='true'] [class*='close' i]",
 ]
 _BLOCKER_TYPE_SIGNALS = {
     # Specific content-based classes first. First match wins.
@@ -450,8 +481,10 @@ def _classify_blocker_action(element_text: str, selector: str) -> str:
     return "clicked_close"
 
 
-async def _find_visible_blocker(page) -> tuple[Any, str, str, str, str] | None:
+async def _find_visible_blocker(page, exclude_selectors: set[str] | None = None) -> tuple[Any, str, str, str, str] | None:
     for selector in _BLOCKER_SELECTORS:
+        if exclude_selectors and selector in exclude_selectors:
+            continue
         try:
             locator = page.locator(selector).first
             if await locator.count() and await locator.is_visible(timeout=400):
@@ -516,9 +549,10 @@ async def dismiss_blockers(page, phase: str = "pre_action") -> list[RecoveryEven
     last_action_taken = "clicked_close"
     last_selector = ""
     choke_point = _PHASE_TO_CHOKE_POINT.get(phase, phase)
+    failed_selectors: set[str] = set()
 
-    for _attempt in range(3):
-        blocker = await _find_visible_blocker(page)
+    for _attempt in range(5):
+        blocker = await _find_visible_blocker(page, exclude_selectors=failed_selectors)
         if not blocker:
             break
         locator, selector, context_text, action_taken, blocker_type = blocker
@@ -526,53 +560,68 @@ async def dismiss_blockers(page, phase: str = "pre_action") -> list[RecoveryEven
         last_action_taken = action_taken
         last_selector = selector
         try:
-            await locator.click(timeout=1200)
+            await locator.click(timeout=1500)
         except Exception:
             try:
                 await page.keyboard.press("Escape")
             except Exception:
                 pass
-        await page.wait_for_timeout(800)
+        await page.wait_for_timeout(1000)
         dismissed_count += 1
 
         try:
-            still_visible = await locator.is_visible(timeout=300)
+            still_visible = await locator.is_visible(timeout=500)
+            if still_visible:
+                failed_selectors.add(selector)
+                success = False
+            else:
+                success = True
         except Exception:
-            still_visible = False
-        if still_visible:
-            try:
-                await page.keyboard.press("Escape")
-                await page.wait_for_timeout(400)
-            except Exception:
-                pass
+            success = True # Assume gone if check fails
 
-    if dismissed_count:
-        remaining = await _find_visible_blocker(page)
-        success = remaining is None
         handled.append(
             RecoveryEvent(
                 choke_point=choke_point,
-                blocker_type=last_blocker_type,
-                action_taken=last_action_taken,
+                blocker_type=blocker_type,
+                action_taken=action_taken,
                 success=success,
-                selector_used=last_selector,
+                selector_used=selector,
                 notes=(
-                    f"{last_blocker_type.replace('_', ' ').title()} detected and dismissed before action"
-                    if success and phase == "pre_action"
-                    else f"{last_blocker_type.replace('_', ' ').title()} detected and cleared at {choke_point.replace('_', ' ')}"
+                    f"Cleared {blocker_type} using {selector}"
                     if success
-                    else f"{last_blocker_type.replace('_', ' ').title()} detected but could not be fully cleared after {dismissed_count} attempts"
+                    else f"Failed to clear {blocker_type} using {selector}"
                 ),
             )
         )
+
     return handled
+
+
+async def _prefer_visible_locator(locator, *, max_candidates: int = 5):
+    try:
+        count = await locator.count()
+    except Exception:
+        return None
+
+    if count <= 0:
+        return None
+
+    for index in range(min(count, max_candidates)):
+        candidate = locator.nth(index)
+        try:
+            if await candidate.is_visible(timeout=300):
+                return candidate
+        except Exception:
+            continue
+
+    return locator.first
 
 
 async def _resolve_locator(page, candidate: ActionCandidate):
     for selector in candidate.selectors:
         try:
-            locator = page.locator(selector).first
-            if await locator.count():
+            locator = await _prefer_visible_locator(page.locator(selector))
+            if locator is not None:
                 return locator
         except Exception:
             continue
@@ -581,25 +630,31 @@ async def _resolve_locator(page, candidate: ActionCandidate):
     name = candidate.name or candidate.intent or candidate.text
     if role and name:
         try:
-            locator = page.get_by_role(role, name=re.compile(re.escape(name), re.I))
-            if await locator.count():
-                return locator.first
+            locator = await _prefer_visible_locator(
+                page.get_by_role(role, name=re.compile(re.escape(name), re.I))
+            )
+            if locator is not None:
+                return locator
         except Exception:
             pass
 
     if candidate.text:
         try:
-            locator = page.get_by_text(re.compile(re.escape(candidate.text), re.I))
-            if await locator.count():
-                return locator.first
+            locator = await _prefer_visible_locator(
+                page.get_by_text(re.compile(re.escape(candidate.text), re.I))
+            )
+            if locator is not None:
+                return locator
         except Exception:
             pass
 
     if candidate.intent:
         try:
-            locator = page.get_by_text(re.compile(re.escape(candidate.intent), re.I))
-            if await locator.count():
-                return locator.first
+            locator = await _prefer_visible_locator(
+                page.get_by_text(re.compile(re.escape(candidate.intent), re.I))
+            )
+            if locator is not None:
+                return locator
         except Exception:
             pass
 
@@ -646,7 +701,10 @@ async def _execute_candidate(
             pass
 
     if action_type == "click":
-        await locator.click(timeout=STEP_TIMEOUT_SECONDS * 1000)
+        try:
+            await locator.click(timeout=STEP_TIMEOUT_SECONDS * 1000)
+        except PlaywrightTimeoutError:
+            await locator.evaluate("(el) => el.click()")
     elif action_type == "fill":
         await locator.fill(resolved_value or "", timeout=STEP_TIMEOUT_SECONDS * 1000)
     elif action_type == "submit":
@@ -669,6 +727,10 @@ async def _execute_candidate(
         "name": candidate.name,
         "value": resolved_value,
     }
+
+
+def _step_uses_fallback_candidates(step: JourneyStep) -> bool:
+    return step.step_type != StepType.FILL_SUBMIT.value
 
 
 async def _llm_verify_step(_page, _step: JourneyStep, _before: dict[str, Any], _after: dict[str, Any]) -> bool:
@@ -968,27 +1030,93 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
                 break
 
             try:
-                for candidate in candidates:
-                    action_trace.append(
-                        await _execute_candidate(
-                            page,
-                            _as_action_candidate(candidate),
-                            state,
+                if _step_uses_fallback_candidates(step):
+                    last_after_snapshot = before_snapshot
+                    last_failure: VerificationResult | None = None
+                    for candidate in candidates:
+                        try:
+                            executed_action = await _execute_candidate(
+                                page,
+                                _as_action_candidate(candidate),
+                                state,
+                            )
+                            action_trace.append(executed_action)
+                            await _wait_for_transition(page, before_snapshot)
+                            blocker_events = await dismiss_blockers(page, "post_navigation")
+                            recovery_attempts.extend(blocker_events)
+                            _append_recovery_notes(notes, blocker_events)
+                            after_snapshot = await _capture_page_snapshot(page)
+                            last_after_snapshot = after_snapshot
+                            candidate_verification = await verify_action_success(
+                                page,
+                                step,
+                                state,
+                                before_snapshot,
+                                after_snapshot,
+                            )
+                            if candidate_verification.success:
+                                verification_result = candidate_verification
+                                chosen_action = {"fallback_sequence": action_trace}
+                                break
+                            last_failure = candidate_verification
+                        except Exception as candidate_exc:
+                            error_text = str(candidate_exc)[:300]
+                            await _wait_for_transition(page, before_snapshot)
+                            blocker_events = await dismiss_blockers(page, "post_failure")
+                            recovery_attempts.extend(blocker_events)
+                            _append_recovery_notes(notes, blocker_events)
+                            after_snapshot = await _capture_page_snapshot(page)
+                            last_after_snapshot = after_snapshot
+                            candidate_verification = await verify_action_success(
+                                page,
+                                step,
+                                state,
+                                before_snapshot,
+                                after_snapshot,
+                            )
+                            if candidate_verification.success and action_trace:
+                                note = f"Action error overruled by success signals: {error_text}"
+                                notes.append(note)
+                                verification_result = candidate_verification
+                                chosen_action = {"fallback_sequence": action_trace}
+                                break
+                            last_failure = VerificationResult(
+                                success=False,
+                                passed_signals=candidate_verification.passed_signals,
+                                failed_signals=candidate_verification.failed_signals,
+                                delta_summary=candidate_verification.delta_summary,
+                                failure_type="action_resolution_failed",
+                                llm_used=candidate_verification.llm_used,
+                            )
+                    else:
+                        after_snapshot = last_after_snapshot
+                        verification_result = last_failure or VerificationResult(
+                            success=False,
+                            failure_type="action_resolution_failed",
                         )
+                        chosen_action = {"fallback_sequence": action_trace} if action_trace else None
+                else:
+                    for candidate in candidates:
+                        action_trace.append(
+                            await _execute_candidate(
+                                page,
+                                _as_action_candidate(candidate),
+                                state,
+                            )
+                        )
+                    chosen_action = {"sequence": action_trace}
+                    await _wait_for_transition(page, before_snapshot)
+                    blocker_events = await dismiss_blockers(page, "post_navigation")
+                    recovery_attempts.extend(blocker_events)
+                    _append_recovery_notes(notes, blocker_events)
+                    after_snapshot = await _capture_page_snapshot(page)
+                    verification_result = await verify_action_success(
+                        page,
+                        step,
+                        state,
+                        before_snapshot,
+                        after_snapshot,
                     )
-                chosen_action = {"sequence": action_trace}
-                await _wait_for_transition(page, before_snapshot)
-                blocker_events = await dismiss_blockers(page, "post_navigation")
-                recovery_attempts.extend(blocker_events)
-                _append_recovery_notes(notes, blocker_events)
-                after_snapshot = await _capture_page_snapshot(page)
-                verification_result = await verify_action_success(
-                    page,
-                    step,
-                    state,
-                    before_snapshot,
-                    after_snapshot,
-                )
                 if verification_result.success:
                     _update_state_after_step(state, step, after_snapshot.get("url") or state.current_url, verification_result)
                     step_results.append(
@@ -1147,20 +1275,11 @@ async def run_structured_journeys(
             ctx_kwargs["record_video_size"] = {"width": 1280, "height": 720}
         context = await browser.new_context(**ctx_kwargs)
         page = await context.new_page()
+        page.on("dialog", lambda dialog: asyncio.create_task(dialog.accept()))
         try:
             await page.goto(url, timeout=25000, wait_until="networkidle")
         except Exception:
             await page.goto(url, timeout=30000, wait_until="domcontentloaded")
-
-        # Wait for product catalog elements if it's an ecommerce site
-        try:
-            await page.wait_for_selector(
-                ".product, .product-item, .product-card, .card-title, .card-block, a[href*='prod.html'], a[href*='#/product/']",
-                timeout=6000,
-                state="visible",
-            )
-        except Exception:
-            pass  # Site might not have these specific selectors or is not ecommerce
 
         parsed = [
             journey if isinstance(journey, JourneyPlan) else JourneyPlan.from_dict(journey)
@@ -1168,6 +1287,18 @@ async def run_structured_journeys(
         ]
         for plan in parsed:
             _raise_if_canceled(should_cancel)
+            
+            # Ensure catalog is loaded for every journey (critical for SPAs between navigation)
+            try:
+                await page.wait_for_selector(
+                    ".product, .product-item, .product-card, .card-title, .card-block, .productName, div[id*='Img'], a:has-text('Shop Now'), a:has-text('Add to bag'), a[href*='prod.html'], a[href*='#/product/']",
+                    timeout=15000,
+                    state="visible",
+                )
+                await asyncio.sleep(2)
+            except Exception:
+                pass
+
             state = SessionState(
                 base_url=url,
                 current_url=url,

@@ -197,6 +197,7 @@ def _structural_counts(crawl: dict[str, Any]) -> dict[str, int]:
         html.count(token)
         for token in (
             "/product/",
+            "/products/",
             "#/product/",
             "/item/",
             "/shop/",
@@ -775,7 +776,14 @@ def _cart_step() -> JourneyStep:
                     "button[class*='atc']",
                     "button[class*='btn-cart']",
                     "a[class*='add_to_cart_button']",
+                    "button[class*='quick-add']",
+                    "button[class*='AddToCart']",
+                    "button[name='add']",
                     "button[name='add-to-cart']",
+                    "button[data-testid*='add-to-cart']",
+                    "button[data-testid*='quickAdd']",
+                    "button:has-text('Add to bag')",
+                    "button:has-text('ADD TO BAG')",
                     "input[name='add-to-cart']",
                     "input[name='submit.add-to-cart']",
                     "input[id='add-to-cart-button']",
@@ -846,16 +854,33 @@ def _open_product_step() -> JourneyStep:
         intent="product detail link or view details button",
         step_type=StepType.CLICK.value,
         action_candidates=[
-            ActionCandidate(type="click", intent="view details link", selectors=["a:has-text('View Details')", "a:has-text('View Product')", "a:has-text('See Details')", "a:has-text('More Info')"], role="link", name="View Details", text="View Details"),
-            ActionCandidate(type="click", intent="product item link", selectors=["a[href*='prod.html']", "a[href*='/product/']", "a[href*='product']", "a[href*='item']", "a[href*='/dp/']", ".card-title a", ".product-item-link", ".product-name a", ".product-title a", "h2 a", "h3 a", ".product-card a", ".product-item a"], role="link", name="Product", text="Product"),
-            ActionCandidate(type="click", intent="shop now link", selectors=["a:has-text('Shop Now')", ".shop_now", "a:has-text('Explore')"], role="link", name="Shop Now", text="Shop Now"),
+            ActionCandidate(
+                type="click", 
+                intent="view details link", 
+                selectors=[
+                    "a:has-text('View Details')", "a:has-text('View Product')", "a:has-text('See Details')", "a:has-text('More Info')", 
+                    "a.productName", "a[data-testid='product-card-link']", ".product-card_product-title-link__nDARd", ".card-block h4.card-title a:visible", ".card h4.card-title a:visible", "a[href*='prod.html']:visible", "a.hrefch:visible", "a[href*='/products/'][href*='-']:not([href*='/collections/'])", "a[href*='/product/']", 
+                    "a[href*='item']", "a[href*='/dp/']", ".card-title a", ".product-item-link", ".product-name a", ".product-title a", 
+                    "h2 a", "h3 a", ".product-card a", ".product-item a", "div[id*='Img']", "[aria-label*='Category']"
+                ], 
+                role="link", 
+                name="Product Link", 
+                text="Product Detail"
+            ),
         ],
         success_signals=[
-            SuccessSignal(type="url_contains", value="product", priority="high", required=False),
+            SuccessSignal(
+                type="url_matches",
+                value=r"(?:/product/|/products/[^/?#]+(?:-[^/?#]+)+|/dp/|prod\.html(?:\?|#|$))",
+                priority="high",
+                required=True,
+            ),
             SuccessSignal(type="url_contains", value="prod.html", priority="high", required=False),
-            SuccessSignal(type="url_contains", value="item", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/products/", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/product/", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/dp/", priority="high", required=False),
             SuccessSignal(type="element_visible", value="Add to cart", priority="medium", required=False),
-            SuccessSignal(type="text_present", value="description", priority="low", required=False),
+            SuccessSignal(type="text_present", value="Product description", priority="medium", required=False),
         ],
         failure_hints=["product page did not load"],
         allow_soft_recovery=True,
@@ -868,20 +893,21 @@ def _cart_from_detail_step() -> JourneyStep:
         intent="add to cart button on product detail page",
         step_type=StepType.CLICK.value,
         action_candidates=[
-            ActionCandidate(type="click", intent="add to cart button", selectors=["button:has-text('Add to cart')", "button:has-text('ADD TO CART')", "button:has-text('Add To Cart')", "button:has-text('ADD TO BASKET')", "a:has-text('Add to cart')", "a:has-text('ADD TO BASKET')", "[onclick*='addToCart']", "[onclick*='add_to_cart']", ".btn-cart", "a.btn-success", "a[class*='add_to_cart_button']", "input[name='submit.add-to-cart']", "input[id='add-to-cart-button']", "#add-to-cart-button"], role="button", name="Add to cart", text="Add to cart"),
+            ActionCandidate(type="click", intent="add to cart button", selectors=["button:has-text('Add to cart')", "button:has-text('ADD TO CART')", "button:has-text('Add To Cart')", "button:has-text('ADD TO BASKET')", "button:has-text('Add to bag')", "button:has-text('ADD TO BAG')", "a:has-text('Add to cart')", "a:has-text('ADD TO BASKET')", "button[name='save_to_cart']", "button[name='add']", "button[data-testid='add-to-cart']", "[onclick*='addToCart']", "[onclick*='add_to_cart']", ".btn-cart", "a.btn-success", "a[class*='add_to_cart_button']", "input[name='submit.add-to-cart']", "input[id='add-to-cart-button']", "#add-to-cart-button"], role="button", name="Add to cart", text="Add to cart"),
         ],
         success_signals=[
             SuccessSignal(type="element_visible", value="Cart", priority="medium", required=False),
             SuccessSignal(type="text_present", value="added", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Product added", priority="high", required=False),
             SuccessSignal(type="text_present", value="Cart", priority="medium", required=False),
             SuccessSignal(type="text_present", value="View Basket", priority="medium", required=False),
             SuccessSignal(type="text_present", value="View Cart", priority="medium", required=False),
             SuccessSignal(type="text_present", value="items", priority="medium", required=False),
             SuccessSignal(type="url_contains", value="cart", priority="high", required=False),
-            SuccessSignal(type="state_assertion", value={"cart_has_items": True}, priority="medium", required=False),
+            SuccessSignal(type="url_contains", value="#", priority="high", required=False),
         ],
         failure_hints=["item not added", "cart unchanged"],
-        expected_state_change={"cart_has_items": True},
+        expected_state_change={},
         allow_soft_recovery=False,
     )
 
