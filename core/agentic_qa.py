@@ -1090,10 +1090,10 @@ def plan_journeys(context: dict[str, Any]) -> list[JourneyPlan]:
         ]
     if app_type in {AppType.SAAS_AUTH.value, "saas"} or "dashboard" in app_type:
         return [
-            JourneyPlan(name="register_login", app_type="saas", steps=[_login_step()]),
+            JourneyPlan(name="register_login", app_type=AppType.SAAS_AUTH.value, steps=[_login_step()]),
         ]
     if app_type in {AppType.TASK_MANAGER.value, "crud", "task"}:
-        return [JourneyPlan(name="core_crud", app_type="crud", steps=_crud_steps())]
+        return [JourneyPlan(name="core_crud", app_type=AppType.TASK_MANAGER.value, steps=_crud_steps())]
     if app_type == AppType.DOM_MUTATION.value:
         return [JourneyPlan(name="dom_mutation_basic", app_type=AppType.DOM_MUTATION.value, steps=_dom_mutation_steps())]
     if app_type == AppType.MARKETING.value:
