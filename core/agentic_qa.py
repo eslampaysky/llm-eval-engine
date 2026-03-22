@@ -402,6 +402,16 @@ Input Data:
 - HTML Snippet (first 2000 chars):
 {str(crawl.get('page_html') or '')[:2000]}
 
+App Types:
+- "ecommerce": has product catalog, shopping cart, add-to-cart buttons
+- "saas_auth": login/signup is the PRIMARY purpose of the page, leads directly to app dashboard
+- "marketing_site": promotes a product, has pricing/features/contact pages, login is secondary CTA
+- "task_manager": todo lists, task boards, CRUD interface
+- "dom_mutation": simple add/remove element demos
+- "generic": none of the above
+
+You MUST return one of exactly these strings, no variations: ecommerce, saas_auth, task_manager, dom_mutation, marketing_site, generic
+
 Return JSON only with this exact shape:
 {{
   "app_type": "ecommerce|saas_auth|task_manager|dom_mutation|marketing_site|generic",
