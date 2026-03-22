@@ -6,7 +6,7 @@ from api.database import get_client_by_api_key, register_client
 
 load_dotenv()
 
-API_KEYS = [k.strip() for k in os.getenv("API_KEYS", "").split(",") if k.strip()] //api
+API_KEYS = [k.strip() for k in os.getenv("API_KEYS", "").split(",") if k.strip()] #api
 
 def bootstrap_clients_from_env():
     for entry in API_KEYS:
