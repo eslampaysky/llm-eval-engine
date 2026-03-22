@@ -749,7 +749,7 @@ async def verify_action_success(
         # Signal-based derived state extraction
         if signal_ok:
             if signal.type == "url_contains" and step.goal == "login":
-                if any(m in str(signal.value) for m in ("/dashboard", "/account", "/home", "/inventory", "/products", "/shop")):
+                if any(m in str(signal.value) for m in ("dashboard", "account", "home", "inventory", "products", "shop", "/app")):
                     derived_state["is_logged_in"] = True
             if signal.type == "url_contains" and step.goal in ("add_to_cart", "add_to_cart_from_detail"):
                 if any(m in str(signal.value) for m in ("cart", "basket", "checkout")):
@@ -770,21 +770,15 @@ async def verify_action_success(
     after_text = (after_snapshot.get("text_snippet") or "").lower()
     if step.goal == "login":
         auth_success_markers = (
-            "/dashboard",
-            "/account",
-            "/home",
+            "inventory",
+            "account",
+            "home",
             "/app",
-            "/secure",
-            "/workspace",
-            "/portal",
-            "/logged-in-successfully",
-            "/index",
-            "/inventory",
-            "/inventory.html",
-            "/products",
-            "/shop",
-            "/store",
-            "/items",
+            "secure",
+            "workspace",
+            "portal",
+            "logged-in-successfully",
+            "index",
         )
         auth_text_markers = (
             "logout",
