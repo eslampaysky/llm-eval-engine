@@ -859,7 +859,7 @@ def _open_product_step() -> JourneyStep:
                 intent="view details link", 
                 selectors=[
                     "a:has-text('View Details')", "a:has-text('View Product')", "a:has-text('See Details')", "a:has-text('More Info')", 
-                    "a.productName", "a[data-testid='product-card-link']", ".product-card_product-title-link__nDARd", ".card-block h4.card-title a:visible", ".card h4.card-title a:visible", "a[href*='prod.html']:visible", "a.hrefch:visible", "a[href*='/products/'][href*='-']:not([href*='/collections/'])", "a[href*='/product/']", 
+                    "a.productName", "a[data-testid='product-card-link']", ".product-card_product-title-link__nDARd", "a[href*='product_details']", ".card-block h4.card-title a:visible", ".card h4.card-title a:visible", "a[href*='prod.html']:visible", "a.hrefch:visible", "a[href*='/products/'][href*='-']:not([href*='/collections/'])", "a[href*='/product/']", "a[href*='/book/']", "a[href*='/books/']",
                     "a[href*='item']", "a[href*='/dp/']", ".card-title a", ".product-item-link", ".product-name a", ".product-title a", 
                     "h2 a", "h3 a", ".product-card a", ".product-item a", "div[id*='Img']", "[aria-label*='Category']"
                 ], 
@@ -871,13 +871,16 @@ def _open_product_step() -> JourneyStep:
         success_signals=[
             SuccessSignal(
                 type="url_matches",
-                value=r"(?:/product/|/products/[^/?#]+(?:-[^/?#]+)+|/dp/|prod\.html(?:\?|#|$))",
+                value=r"(?:/product/|/products/[^/?#]+(?:-[^/?#]+)+|/product_details/|/book/|/books/|/dp/|prod\.html(?:\?|#|$))",
                 priority="high",
                 required=True,
             ),
             SuccessSignal(type="url_contains", value="prod.html", priority="high", required=False),
             SuccessSignal(type="url_contains", value="/products/", priority="high", required=False),
             SuccessSignal(type="url_contains", value="/product/", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="product_details", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/book/", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/books/", priority="high", required=False),
             SuccessSignal(type="url_contains", value="/dp/", priority="high", required=False),
             SuccessSignal(type="element_visible", value="Add to cart", priority="medium", required=False),
             SuccessSignal(type="text_present", value="Product description", priority="medium", required=False),
@@ -893,7 +896,7 @@ def _cart_from_detail_step() -> JourneyStep:
         intent="add to cart button on product detail page",
         step_type=StepType.CLICK.value,
         action_candidates=[
-            ActionCandidate(type="click", intent="add to cart button", selectors=["button:has-text('Add to cart')", "button:has-text('ADD TO CART')", "button:has-text('Add To Cart')", "button:has-text('ADD TO BASKET')", "button:has-text('Add to bag')", "button:has-text('ADD TO BAG')", "a:has-text('Add to cart')", "a:has-text('ADD TO BASKET')", "button[name='save_to_cart']", "button[name='add']", "button[data-testid='add-to-cart']", "[onclick*='addToCart']", "[onclick*='add_to_cart']", ".btn-cart", "a.btn-success", "a[class*='add_to_cart_button']", "input[name='submit.add-to-cart']", "input[id='add-to-cart-button']", "#add-to-cart-button"], role="button", name="Add to cart", text="Add to cart"),
+            ActionCandidate(type="click", intent="add to cart button", selectors=["[translate='ADD_TO_CART']", "[ng-click*='addToCart']", "[ng-click*='AddToCart']", "button:has-text('Add to cart')", "button:has-text('ADD TO CART')", "button:has-text('Add To Cart')", "button:has-text('ADD TO BASKET')", "button:has-text('Add to bag')", "button:has-text('ADD TO BAG')", "a:has-text('Add to cart')", "a:has-text('ADD TO BASKET')", "button[name='save_to_cart']", "button[name='add']", "button[data-testid='add-to-cart']", "[onclick*='addToCart']", "[onclick*='add_to_cart']", ".btn-cart", "a.btn-success", "a[class*='add_to_cart_button']", "div.button_add_to_cart", "input[name='submit.add-to-cart']", "input[id='add-to-cart-button']", "#add-to-cart-button"], role="button", name="Add to cart", text="Add to cart"),
         ],
         success_signals=[
             SuccessSignal(type="element_visible", value="Cart", priority="medium", required=False),
