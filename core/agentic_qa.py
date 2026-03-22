@@ -604,8 +604,19 @@ def _discover_site_fallback(crawl: dict, description: str | None = None) -> dict
     if anthropic_key:
         try:
             inferred_spec = infer_spec(crawl)
-            if inferred_spec.get("product_type"):
-                inferred["app_type"] = str(inferred_spec["product_type"]).lower()
+            ptype = str(inferred_spec.get("product_type") or "").lower()
+            if "ecommerce" in ptype or "shop" in ptype:
+                inferred["app_type"] = "ecommerce"
+            elif "saas" in ptype or "auth" in ptype:
+                inferred["app_type"] = "saas_auth"
+            elif "marketing" in ptype or "landing" in ptype:
+                inferred["app_type"] = "marketing_site"
+            elif "task" in ptype or "todo" in ptype:
+                inferred["app_type"] = "task_manager"
+            elif "dom" in ptype or "mutation" in ptype:
+                inferred["app_type"] = "dom_mutation"
+            else:
+                inferred["app_type"] = "generic"
             if inferred_spec.get("critical_journeys"):
                 inferred["critical_journeys"] = inferred_spec["critical_journeys"]
         except Exception:
