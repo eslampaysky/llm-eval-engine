@@ -1269,7 +1269,7 @@ def run_agentic_qa(
     tier = tier.lower().strip()
     if tier not in ("vibe", "deep", "fix"):
         tier = "vibe"
-    audit_timeout_seconds = 60 if tier == "vibe" else 180
+    audit_timeout_seconds = 60 if tier == "vibe" else 300
     started_at = time.monotonic()
 
     def _progress(step: int, total: int, msg: str):
