@@ -746,6 +746,15 @@ async def verify_action_success(
             llm_used = True
             signal_ok = await _llm_verify_step(page, step, before_snapshot, after_snapshot)
 
+        # Signal-based derived state extraction
+        if signal_ok:
+            if signal.type == "url_contains" and step.goal == "login":
+                if any(m in str(signal.value) for m in ("/dashboard", "/account", "/home", "/inventory", "/products", "/shop")):
+                    derived_state["is_logged_in"] = True
+            if signal.type == "url_contains" and step.goal in ("add_to_cart", "add_to_cart_from_detail"):
+                if any(m in str(signal.value) for m in ("cart", "basket", "checkout")):
+                    derived_state["cart_has_items"] = True
+
         signal_payload = {
             "type": signal.type,
             "value": signal.value,
@@ -770,6 +779,12 @@ async def verify_action_success(
             "/portal",
             "/logged-in-successfully",
             "/index",
+            "/inventory",
+            "/inventory.html",
+            "/products",
+            "/shop",
+            "/store",
+            "/items",
         )
         auth_text_markers = (
             "logout",
@@ -779,13 +794,17 @@ async def verify_action_success(
             "dashboard",
             "welcome",
             "logged in",
+            "products",
+            "cart",
+            "basket",
+            "items",
         )
         if any(marker in after_url for marker in auth_success_markers) or any(marker in after_text for marker in auth_text_markers):
             derived_state["is_logged_in"] = True
 
     if step.goal in ("add_to_cart", "add_to_cart_from_detail"):
-        cart_success_markers = ("view basket", "view cart", "added to cart", "added to basket", " items")
-        if any(marker in after_text for marker in cart_success_markers):
+        cart_success_markers = ("view basket", "view cart", "added to cart", "added to basket", " items", "cart (", "basket (")
+        if any(marker in after_text for marker in cart_success_markers) or "cart" in after_url:
             derived_state["cart_has_items"] = True
     if step.goal == "create_record":
         expected_text = _resolve_state_reference(step.input_bindings.get("value"), state) or step.input_bindings.get("value")
