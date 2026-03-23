@@ -20,7 +20,6 @@ from dataclasses import dataclass, field, asdict
 from typing import Any, Callable
 
 from core.models import AppType, JourneyPlan, JourneyStep, SuccessSignal, ActionCandidate, StepType, to_dict
-from core.report_builder import build_fix_prompt_context, build_journey_timeline, infer_spec
 from core.web_agent import AuditCanceledError, run_structured_journeys, run_web_audit
 from core.gemini_judge import judge_visual
 
@@ -600,28 +599,6 @@ def _discover_site_fallback(crawl: dict, description: str | None = None) -> dict
             inferred["app_type"] = AppType.MARKETING.value
             inferred["features"] = ["pricing", "features", "contact"]
             inferred["primary_goal"] = "explore marketing paths"
-
-    anthropic_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
-    if anthropic_key:
-        try:
-            inferred_spec = infer_spec(crawl)
-            ptype = str(inferred_spec.get("product_type") or "").lower()
-            if "ecommerce" in ptype or "shop" in ptype:
-                inferred["app_type"] = "ecommerce"
-            elif "saas" in ptype or "auth" in ptype:
-                inferred["app_type"] = "saas_auth"
-            elif "marketing" in ptype or "landing" in ptype:
-                inferred["app_type"] = "marketing_site"
-            elif "task" in ptype or "todo" in ptype:
-                inferred["app_type"] = "task_manager"
-            elif "dom" in ptype or "mutation" in ptype:
-                inferred["app_type"] = "dom_mutation"
-            else:
-                inferred["app_type"] = "generic"
-            if inferred_spec.get("critical_journeys"):
-                inferred["critical_journeys"] = inferred_spec["critical_journeys"]
-        except Exception:
-            pass
 
     return inferred
 
