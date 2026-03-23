@@ -1291,6 +1291,22 @@ def run_agentic_qa(
             raise AuditTimeoutError("Audit exceeded maximum allowed time")
 
     total_steps = {"vibe": 4, "deep": 5, "fix": 6}[tier]
+    description_text = (site_description or "").lower()
+    single_page_marketing_keywords = (
+        "marketing",
+        "portfolio",
+        "personal portfolio",
+        "developer advocate",
+        "consulting",
+        "agency",
+        "landing page",
+        "brochure",
+        "b2b",
+    )
+    prefer_single_page_crawl = (
+        tier == "deep"
+        and any(keyword in description_text for keyword in single_page_marketing_keywords)
+    )
 
     # Step 1: Browser crawl
     _raise_if_canceled()
@@ -1300,7 +1316,7 @@ def run_agentic_qa(
     # ── Tier-specific crawl parameters ────────────────────────────────────
     record_video = False
     run_journeys = journeys if tier in ("deep", "fix") else None
-    max_pages = 3 if tier in ("deep", "fix") else 1
+    max_pages = 1 if prefer_single_page_crawl else (3 if tier in ("deep", "fix") else 1)
 
     try:
         crawl = asyncio.run(

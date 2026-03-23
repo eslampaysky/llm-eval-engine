@@ -1277,9 +1277,9 @@ async def run_structured_journeys(
         page = await context.new_page()
         page.on("dialog", lambda dialog: asyncio.create_task(dialog.accept()))
         try:
-            await page.goto(url, timeout=25000, wait_until="networkidle")
+            await page.goto(url, timeout=12000, wait_until="networkidle")
         except Exception:
-            await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+            await page.goto(url, timeout=15000, wait_until="domcontentloaded")
 
         parsed = [
             journey if isinstance(journey, JourneyPlan) else JourneyPlan.from_dict(journey)
@@ -1423,10 +1423,10 @@ async def run_web_audit(
         try:
             _raise_if_canceled(should_cancel)
             try:
-                resp = await page.goto(url, timeout=25000, wait_until="networkidle")
+                resp = await page.goto(url, timeout=12000, wait_until="networkidle")
             except Exception:
                 result["classification_note"] = "discovery_timeout"
-                resp = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                resp = await page.goto(url, timeout=15000, wait_until="domcontentloaded")
             result["status_code"] = resp.status if resp else None
             result["title"] = await page.title()
 
