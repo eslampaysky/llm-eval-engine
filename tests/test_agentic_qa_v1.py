@@ -155,7 +155,7 @@ def test_agentic_qa_has_tier_timeout_guard() -> None:
     with open(agentic_path, encoding="utf-8") as fh:
         agentic_text = fh.read()
 
-    assert 'audit_timeout_seconds = 60 if tier == "vibe" else 180' in agentic_text
+    assert 'audit_timeout_seconds = 60 if tier == "vibe" else 300' in agentic_text
     assert "asyncio.wait_for(" in agentic_text
 
 
