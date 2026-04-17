@@ -1,0 +1,237 @@
+{
+  "url": "https://www.gymshark.com",
+  "score": 76,
+  "journeys_passed": 0,
+  "status": "FAIL",
+  "journey_timeline": [
+    {
+      "journey": "core_exploration",
+      "app_type": "generic",
+      "status": "FAILED",
+      "failed_step": "main navigation or primary CTA",
+      "reason": "Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('Get started')\").first\n    - locator resolved to <a href=\"https://www.gymshark.com/blog/article/calisthenic-workouts-for-beginners\">\u2026</a>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enab",
+      "steps": [
+        {
+          "step": "main navigation or primary CTA",
+          "status": "failed",
+          "failure_type": "action_resolution_failed",
+          "evidence_delta": [
+            "New text appeared: '$46'",
+            "New text appeared: '4.3'",
+            "New text appeared: 'Lift Seamles'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_accept",
+              "success": true,
+              "selector_used": "button#onetrust-accept-btn-handler",
+              "notes": "Cleared unknown_blocker using button#onetrust-accept-btn-handler"
+            },
+            {
+              "choke_point": "before_action",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "button:has-text('US')",
+              "notes": "Failed to clear unknown_blocker using button:has-text('US')"
+            },
+            {
+              "choke_point": "before_action",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "div:has-text('US')",
+              "notes": "Failed to clear cookie_consent using div:has-text('US')"
+            },
+            {
+              "choke_point": "before_action",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "div:has-text('NL')",
+              "notes": "Failed to clear cookie_consent using div:has-text('NL')"
+            },
+            {
+              "choke_point": "before_action",
+              "blocker_type": "modal",
+              "action_taken": "clicked_close",
+              "success": true,
+              "selector_used": "[class*='close' i]",
+              "notes": "Cleared modal using [class*='close' i]"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "newsletter_popup",
+              "action_taken": "clicked_close",
+              "success": true,
+              "selector_used": "button:has-text('US')",
+              "notes": "Cleared newsletter_popup using button:has-text('US')"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "div:has-text('US')",
+              "notes": "Failed to clear cookie_consent using div:has-text('US')"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "div:has-text('NL')",
+              "notes": "Failed to clear cookie_consent using div:has-text('NL')"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "div:has-text('US')",
+              "notes": "Failed to clear cookie_consent using div:has-text('US')"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "cookie_consent",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "div:has-text('NL')",
+              "notes": "Failed to clear cookie_consent using div:has-text('NL')"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "step_results": [
+    {
+      "step_name": "main navigation or primary CTA",
+      "goal": "explore_main_content",
+      "status": "failed",
+      "chosen_action": null,
+      "verification": {
+        "success": false,
+        "passed_signals": [],
+        "failed_signals": [],
+        "delta_summary": [
+          "New text appeared: '$46'",
+          "New text appeared: '4.3'",
+          "New text appeared: 'Lift Seamles'"
+        ],
+        "failure_type": "action_resolution_failed",
+        "llm_used": false
+      },
+      "evidence_delta": [
+        "New text appeared: '$46'",
+        "New text appeared: '4.3'",
+        "New text appeared: 'Lift Seamles'"
+      ],
+      "recovery_attempts": [
+        {
+          "choke_point": "before_action",
+          "blocker_type": "unknown_blocker",
+          "action_taken": "clicked_accept",
+          "success": true,
+          "selector_used": "button#onetrust-accept-btn-handler",
+          "notes": "Cleared unknown_blocker using button#onetrust-accept-btn-handler"
+        },
+        {
+          "choke_point": "before_action",
+          "blocker_type": "unknown_blocker",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "button:has-text('US')",
+          "notes": "Failed to clear unknown_blocker using button:has-text('US')"
+        },
+        {
+          "choke_point": "before_action",
+          "blocker_type": "cookie_consent",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "div:has-text('US')",
+          "notes": "Failed to clear cookie_consent using div:has-text('US')"
+        },
+        {
+          "choke_point": "before_action",
+          "blocker_type": "cookie_consent",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "div:has-text('NL')",
+          "notes": "Failed to clear cookie_consent using div:has-text('NL')"
+        },
+        {
+          "choke_point": "before_action",
+          "blocker_type": "modal",
+          "action_taken": "clicked_close",
+          "success": true,
+          "selector_used": "[class*='close' i]",
+          "notes": "Cleared modal using [class*='close' i]"
+        },
+        {
+          "choke_point": "after_failure",
+          "blocker_type": "newsletter_popup",
+          "action_taken": "clicked_close",
+          "success": true,
+          "selector_used": "button:has-text('US')",
+          "notes": "Cleared newsletter_popup using button:has-text('US')"
+        },
+        {
+          "choke_point": "after_failure",
+          "blocker_type": "cookie_consent",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "div:has-text('US')",
+          "notes": "Failed to clear cookie_consent using div:has-text('US')"
+        },
+        {
+          "choke_point": "after_failure",
+          "blocker_type": "cookie_consent",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "div:has-text('NL')",
+          "notes": "Failed to clear cookie_consent using div:has-text('NL')"
+        },
+        {
+          "choke_point": "after_failure",
+          "blocker_type": "cookie_consent",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "div:has-text('US')",
+          "notes": "Failed to clear cookie_consent using div:has-text('US')"
+        },
+        {
+          "choke_point": "after_failure",
+          "blocker_type": "cookie_consent",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "div:has-text('NL')",
+          "notes": "Failed to clear cookie_consent using div:has-text('NL')"
+        }
+      ],
+      "failure_type": "action_resolution_failed",
+      "error": "Locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text('Get started')\").first\n    - locator resolved to <a href=\"https://www.gymshark.com/blog/article/calisthenic-workouts-for-beginners\">\u2026</a>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enab",
+      "notes": [
+        "Cleared unknown_blocker using button#onetrust-accept-btn-handler",
+        "Failed to clear unknown_blocker using button:has-text('US')",
+        "Failed to clear cookie_consent using div:has-text('US')",
+        "Failed to clear cookie_consent using div:has-text('NL')",
+        "Cleared modal using [class*='close' i]",
+        "Cleared newsletter_popup using button:has-text('US')"
+      ],
+      "before_snapshot": {
+        "url": "https://www.gymshark.com/",
+        "title": "Gymshark Official Store - Gym Clothes & Workout Clothes",
+        "text_snippet": "ARE YOU IN THE RIGHT PLACE?\nROW\nUS\nPause slide rotation\n12% Student Discount \u200d\ud83c\udf93\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nAccessibility Statement\nSkip to content\nskip to Women\nWomen\nExpand Women\nskip to Men\nMen\nExpand Men\nskip to Accessories\nAccessories\nExpand Accessories\nExplore\nExpand Explore\nMATCHING SETS\n\nMatching gym sets = better workouts. Don\u2019t believe us? Try it yourself xo\n\nShop Now\nWOMENS\nMATCHING SETS\nView All\n4\nLift Seamless Shorts\n\nCool Brown\n"
+      },
+      "after_snapshot": {
+        "url": "https://www.gymshark.com/",
+        "title": "Gymshark Official Store - Gym Clothes & Workout Clothes",
+        "text_snippet": "Play slide rotation\n12% Student Discount \u200d\ud83c\udf93\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nAccessibility Statement\nSkip to content\nskip to Women\nWomen\nExpand Women\nskip to Men\nMen\nExpand Men\nskip to Accessories\nAccessories\nExpand Accessories\nExplore\nExpand Explore\nMATCHING SETS\n\nMatching gym sets = better workouts. Don\u2019t believe us? Try it yourself xo\n\nShop Now\nWOMENS\nMATCHING SETS\nView All\n4\nLift Seamless Shorts\n\nCool Brown\n\nRegular Price:\n$46\n4.3\nLift Seamles"
+      },
+      "screenshot_path": null
+    }
+  ]
+}

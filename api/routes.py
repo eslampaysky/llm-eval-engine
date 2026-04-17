@@ -360,6 +360,37 @@ def _persist_agentic_qa_screenshot(audit_id: str, kind: str, payload_b64: str | 
     return str(path)
 
 
+def _looks_like_base64_payload(value: str | None) -> bool:
+    if not value:
+        return False
+    stripped = value.strip()
+    if not stripped:
+        return False
+    if stripped.startswith("data:image"):
+        return True
+    if len(stripped) < 200:
+        return False
+    lowered = stripped.lower()
+    if any(token in lowered for token in ("\\", ".png", ".jpg", ".jpeg", ".webp", "http://", "https://")):
+        return False
+    if stripped.startswith("/"):
+        return False
+    valid_chars = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n\r")
+    return all(ch in valid_chars for ch in stripped)
+
+
+def _agentic_screenshot_ref(row: dict[str, Any], kind: str) -> str | None:
+    path_key = f"{kind}_ss_path"
+    legacy_key = f"{kind}_ss_b64"
+    path_value = row.get(path_key)
+    if path_value:
+        return str(path_value)
+    legacy_value = row.get(legacy_key)
+    if legacy_value:
+        return str(legacy_value)
+    return None
+
+
 def _resolve_plan_for_client(client_name: str | None) -> tuple[str, dict[str, Any]]:
     if not client_name:
         return "free", get_plan_limits("free")
@@ -3431,6 +3462,7 @@ async def start_agentic_qa(
         auth_ctx.get("client_name"),
         user_api_key,
         job_id=audit_id,
+        job_type="agentic_qa",
     )
     return {
         "audit_id": audit_id,
@@ -3469,17 +3501,35 @@ def get_agentic_qa_status(
             step_results = json.loads(row["step_results_json"])
         except json.JSONDecodeError:
             step_results = None
+    classifier_signals = None
+    if row.get("classifier_signals_json"):
+        try:
+            classifier_signals = json.loads(row["classifier_signals_json"])
+        except json.JSONDecodeError:
+            classifier_signals = None
+
+    # Phase 4A: Parse full result with Phase 3 intelligence
+    result = None
+    if row.get("result_json"):
+        try:
+            result = json.loads(row["result_json"])
+        except json.JSONDecodeError:
+            result = None
 
     # Detect analysis limitation from the stored result
     analysis_limited = row.get("confidence") is None and row.get("status") == "done"
 
-    return {
+    response = {
         "audit_id": audit_id,
         "status": row.get("status"),
         "url": row.get("url") or "",
         "tier": row.get("tier") or "vibe",
         "score": row.get("score"),
         "confidence": row.get("confidence"),
+        "app_type": row.get("app_type"),
+        "classifier_confidence": row.get("classifier_confidence"),
+        "classifier_source": row.get("classifier_source"),
+        "signals": classifier_signals,
         "findings": findings,
         "summary": row.get("summary"),
         "bundled_fix_prompt": row.get("bundled_fix"),
@@ -3487,10 +3537,16 @@ def get_agentic_qa_status(
         "step_results": step_results,
         "analysis_limited": analysis_limited,
         "video_url": f"/agentic-qa/{audit_id}/video" if row.get("video_path") else None,
-        "desktop_screenshot_url": f"/agentic-qa/{audit_id}/screenshot/desktop" if row.get("desktop_ss_b64") else None,
-        "mobile_screenshot_url": f"/agentic-qa/{audit_id}/screenshot/mobile" if row.get("mobile_ss_b64") else None,
+        "desktop_screenshot_url": f"/agentic-qa/{audit_id}/screenshot/desktop" if _agentic_screenshot_ref(row, "desktop") else None,
+        "mobile_screenshot_url": f"/agentic-qa/{audit_id}/screenshot/mobile" if _agentic_screenshot_ref(row, "mobile") else None,
         "created_at": row.get("created_at"),
     }
+    
+    # Phase 4A: Include full result with Phase 3 intelligence if available
+    if result:
+        response["result"] = result
+    
+    return response
 
 
 @router.post("/agentic-qa/{audit_id}/cancel", status_code=202)
@@ -3541,13 +3597,15 @@ def get_agentic_qa_screenshot_desktop(
     row = get_agentic_qa_row(audit_id)
     if not row or row.get("client_name") != auth_ctx.get("client_name"):
         raise HTTPException(status_code=404, detail="Audit not found")
-    b64 = row.get("desktop_ss_b64")
-    if not b64:
+    screenshot_ref = _agentic_screenshot_ref(row, "desktop")
+    if not screenshot_ref:
         raise HTTPException(status_code=404, detail="Desktop screenshot not available")
-    screenshot_path = Path(str(b64))
+    screenshot_path = Path(screenshot_ref)
     if screenshot_path.exists():
         return FileResponse(screenshot_path, media_type="image/png")
-    return Response(content=base64.b64decode(b64), media_type="image/png")
+    if _looks_like_base64_payload(screenshot_ref):
+        return Response(content=base64.b64decode(screenshot_ref), media_type="image/png")
+    raise HTTPException(status_code=404, detail="Desktop screenshot not available")
 
 
 @router.get("/agentic-qa/{audit_id}/screenshot/mobile")
@@ -3561,13 +3619,15 @@ def get_agentic_qa_screenshot_mobile(
     row = get_agentic_qa_row(audit_id)
     if not row or row.get("client_name") != auth_ctx.get("client_name"):
         raise HTTPException(status_code=404, detail="Audit not found")
-    b64 = row.get("mobile_ss_b64")
-    if not b64:
+    screenshot_ref = _agentic_screenshot_ref(row, "mobile")
+    if not screenshot_ref:
         raise HTTPException(status_code=404, detail="Mobile screenshot not available")
-    screenshot_path = Path(str(b64))
+    screenshot_path = Path(screenshot_ref)
     if screenshot_path.exists():
         return FileResponse(screenshot_path, media_type="image/png")
-    return Response(content=base64.b64decode(b64), media_type="image/png")
+    if _looks_like_base64_payload(screenshot_ref):
+        return Response(content=base64.b64decode(screenshot_ref), media_type="image/png")
+    raise HTTPException(status_code=404, detail="Mobile screenshot not available")
 
 
 def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, credentials, client_name, user_api_key=None):
@@ -3600,6 +3660,10 @@ def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, credent
             _finish_progress(audit_id, "canceled")
             return
 
+        # Phase 4A: Use result_to_dict() to get enriched result including Phase 3 intelligence
+        result_dict = result_to_dict(result)
+        
+        # Extract legacy fields for backward compatibility
         findings_dicts = [
             {
                 "severity": f.severity,
@@ -3620,6 +3684,12 @@ def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, credent
 
         finalize_agentic_qa_success(
             audit_id=audit_id,
+            app_type=result.app_type,
+            classifier_confidence=result.classifier_confidence,
+            classifier_source=result.classifier_source,
+            classifier_signals_json=json.dumps(result.classifier_signals, ensure_ascii=False)
+            if result.classifier_signals is not None
+            else None,
             score=result.score,
             confidence=result.confidence,
             findings_json=json.dumps(findings_dicts, ensure_ascii=False),
@@ -3628,8 +3698,9 @@ def _run_agentic_qa_job(audit_id, url, tier, journeys, site_description, credent
             journey_timeline_json=json.dumps(result.journey_timeline, ensure_ascii=False) if result.journey_timeline is not None else None,
             step_results_json=json.dumps(result.step_results, ensure_ascii=False) if result.step_results is not None else None,
             video_path=result.video_path,
-            desktop_ss_b64=desktop_screenshot_path,
-            mobile_ss_b64=mobile_screenshot_path,
+            desktop_ss_path=desktop_screenshot_path,
+            mobile_ss_path=mobile_screenshot_path,
+            result_json=json.dumps(result_dict, ensure_ascii=False),
         )
         _finish_progress(audit_id, "done")
 

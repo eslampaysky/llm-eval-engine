@@ -9,7 +9,14 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import core.agentic_qa as agentic_qa
+
 from core.agentic_qa import _cart_from_detail_step, _cart_step, _login_step, _open_product_step, discover_site, plan_journeys
+from core.app_classifier import (
+    _classifier_context,
+    _normalize_classifier_output,
+    _normalize_phase1_output,
+)
 from core.models import ActionCandidate, AppType, JourneyPlan, JourneyStep, RecoveryEvent, SessionState, StepResult, StepType, SuccessSignal
 from core.report_builder import build_journey_timeline
 
@@ -159,6 +166,24 @@ def test_agentic_qa_has_tier_timeout_guard() -> None:
     assert "asyncio.wait_for(" in agentic_text
 
 
+def test_agentic_qa_imports_journey_timeline_builder() -> None:
+    agentic_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "core", "agentic_qa.py"))
+    with open(agentic_path, encoding="utf-8") as fh:
+        agentic_text = fh.read()
+
+    assert "from core.report_builder import" in agentic_text
+    assert "build_journey_timeline" in agentic_text
+
+
+def test_agentic_qa_imports_fix_prompt_context_builder() -> None:
+    agentic_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "core", "agentic_qa.py"))
+    with open(agentic_path, encoding="utf-8") as fh:
+        agentic_text = fh.read()
+
+    assert "from core.report_builder import" in agentic_text
+    assert "build_fix_prompt_context" in agentic_text
+
+
 def test_marketing_site_discovery_prefers_marketing_template_family() -> None:
     crawl = {
         "title": "Cookiebot Pricing and Features",
@@ -177,6 +202,157 @@ def test_marketing_site_discovery_prefers_marketing_template_family() -> None:
     assert context["app_type"] == AppType.MARKETING.value
     assert context["primary_goal"] == "explore marketing paths"
     assert "pricing" in context["features"]
+
+
+def test_classifier_context_includes_dom_and_visible_signals() -> None:
+    crawl = {
+        "title": "Shop Demo",
+        "text_snippet": "browse products add to cart checkout",
+        "buttons": ["Add to cart", "Checkout"],
+        "nav_links": [{"text": "Pricing", "href": "/pricing"}],
+        "forms": [{"id": "login", "action": "/login", "fields": 2}],
+        "page_html": "<main><div class='product-card'></div><button>Add to cart</button></main>",
+        "structural_signals": {"has_add_to_cart_button": 1},
+    }
+
+    context = _classifier_context(crawl, description="Demo storefront")
+
+    assert context["title"] == "Shop Demo"
+    assert context["site_description"] == "Demo storefront"
+    assert "Add to cart" in context["buttons"]
+    assert context["nav_links"][0]["text"] == "Pricing"
+    assert "product-card" in context["page_html_excerpt"]
+    assert context["structural_signals"]["has_add_to_cart_button"] == 1
+
+
+def test_classifier_output_rejects_invalid_app_type() -> None:
+    assert _normalize_classifier_output({"app_type": "portfolio"}) is None
+
+
+def test_classifier_output_normalizes_valid_payload() -> None:
+    normalized = _normalize_classifier_output(
+        {
+            "app_type": "ecommerce",
+            "requires_auth_first": True,
+            "confidence": "91",
+            "reasoning": "Catalog and cart signals dominate.",
+        }
+    )
+
+    assert normalized == {
+        "app_type": "ecommerce",
+        "requires_auth_first": True,
+        "confidence": 91,
+        "reasoning": "Catalog and cart signals dominate.",
+        "classification_source": "llm",
+    }
+
+
+def test_phase1_classifier_output_matches_requested_json_contract() -> None:
+    normalized = _normalize_phase1_output(
+        {
+            "app_type": "marketing_site",
+            "confidence": "0.84",
+            "signals": ["pricing link", "docs link", "signup button"],
+        }
+    )
+
+    assert normalized == {
+        "app_type": "marketing_site",
+        "confidence": 0.84,
+        "signals": ["pricing link", "docs link", "signup button"],
+    }
+
+
+def test_phase1_classifier_output_rejects_dom_mutation_for_phase1_contract() -> None:
+    assert _normalize_phase1_output({"app_type": "dom_mutation", "confidence": 0.5, "signals": []}) is None
+
+
+def test_discover_site_prefers_llm_classifier_result(monkeypatch) -> None:
+    monkeypatch.setattr(
+        agentic_qa,
+        "classify_site_with_llm",
+        lambda crawl, description=None: {
+            "app_type": "marketing_site",
+            "requires_auth_first": False,
+            "confidence": 88,
+            "reasoning": "Pricing and contact dominate.",
+            "signals": ["pricing link", "contact link"],
+            "classification_source": "llm",
+        },
+    )
+
+    context = discover_site({"title": "Anything", "text_snippet": "", "nav_links": [], "buttons": [], "forms": []})
+
+    assert context["app_type"] == AppType.MARKETING.value
+    assert context["classification_source"] == "llm"
+    assert context["confidence"] == 88
+    assert context["primary_goal"] == "explore marketing paths"
+
+
+def test_discover_site_falls_back_to_structural_classifier_when_llm_unavailable(monkeypatch) -> None:
+    monkeypatch.setattr(agentic_qa, "classify_site_with_llm", lambda crawl, description=None: None)
+
+    crawl = {
+        "title": "Todo App",
+        "text_snippet": "todos add new task complete delete",
+        "nav_links": [],
+        "buttons": ["Create", "Delete"],
+        "forms": [{"id": "todo-form", "action": "/todos", "fields": 1}],
+        "page_html": """
+            <main>
+              <input class="new-todo" />
+              <input type="checkbox" />
+              <input type="checkbox" />
+              <input type="checkbox" />
+              <div contenteditable="true"></div>
+              <li class="todo-item"></li>
+              <li class="todo-item"></li>
+              <li class="todo-item"></li>
+            </main>
+        """,
+    }
+
+    context = discover_site(crawl, description="Task management app")
+
+    assert context["app_type"] == AppType.TASK_MANAGER.value
+    assert context["classification_source"] == "structural"
+
+
+def test_discover_site_uses_description_boost_after_structural_generic(monkeypatch) -> None:
+    monkeypatch.setattr(agentic_qa, "classify_site_with_llm", lambda crawl, description=None: None)
+
+    crawl = {
+        "title": "Welcome",
+        "text_snippet": "hello there",
+        "nav_links": [],
+        "buttons": [],
+        "forms": [],
+        "page_html": "",
+    }
+
+    context = discover_site(crawl, description="SaaS app with login and dashboard")
+
+    assert context["app_type"] == AppType.SAAS_AUTH.value
+    assert context["classification_source"] == "description_boost"
+
+
+def test_discover_site_uses_generic_fallback_when_no_classifier_matches(monkeypatch) -> None:
+    monkeypatch.setattr(agentic_qa, "classify_site_with_llm", lambda crawl, description=None: None)
+
+    crawl = {
+        "title": "Plain Page",
+        "text_snippet": "welcome to our website",
+        "nav_links": [],
+        "buttons": [],
+        "forms": [],
+        "page_html": "<main><p>Hello world</p></main>",
+    }
+
+    context = discover_site(crawl, description=None)
+
+    assert context["app_type"] == AppType.GENERIC.value
+    assert context["classification_source"] == "generic_fallback"
 
 
 def test_marketing_site_plan_uses_navigation_journeys() -> None:
@@ -560,6 +736,25 @@ def test_detail_cart_step_has_amazon_and_basket_selectors():
     assert "ADD TO BASKET" in selectors
 
 
+def test_detail_cart_step_requires_real_cart_state_change() -> None:
+    step = _cart_from_detail_step()
+
+    assert step.expected_state_change == {"cart_has_items": True}
+    signal_values = {str(signal.value) for signal in step.success_signals}
+    assert "Checkout" in signal_values
+    assert "View bag" in signal_values
+    assert "Your bag" in signal_values
+
+
+def test_web_agent_has_dom_cart_detection_for_drawers_and_badges() -> None:
+    source = Path("core/web_agent.py").read_text(encoding="utf-8")
+
+    assert "async def _detect_cart_state_from_dom" in source
+    assert "dom_cart_badge" in source
+    assert "dom_cart_visible" in source
+    assert "checkout securely" in source
+
+
 def test_saucedemo_login_first_commerce_routes_to_ecommerce() -> None:
     crawl = {
         "title": "Swag Labs",
@@ -772,6 +967,108 @@ def test_agentic_qa_routes_persist_screenshots_to_files() -> None:
     assert "desktop_screenshot_path = _persist_agentic_qa_screenshot(" in routes_source
     assert "mobile_screenshot_path = _persist_agentic_qa_screenshot(" in routes_source
     assert "if screenshot_path.exists():" in routes_source
+
+
+def test_agentic_qa_db_success_write_uses_path_columns_only() -> None:
+    db_source = Path("api/database.py").read_text(encoding="utf-8")
+
+    assert "desktop_ss_path={_P}" in db_source
+    assert "mobile_ss_path={_P}" in db_source
+    assert "desktop_ss_b64=NULL" in db_source
+    assert "mobile_ss_b64=NULL" in db_source
+
+
+def test_agentic_qa_status_route_exposes_step_results_for_llm_proof() -> None:
+    routes_source = Path("api/routes.py").read_text(encoding="utf-8")
+
+    assert '"step_results": step_results' in routes_source
+    assert '"analysis_limited": analysis_limited' in routes_source
+
+
+def test_agentic_qa_status_route_exposes_classifier_observability() -> None:
+    routes_source = Path("api/routes.py").read_text(encoding="utf-8")
+
+    assert '"app_type": row.get("app_type")' in routes_source
+    assert '"classifier_confidence": row.get("classifier_confidence")' in routes_source
+    assert '"classifier_source": row.get("classifier_source")' in routes_source
+    assert '"signals": classifier_signals' in routes_source
+
+
+def test_agentic_qa_success_persists_classifier_observability() -> None:
+    routes_source = Path("api/routes.py").read_text(encoding="utf-8")
+    db_source = Path("api/database.py").read_text(encoding="utf-8")
+    agentic_source = Path("core/agentic_qa.py").read_text(encoding="utf-8")
+
+    assert "app_type=result.app_type" in routes_source
+    assert "classifier_confidence=result.classifier_confidence" in routes_source
+    assert "classifier_source=result.classifier_source" in routes_source
+    assert "classifier_signals_json=json.dumps(result.classifier_signals" in routes_source
+    assert "classifier_confidence INTEGER" in db_source
+    assert "classifier_source TEXT" in db_source
+    assert "classifier_signals_json TEXT" in db_source
+    assert "app_type: str | None = None" in agentic_source
+    assert "classifier_confidence: int | None = None" in agentic_source
+    assert "classifier_source: str | None = None" in agentic_source
+    assert "classifier_signals: list[str] = field(default_factory=list)" in agentic_source
+
+
+def test_cart_step_supports_listing_quick_add_and_option_variants() -> None:
+    step = _cart_step()
+    selectors = step.action_candidates[0].selectors
+
+    assert "button:has-text('Quick add')" in selectors
+    assert "button:has-text('Select options')" in selectors
+    assert "button:has-text('Choose size')" in selectors
+    assert "[aria-label*='add to cart' i]" in selectors
+    assert ".product-card [data-testid*='add-to-cart']" in selectors
+
+
+def test_open_product_step_supports_listing_option_fallback_links() -> None:
+    step = _open_product_step()
+    selectors = step.action_candidates[0].selectors
+
+    assert "a:has-text('Select options')" in selectors
+    assert "a:has-text('View options')" in selectors
+    assert ".product-card [href*='/product/']" in selectors
+
+
+def test_web_agent_hover_and_force_click_support_present() -> None:
+    agent_text = Path("core/web_agent.py").read_text(encoding="utf-8")
+
+    assert "await locator.hover(timeout=1000)" in agent_text
+    assert "await locator.click(timeout=2000, force=True)" in agent_text
+
+
+def test_gemini_judge_supports_provider_order_override() -> None:
+    judge_text = Path("core/gemini_judge.py").read_text(encoding="utf-8")
+
+    assert 'AIBREAKER_VISION_PROVIDER_ORDER' in judge_text
+    assert 'return ["gemini", "groq", "playwright"]' in judge_text
+    assert 'for provider in provider_order:' in judge_text
+
+
+def test_real_user_suite_tracks_llm_used_signal() -> None:
+    suite_text = Path("scripts/run_real_user_suite.py").read_text(encoding="utf-8")
+
+    assert '"score", "analysis_limited", "llm_used"' in suite_text
+    assert '"llm_used": llm_used' in suite_text
+
+
+def test_phase0_validation_script_exists() -> None:
+    script_text = Path("scripts/validate_phase0.py").read_text(encoding="utf-8")
+
+    assert 'SELECT * FROM agentic_qa_reports WHERE audit_id = %s' in script_text
+    assert '"llm_used": _llm_used(status_payload)' in script_text
+    assert '"desktop_legacy_empty"' in script_text
+
+
+def test_classification_validation_script_exists() -> None:
+    script_text = Path("scripts/validate_classification.py").read_text(encoding="utf-8")
+
+    assert 'headers = ["URL", "predicted", "expected", "correct"]' in script_text
+    assert 'accuracy: {correct_count}/{total}' in script_text
+    assert 'default="configs/calibration_targets.json"' in script_text
+    assert 'return 0 if accuracy >= args.min_accuracy else 1' in script_text
 
 
 def test_frontend_exposes_agentic_qa_cancel_api() -> None:

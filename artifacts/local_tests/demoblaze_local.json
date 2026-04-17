@@ -1,0 +1,497 @@
+{
+  "url": "https://www.demoblaze.com",
+  "score": 98,
+  "journeys_passed": 0,
+  "status": "FAIL",
+  "journey_timeline": [
+    {
+      "journey": "direct_add_to_cart",
+      "app_type": "ecommerce",
+      "status": "FAILED",
+      "failed_step": "add to cart button on listing page",
+      "reason": "Could not resolve action candidate: add to cart button",
+      "steps": [
+        {
+          "step": "add to cart button on listing page",
+          "status": "failed",
+          "failure_type": "action_resolution_failed",
+          "evidence_delta": [
+            "New text appeared: '$790'",
+            "New text appeared: 'Iphone 6 32gb'",
+            "New text appeared: 'It comes with 1GB of RAM. The phone packs 16GB of internal storage cannot be exp'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "button:has-text('US')",
+              "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "button:has-text('US')",
+              "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "button:has-text('US')",
+              "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "journey": "detail_then_cart",
+      "app_type": "ecommerce",
+      "status": "FAILED",
+      "failed_step": "add to cart button on product detail page",
+      "reason": "validation_failed",
+      "steps": [
+        {
+          "step": "product detail link or view details button",
+          "status": "passed",
+          "failure_type": null,
+          "evidence_delta": [
+            "URL changed from https://www.demoblaze.com/ to https://www.demoblaze.com/prod.html?idp_=2",
+            "New text appeared: '$820 *includes tax'",
+            "New text appeared: 'About Us'",
+            "New text appeared: 'Add to cart'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "button:has-text('US')",
+              "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+            },
+            {
+              "choke_point": "after_navigation",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "a:has-text('US')",
+              "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+            }
+          ]
+        },
+        {
+          "step": "add to cart button on product detail page",
+          "status": "failed",
+          "failure_type": "validation_failed",
+          "evidence_delta": [
+            "URL changed from https://www.demoblaze.com/prod.html?idp_=2 to https://www.demoblaze.com/prod.html?idp_=2#"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "a:has-text('US')",
+              "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+            },
+            {
+              "choke_point": "after_navigation",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "a:has-text('US')",
+              "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "a:has-text('US')",
+              "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+            },
+            {
+              "choke_point": "after_navigation",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "a:has-text('US')",
+              "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "unknown_blocker",
+              "action_taken": "clicked_close",
+              "success": false,
+              "selector_used": "a:has-text('US')",
+              "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+            },
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "soft_recovery",
+              "action_taken": "soft_recovery_skipped",
+              "success": false,
+              "selector_used": "",
+              "notes": "Soft recovery was attempted but did not restore the page state"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "step_results": [
+    {
+      "step_name": "add to cart button on listing page",
+      "goal": "add_to_cart",
+      "status": "failed",
+      "chosen_action": null,
+      "verification": {
+        "success": false,
+        "passed_signals": [
+          {
+            "type": "text_present",
+            "value": "cart",
+            "priority": "medium",
+            "required": false
+          },
+          {
+            "type": "text_present",
+            "value": "1",
+            "priority": "medium",
+            "required": false
+          },
+          {
+            "type": "element_visible",
+            "value": "Cart",
+            "priority": "medium",
+            "required": false
+          }
+        ],
+        "failed_signals": [
+          {
+            "type": "expected_state_change",
+            "key": "cart_has_items",
+            "value": true,
+            "actual": null
+          }
+        ],
+        "delta_summary": [
+          "New text appeared: '$790'",
+          "New text appeared: 'Iphone 6 32gb'",
+          "New text appeared: 'It comes with 1GB of RAM. The phone packs 16GB of internal storage cannot be exp'"
+        ],
+        "failure_type": "action_resolution_failed",
+        "llm_used": false
+      },
+      "evidence_delta": [
+        "New text appeared: '$790'",
+        "New text appeared: 'Iphone 6 32gb'",
+        "New text appeared: 'It comes with 1GB of RAM. The phone packs 16GB of internal storage cannot be exp'"
+      ],
+      "recovery_attempts": [
+        {
+          "choke_point": "before_action",
+          "blocker_type": "unknown_blocker",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "button:has-text('US')",
+          "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+        },
+        {
+          "choke_point": "after_failure",
+          "blocker_type": "unknown_blocker",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "button:has-text('US')",
+          "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+        },
+        {
+          "choke_point": "after_failure",
+          "blocker_type": "unknown_blocker",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "button:has-text('US')",
+          "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+        }
+      ],
+      "failure_type": "action_resolution_failed",
+      "error": "Could not resolve action candidate: add to cart button",
+      "notes": [
+        "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+      ],
+      "before_snapshot": {
+        "url": "https://www.demoblaze.com/",
+        "title": "STORE",
+        "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nSamsung galaxy s6\n$360\n\nThe Samsung Galaxy S6 is powered by 1.5GHz octa-core Samsung Exynos 7420 processor and it comes with 3GB of RAM. The phone packs 32GB of internal storage cannot be expanded.\n\nNokia lumia 1520\n$820\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nNexus 6\n$650\n\nThe Motorola Google Nexus 6 is powered by 2.7GHz quad-core Qualcomm Snapdragon 805 processor and it comes with 3GB of RAM.\n\nSamsung galaxy s7\n$800\n\nThe Samsung Galaxy S7 is powered by 1.6GHz octa-core it comes with 4GB of RAM. The phone packs 32GB of internal storage that can be expanded up to 200GB via a microSD card.\n\nIphone 6 "
+      },
+      "after_snapshot": {
+        "url": "https://www.demoblaze.com/",
+        "title": "STORE",
+        "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nNokia lumia 1520\n$820\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nNexus 6\n$650\n\nThe Motorola Google Nexus 6 is powered by 2.7GHz quad-core Qualcomm Snapdragon 805 processor and it comes with 3GB of RAM.\n\nSamsung galaxy s7\n$800\n\nThe Samsung Galaxy S7 is powered by 1.6GHz octa-core it comes with 4GB of RAM. The phone packs 32GB of internal storage that can be expanded up to 200GB via a microSD card.\n\nIphone 6 32gb\n$790\n\nIt comes with 1GB of RAM. The phone packs 16GB of internal storage cannot be expanded. As far as the cameras are concerned, the Apple iPhone 6 packs a 8-megapixel primary camera on the rea"
+      },
+      "screenshot_path": null
+    },
+    {
+      "step_name": "product detail link or view details button",
+      "goal": "open_product",
+      "status": "passed",
+      "chosen_action": {
+        "sequence": [
+          {
+            "type": "click",
+            "intent": "view details link",
+            "selectors": [
+              "a:has-text('View Details')",
+              "a:has-text('View Product')",
+              "a:has-text('See Details')",
+              "a:has-text('More Info')",
+              "a.productName",
+              "a:has-text('Shop Now')",
+              "a:has-text('Shop now')",
+              ".shop_now",
+              "a:has-text('Explore')",
+              "a:has-text('Shop')",
+              "a[data-testid='product-card-link']",
+              ".product-card_product-title-link__nDARd",
+              "a[href*='prod.html']",
+              "a.hrefch",
+              "a[href*='/product/']",
+              "a[href*='product']",
+              "a[href*='item']",
+              "a[href*='/dp/']",
+              ".card-title a",
+              ".product-item-link",
+              ".product-name a",
+              ".product-title a",
+              "h2 a",
+              "h3 a",
+              ".product-card a",
+              ".product-item a",
+              "div[id*='Img']",
+              "[aria-label*='Category']"
+            ],
+            "role": "link",
+            "name": "Product Link",
+            "value": null
+          }
+        ]
+      },
+      "verification": {
+        "success": true,
+        "passed_signals": [
+          {
+            "type": "url_contains",
+            "value": "prod.html",
+            "priority": "high",
+            "required": false
+          },
+          {
+            "type": "element_visible",
+            "value": "Add to cart",
+            "priority": "medium",
+            "required": false
+          },
+          {
+            "type": "text_present",
+            "value": "description",
+            "priority": "low",
+            "required": false
+          }
+        ],
+        "failed_signals": [],
+        "delta_summary": [
+          "URL changed from https://www.demoblaze.com/ to https://www.demoblaze.com/prod.html?idp_=2",
+          "New text appeared: '$820 *includes tax'",
+          "New text appeared: 'About Us'",
+          "New text appeared: 'Add to cart'"
+        ],
+        "failure_type": "none",
+        "llm_used": false
+      },
+      "evidence_delta": [
+        "URL changed from https://www.demoblaze.com/ to https://www.demoblaze.com/prod.html?idp_=2",
+        "New text appeared: '$820 *includes tax'",
+        "New text appeared: 'About Us'",
+        "New text appeared: 'Add to cart'"
+      ],
+      "recovery_attempts": [
+        {
+          "choke_point": "before_action",
+          "blocker_type": "unknown_blocker",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "button:has-text('US')",
+          "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+        },
+        {
+          "choke_point": "after_navigation",
+          "blocker_type": "unknown_blocker",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "a:has-text('US')",
+          "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+        }
+      ],
+      "failure_type": null,
+      "error": null,
+      "notes": [
+        "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+      ],
+      "before_snapshot": {
+        "url": "https://www.demoblaze.com/",
+        "title": "STORE",
+        "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nSamsung galaxy s6\n$360\n\nThe Samsung Galaxy S6 is powered by 1.5GHz octa-core Samsung Exynos 7420 processor and it comes with 3GB of RAM. The phone packs 32GB of internal storage cannot be expanded.\n\nNokia lumia 1520\n$820\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nNexus 6\n$650\n\nThe Motorola Google Nexus 6 is powered by 2.7GHz quad-core Qualcomm Snapdragon 805 processor and it comes with 3GB of RAM.\n\nSamsung galaxy s7\n$800\n\nThe Samsung Galaxy S7 is powered by 1.6GHz octa-core it comes with 4GB of RAM. The phone packs 32GB of internal storage that can be expanded up to 200GB via a microSD card.\n\nIphone 6 "
+      },
+      "after_snapshot": {
+        "url": "https://www.demoblaze.com/prod.html?idp_=2",
+        "title": "STORE",
+        "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nNokia lumia 1520\n$820 *includes tax\n\nProduct description\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nAdd to cart\nAbout Us\n\nWe believe performance needs to be validated at every stage of the software development cycle and our open source compatible, massively scalable platform makes that a reality.\n\nGet in Touch\n\nAddress: 2390 El Camino Real\n\nPhone: +440 123456\n\nEmail: demo@blazemeter.com\n\n PRODUCT STORE\n\nCopyright \u00a9 Product Store"
+      },
+      "screenshot_path": null
+    },
+    {
+      "step_name": "add to cart button on product detail page",
+      "goal": "add_to_cart_from_detail",
+      "status": "failed",
+      "chosen_action": {
+        "sequence": [
+          {
+            "type": "click",
+            "intent": "add to cart button",
+            "selectors": [
+              "button:has-text('Add to cart')",
+              "button:has-text('ADD TO CART')",
+              "button:has-text('Add To Cart')",
+              "button:has-text('ADD TO BASKET')",
+              "button:has-text('Add to bag')",
+              "button:has-text('ADD TO BAG')",
+              "a:has-text('Add to cart')",
+              "a:has-text('ADD TO BASKET')",
+              "button[name='save_to_cart']",
+              "button[name='add']",
+              "button[data-testid='add-to-cart']",
+              "[onclick*='addToCart']",
+              "[onclick*='add_to_cart']",
+              ".btn-cart",
+              "a.btn-success",
+              "a[class*='add_to_cart_button']",
+              "input[name='submit.add-to-cart']",
+              "input[id='add-to-cart-button']",
+              "#add-to-cart-button"
+            ],
+            "role": "button",
+            "name": "Add to cart",
+            "value": null
+          }
+        ]
+      },
+      "verification": {
+        "success": false,
+        "passed_signals": [
+          {
+            "type": "element_visible",
+            "value": "Cart",
+            "priority": "medium",
+            "required": false
+          },
+          {
+            "type": "text_present",
+            "value": "Cart",
+            "priority": "medium",
+            "required": false
+          }
+        ],
+        "failed_signals": [
+          {
+            "type": "expected_state_change",
+            "key": "cart_has_items",
+            "value": true,
+            "actual": null
+          }
+        ],
+        "delta_summary": [
+          "URL changed from https://www.demoblaze.com/prod.html?idp_=2 to https://www.demoblaze.com/prod.html?idp_=2#"
+        ],
+        "failure_type": "validation_failed",
+        "llm_used": false
+      },
+      "evidence_delta": [
+        "URL changed from https://www.demoblaze.com/prod.html?idp_=2 to https://www.demoblaze.com/prod.html?idp_=2#"
+      ],
+      "recovery_attempts": [
+        {
+          "choke_point": "before_action",
+          "blocker_type": "unknown_blocker",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "a:has-text('US')",
+          "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+        },
+        {
+          "choke_point": "after_navigation",
+          "blocker_type": "unknown_blocker",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "a:has-text('US')",
+          "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+        },
+        {
+          "choke_point": "after_failure",
+          "blocker_type": "unknown_blocker",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "a:has-text('US')",
+          "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+        },
+        {
+          "choke_point": "after_navigation",
+          "blocker_type": "unknown_blocker",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "a:has-text('US')",
+          "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+        },
+        {
+          "choke_point": "after_failure",
+          "blocker_type": "unknown_blocker",
+          "action_taken": "clicked_close",
+          "success": false,
+          "selector_used": "a:has-text('US')",
+          "notes": "Unknown Blocker detected but could not be fully cleared after 3 attempts"
+        },
+        {
+          "choke_point": "after_failure",
+          "blocker_type": "soft_recovery",
+          "action_taken": "soft_recovery_skipped",
+          "success": false,
+          "selector_used": "",
+          "notes": "Soft recovery was attempted but did not restore the page state"
+        }
+      ],
+      "failure_type": "validation_failed",
+      "error": null,
+      "notes": [
+        "Unknown Blocker detected but could not be fully cleared after 3 attempts",
+        "Soft recovery was attempted but did not restore the page state"
+      ],
+      "before_snapshot": {
+        "url": "https://www.demoblaze.com/prod.html?idp_=2",
+        "title": "STORE",
+        "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nNokia lumia 1520\n$820 *includes tax\n\nProduct description\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nAdd to cart\nAbout Us\n\nWe believe performance needs to be validated at every stage of the software development cycle and our open source compatible, massively scalable platform makes that a reality.\n\nGet in Touch\n\nAddress: 2390 El Camino Real\n\nPhone: +440 123456\n\nEmail: demo@blazemeter.com\n\n PRODUCT STORE\n\nCopyright \u00a9 Product Store"
+      },
+      "after_snapshot": {
+        "url": "https://www.demoblaze.com/prod.html?idp_=2#",
+        "title": "STORE",
+        "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nNokia lumia 1520\n$820 *includes tax\n\nProduct description\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nAdd to cart\nAbout Us\n\nWe believe performance needs to be validated at every stage of the software development cycle and our open source compatible, massively scalable platform makes that a reality.\n\nGet in Touch\n\nAddress: 2390 El Camino Real\n\nPhone: +440 123456\n\nEmail: demo@blazemeter.com\n\n PRODUCT STORE\n\nCopyright \u00a9 Product Store"
+      },
+      "screenshot_path": null
+    }
+  ]
+}

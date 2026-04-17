@@ -489,10 +489,10 @@ def main():
         batch     = pick_batch(all_targets, args.batch_size, args.group)
 
         print()
-        print(f"{C.BOLD}{'═'*62}{C.E}")
-        print(f"{C.BOLD}  Batch #{batch_num} — {datetime.now().strftime('%Y-%m-%d %H:%M')}  "
+        print(f"{C.BOLD}{'='*62}{C.E}")
+        print(f"{C.BOLD}  Batch #{batch_num} -- {datetime.now().strftime('%Y-%m-%d %H:%M')}  "
               f"({len(batch)} random targets from 60){C.E}")
-        print(f"{C.BOLD}{'═'*62}{C.E}")
+        print(f"{C.BOLD}{'='*62}{C.E}")
         dim("  " + "  ".join(f"[{t['_group'][0].upper()}]{t['name']}" for t in batch))
 
         for i, target in enumerate(batch, 1):
@@ -527,7 +527,7 @@ def main():
             json_path = save_json(result)
             append_csv(result)
             update_patterns(result)
-            dim(f"  saved → {json_path.name}")
+            dim(f"  saved -> {json_path.name}")
 
             if i < len(batch):
                 time.sleep(12)   # gap between audits in same batch

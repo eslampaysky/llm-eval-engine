@@ -29,6 +29,8 @@ class FailureType(StrEnum):
     BLOCKED_BY_BOT_PROTECTION = "blocked_by_bot_protection"
     CAPTCHA_REQUIRED = "captcha_required"
     SOFT_RECOVERY_EXHAUSTED = "soft_recovery_exhausted"
+    VARIANT_REQUIRED = "variant_required"
+    SELECTOR_NOT_FOUND = "selector_not_found"
 
 
 def _normalize_string_list(values: list[Any] | None) -> list[str]:
@@ -165,6 +167,8 @@ class VerificationResult:
     delta_summary: list[str] = field(default_factory=list)
     failure_type: str = "unknown"
     llm_used: bool = False
+    llm_trace: LLMTrace | None = None  # ← NEW: LLM tracing
+    diagnostic: DiagnosticInfo | None = None  # ← NEW: Rich diagnostics
 
 
 @dataclass
@@ -175,6 +179,43 @@ class RecoveryEvent:
     success: bool
     selector_used: str
     notes: str
+
+
+@dataclass
+class LLMTrace:
+    """Records LLM decisions and reasoning for transparency."""
+    used: bool = False
+    model: str | None = None
+    decision: str | None = None  # What decision was made
+    reasoning: str | None = None  # Why was it made
+    confidence: float = 0.0
+    phase: str | None = None  # action_resolution, verification, etc
+    tokens_input: int = 0
+    tokens_output: int = 0
+    input_data: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class DiagnosticInfo:
+    """Rich diagnostic context for failures."""
+    reason: str  # Short explanation
+    expected: str  # What we expected
+    actual: str  # What actually happened
+    evidence: list[str] = field(default_factory=list)  # Supporting facts
+    recommendations: list[str] = field(default_factory=list)  # How to fix
+    pattern_category: str = "unknown"  # e.g. "selector_issue", "modal_blocker", "async_delay"
+
+
+@dataclass
+class DecisionTrace:
+    """Phase-based decision tracking for transparency."""
+    timestamp: float
+    phase: str  # action_resolution, action_execution, verification, recovery
+    step_goal: str
+    decision: str  # What decision was made
+    outcome: str  # What happened
+    confidence: float = 0.5
+    data: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -192,6 +233,9 @@ class StepResult:
     before_snapshot: dict[str, Any] = field(default_factory=dict)
     after_snapshot: dict[str, Any] = field(default_factory=dict)
     screenshot_path: str | None = None
+    diagnostic: DiagnosticInfo | None = None  # ← NEW: Rich failure diagnostics
+    llm_trace: LLMTrace | None = None  # ← NEW: LLM decision tracing
+    decision_trace: list[DecisionTrace] = field(default_factory=list)  # ← NEW: Phase-based decisions
 
 
 def to_dict(value: Any) -> Any:

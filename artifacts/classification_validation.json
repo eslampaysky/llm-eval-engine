@@ -1,0 +1,257 @@
+{
+  "manifest": "configs\\calibration_targets.json",
+  "rows": [
+    {
+      "name": "Cookiebot",
+      "url": "https://www.cookiebot.com/en/",
+      "predicted": "marketing_site",
+      "expected": "marketing_site",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 80,
+      "signals": [
+        "Pricing",
+        "Signup",
+        "Features"
+      ]
+    },
+    {
+      "name": "Stripe",
+      "url": "https://stripe.com/",
+      "predicted": "marketing_site",
+      "expected": "marketing_site",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 80,
+      "signals": [
+        "Pricing link",
+        "Sign in and Sign up links",
+        "Contact sales link",
+        "Product marketing text"
+      ]
+    },
+    {
+      "name": "Linear",
+      "url": "https://linear.app/",
+      "predicted": "marketing_site",
+      "expected": "marketing_site",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 80,
+      "signals": [
+        "Pricing link",
+        "Signup and Login buttons",
+        "Product marketing text"
+      ]
+    },
+    {
+      "name": "Notion",
+      "url": "https://www.notion.so/",
+      "predicted": "marketing_site",
+      "expected": "marketing_site",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 80,
+      "signals": [
+        "Pricing",
+        "Signup",
+        "Product marketing"
+      ]
+    },
+    {
+      "name": "Vercel",
+      "url": "https://vercel.com/",
+      "predicted": "marketing_site",
+      "expected": "marketing_site",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 90,
+      "signals": [
+        "Pricing not found but docs, features, and signup dominate",
+        "Product marketing cues like 'Trusted by the best teams' and 'The latest posts and changes'"
+      ]
+    },
+    {
+      "name": "The Internet Login",
+      "url": "https://the-internet.herokuapp.com/login",
+      "predicted": "saas_auth",
+      "expected": "saas_auth",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 90,
+      "signals": [
+        "login form",
+        "username and password fields"
+      ]
+    },
+    {
+      "name": "Practice Test Automation Login",
+      "url": "https://practicetestautomation.com/practice-test-login/",
+      "predicted": "saas_auth",
+      "expected": "saas_auth",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 80,
+      "signals": [
+        "login page",
+        "username and password fields",
+        "submit button"
+      ]
+    },
+    {
+      "name": "OrangeHRM Demo",
+      "url": "https://opensource-demo.orangehrmlive.com/",
+      "predicted": "saas_auth",
+      "expected": "saas_auth",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 90,
+      "signals": [
+        "login button",
+        "username and password fields"
+      ]
+    },
+    {
+      "name": "Applitools Demo",
+      "url": "https://demo.applitools.com/",
+      "predicted": "saas_auth",
+      "expected": "saas_auth",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 90,
+      "signals": [
+        "Login Form",
+        "Sign in"
+      ]
+    },
+    {
+      "name": "TodoMVC React",
+      "url": "https://todomvc.com/examples/react/dist/",
+      "predicted": "task_manager",
+      "expected": "task_manager",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 90,
+      "signals": [
+        "Double-click to edit a todo",
+        "New Todo Input"
+      ]
+    },
+    {
+      "name": "TodoMVC Vanilla JS",
+      "url": "https://todomvc.com/examples/vanillajs/",
+      "predicted": "task_manager",
+      "expected": "task_manager",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 80,
+      "signals": [
+        "todo app",
+        "task management"
+      ]
+    },
+    {
+      "name": "Add Remove Elements",
+      "url": "https://the-internet.herokuapp.com/add_remove_elements/",
+      "predicted": "generic",
+      "expected": "generic",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 80,
+      "signals": [
+        "Add Element button",
+        "DOM elements management"
+      ]
+    },
+    {
+      "name": "SauceDemo",
+      "url": "https://www.saucedemo.com/",
+      "predicted": "ecommerce",
+      "expected": "ecommerce",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 80,
+      "signals": [
+        "cart",
+        "login",
+        "storefront"
+      ]
+    },
+    {
+      "name": "Automation Exercise",
+      "url": "https://automationexercise.com/",
+      "predicted": "ecommerce",
+      "expected": "ecommerce",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 90,
+      "signals": [
+        "product catalog",
+        "add-to-cart",
+        "cart",
+        "checkout"
+      ]
+    },
+    {
+      "name": "Advantage Online Shopping",
+      "url": "https://www.advantageonlineshopping.com",
+      "predicted": "ecommerce",
+      "expected": "ecommerce",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 90,
+      "signals": [
+        "product catalog",
+        "add-to-cart",
+        "cart",
+        "checkout"
+      ]
+    },
+    {
+      "name": "Demoblaze",
+      "url": "https://www.demoblaze.com",
+      "predicted": "ecommerce",
+      "expected": "ecommerce",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 90,
+      "signals": [
+        "product catalog",
+        "add-to-cart",
+        "cart",
+        "checkout"
+      ]
+    },
+    {
+      "name": "Dynamic Loading",
+      "url": "https://the-internet.herokuapp.com/dynamic_loading/2",
+      "predicted": "generic",
+      "expected": "generic",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 80,
+      "signals": [
+        "no product catalog",
+        "no login/signup form"
+      ]
+    },
+    {
+      "name": "Frames",
+      "url": "https://the-internet.herokuapp.com/frames",
+      "predicted": "generic",
+      "expected": "generic",
+      "correct": true,
+      "classifier_source": "llm",
+      "confidence": 0,
+      "signals": [
+        "no product catalog",
+        "no login or signup form"
+      ]
+    }
+  ],
+  "correct": 18,
+  "total": 18,
+  "accuracy": 1.0,
+  "success_threshold": 0.8,
+  "success": true
+}

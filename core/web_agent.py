@@ -23,6 +23,8 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_p
 
 from core.models import (
     ActionCandidate,
+    DecisionTrace,
+    DiagnosticInfo,
     FailureType,
     JourneyPlan,
     JourneyStep,
@@ -34,6 +36,7 @@ from core.models import (
     VerificationResult,
     to_dict,
 )
+from core.diagnostics import generate_diagnostic_for_failure, summarize_diagnostic
 
 _log = logging.getLogger(__name__)
 
@@ -66,6 +69,7 @@ STEP_TIMEOUT_SECONDS = 15
 MAX_RETRIES_PER_STEP = 2
 MAX_SOFT_RECOVERY_PER_STEP = 1
 MAX_TOTAL_STEPS_PER_JOURNEY = 30
+MAX_DECISION_TRACES_PER_STEP = 10  # Phase 3b: Limit decision trace payload to prevent bloat
 BOT_BLOCK_SIGNALS = (
     "sorry, you have been blocked",
     "attention required! | cloudflare",
@@ -702,9 +706,17 @@ async def _execute_candidate(
 
     if action_type == "click":
         try:
+            await locator.hover(timeout=1000)
+            await page.wait_for_timeout(150)
+        except Exception:
+            pass
+        try:
             await locator.click(timeout=STEP_TIMEOUT_SECONDS * 1000)
         except PlaywrightTimeoutError:
-            await locator.evaluate("(el) => el.click()")
+            try:
+                await locator.click(timeout=2000, force=True)
+            except Exception:
+                await locator.evaluate("(el) => el.click()")
     elif action_type == "fill":
         await locator.fill(resolved_value or "", timeout=STEP_TIMEOUT_SECONDS * 1000)
     elif action_type == "submit":
@@ -764,6 +776,380 @@ async def _signal_visible(page, value: Any) -> bool:
         return await locator.first.is_visible(timeout=600)
     except Exception:
         return False
+
+
+def _snapshot_looks_like_product_detail(snapshot: dict[str, Any]) -> bool:
+    url = str(snapshot.get("url") or "").lower()
+    text = str(snapshot.get("text_snippet") or "").lower()
+    return (
+        any(token in url for token in ("/product/", "/products/", "prod.html", "/dp/", "/item", "/book/"))
+        or "add to cart" in text
+        or "add to bag" in text
+        or "add to basket" in text
+    )
+
+
+def _pdp_variant_candidates() -> list[ActionCandidate]:
+    return [
+        ActionCandidate(
+            type="click",
+            intent="size option – first visible enabled option",
+            selectors=[
+                "[data-testid*='size'] button:not([disabled]):visible:first-of-type",
+                "[data-test*='size'] button:not([disabled]):visible:first-of-type",
+                "[aria-label*='size' i] button:not([disabled]):visible:first-of-type",
+                "[role='radiogroup'] [role='radio']:not([aria-disabled='true']):visible:first-of-type",
+                "button[aria-label*='size' i]:not([disabled]):visible:first-of-type",
+                "button[class*='size']:not([disabled]):visible:first-of-type",
+                "label[class*='size']:not([disabled]):visible:first-of-type",
+                "input[name*='size']:not([disabled]):visible:first-of-type",
+            ],
+            role="radio",
+            name="Size",
+            text="Size",
+        ),
+        ActionCandidate(
+            type="click",
+            intent="color/variant option – first visible enabled swatch or option",
+            selectors=[
+                "[data-testid*='color'] button:not([disabled]):visible:first-of-type",
+                "[data-testid*='variant'] button:not([disabled]):visible:first-of-type",
+                "[data-testid*='swatch'] button:not([disabled]):visible:first-of-type",
+                "[class*='variant'] button:not([disabled]):visible:first-of-type",
+                "[class*='swatch'] button:not([disabled]):visible:first-of-type",
+                "[class*='color-swatch'] button:not([disabled]):visible:first-of-type",
+                "button[aria-label*='color' i]:not([disabled]):visible:first-of-type",
+                "button[aria-label*='option' i]:not([disabled]):visible:first-of-type",
+                "select option:not([disabled]):not([value='']):first-of-type",
+            ],
+            role="radio",
+            name="Color/Variant",
+            text="Option",
+        ),
+        ActionCandidate(
+            type="click",
+            intent="select dropdown – choose first non-placeholder option",
+            selectors=[
+                "select:visible:first-of-type",
+                "[data-testid*='dropdown']:visible:first-of-type",
+                "[role='combobox']:visible:first-of-type",
+            ],
+            role="combobox",
+            name="Dropdown",
+            text="Select",
+        ),
+    ]
+
+
+async def _detect_required_variants(page) -> list[str]:
+    """
+    Detect required variant fields on a product detail page.
+    Returns list of required variant labels (e.g., ["Size", "Color"]).
+    Looks for:
+    - Labels with "required" or "*" marker
+    - Data attributes indicating required variant
+    - Error messages about missing selections
+    """
+    required_variants: list[str] = []
+    try:
+        # Check for elements with "required" in their attributes or visible text
+        required_indicators = [
+            "label:has-text('*')",  # Asterisk marker
+            "label:has-text('Required')",
+            "[data-testid*='required']",
+            "[aria-required='true']",
+            "div[class*='required']",
+        ]
+        
+        for selector in required_indicators:
+            try:
+                elements = await page.locator(selector).all()
+                for elem in elements[:3]:  # Limit to first 3 to avoid overhead
+                    text = await elem.inner_text()
+                    if any(kw in text.lower() for kw in ["size", "color", "variant", "option", "selection"]):
+                        label = text.strip()[:50]
+                        if label and label not in required_variants:
+                            required_variants.append(label)
+                            break
+            except Exception:
+                continue
+        
+        # Check for select elements without a value set (indicating selection needed)
+        try:
+            selects = await page.locator("select:visible").all()
+            for select in selects[:2]:
+                value = await select.input_value()
+                if not value:
+                    label_text = await select.evaluate("el => el.previousElementSibling?.textContent || el.getAttribute('aria-label') || ''")
+                    if label_text:
+                        required_variants.append(str(label_text).strip()[:50])
+        except Exception:
+            pass
+    except Exception as e:
+        _log.debug(f"Error detecting required variants: {e}")
+    
+    return required_variants
+
+
+def _pdp_cart_step() -> JourneyStep:
+    return JourneyStep(
+        goal="add_to_cart_from_detail",
+        intent="add to cart button on product detail page",
+        action_candidates=[
+            ActionCandidate(
+                type="click",
+                intent="add to cart button",
+                selectors=[
+                    "[translate='ADD_TO_CART']",
+                    "[ng-click*='addToCart']",
+                    "[ng-click*='AddToCart']",
+                    "button:has-text('Add to cart')",
+                    "button:has-text('ADD TO CART')",
+                    "button:has-text('Add To Cart')",
+                    "button:has-text('ADD TO BASKET')",
+                    "button:has-text('Add to bag')",
+                    "button:has-text('ADD TO BAG')",
+                    "a:has-text('Add to cart')",
+                    "a:has-text('ADD TO BASKET')",
+                    "button[name='save_to_cart']",
+                    "button[name='add']",
+                    "button[data-testid='add-to-cart']",
+                    "[onclick*='addToCart']",
+                    "[onclick*='add_to_cart']",
+                    ".btn-cart",
+                    "a.btn-success",
+                    "a[class*='add_to_cart_button']",
+                    "div.button_add_to_cart",
+                    "input[name='submit.add-to-cart']",
+                    "input[id='add-to-cart-button']",
+                    "#add-to-cart-button",
+                ],
+                role="button",
+                name="Add to cart",
+                text="Add to cart",
+            ),
+        ],
+        success_signals=[
+            SuccessSignal(type="element_visible", value="Cart", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="added", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Product added", priority="high", required=False),
+            SuccessSignal(type="text_present", value="Cart", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="View Basket", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="View Cart", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="items", priority="medium", required=False),
+            SuccessSignal(type="url_contains", value="cart", priority="high", required=False),
+        ],
+        expected_state_change={"cart_has_items": True},
+        allow_soft_recovery=False,
+    )
+
+
+async def _continue_add_to_cart_from_pdp(
+    page,
+    state: SessionState,
+    listing_step: JourneyStep,
+    listing_before_snapshot: dict[str, Any],
+    pdp_snapshot: dict[str, Any],
+) -> tuple[VerificationResult | None, dict[str, Any], list[dict[str, Any]], list[RecoveryEvent], list[str]]:
+    if listing_step.goal != "add_to_cart" or not _snapshot_looks_like_product_detail(pdp_snapshot):
+        return None, pdp_snapshot, [], [], []
+
+    continuation_step = _pdp_cart_step()
+    continuation_trace: list[dict[str, Any]] = []
+    continuation_recoveries: list[RecoveryEvent] = []
+    continuation_notes: list[str] = ["Listing fallback opened PDP; continuing add-to-cart on product detail page."]
+    current_snapshot = pdp_snapshot
+
+    # Detect and select required variants (Phase 2 enhancement)
+    required_variants = await _detect_required_variants(page)
+    variant_selection_attempted = False
+    if required_variants:
+        continuation_notes.append(f"Detected required variants: {', '.join(required_variants)}")
+        
+        # Try to select variants – pick first visible/enabled option for each type
+        for candidate in _pdp_variant_candidates():
+            try:
+                variant_action = await _execute_candidate(page, candidate, state)
+                continuation_trace.append(variant_action)
+                variant_selection_attempted = True
+                await _wait_for_transition(page, current_snapshot, timeout_ms=1200)
+                blocker_events = await dismiss_blockers(page, "post_navigation")
+                continuation_recoveries.extend(blocker_events)
+                _append_recovery_notes(continuation_notes, blocker_events)
+                current_snapshot = await _capture_page_snapshot(page)
+                continuation_notes.append(f"Variant selection: {candidate.intent}")
+            except Exception as exc:
+                continuation_notes.append(f"Variant selection failed for {candidate.intent}: {str(exc)[:100]}")
+                continue
+
+    # Now attempt add-to-cart
+    last_failure: VerificationResult | None = None
+    last_error: str | None = None
+    for candidate in _ordered_candidates_for_step(continuation_step):
+        add_before_snapshot = current_snapshot
+        try:
+            executed_action = await _execute_candidate(page, candidate, state)
+            continuation_trace.append(executed_action)
+            await _wait_for_transition(page, add_before_snapshot)
+            blocker_events = await dismiss_blockers(page, "post_navigation")
+            continuation_recoveries.extend(blocker_events)
+            _append_recovery_notes(continuation_notes, blocker_events)
+            current_snapshot = await _capture_page_snapshot(page)
+            verification = await verify_action_success(
+                page,
+                continuation_step,
+                state,
+                add_before_snapshot,
+                current_snapshot,
+            )
+            if (
+                not verification.success
+                and verification.passed_signals
+                and verification.failed_signals
+                and all(
+                    failed.get("type") == "expected_state_change"
+                    and failed.get("key") == "cart_has_items"
+                    for failed in verification.failed_signals
+                )
+            ):
+                verification = VerificationResult(
+                    success=True,
+                    passed_signals=verification.passed_signals + [{"type": "pdp_cart_continuation", "value": True}],
+                    failed_signals=[],
+                    delta_summary=verification.delta_summary,
+                    failure_type="none",
+                    llm_used=verification.llm_used,
+                )
+                continuation_notes.append("PDP continuation treated strong cart signals as success for listing add-to-cart.")
+            if verification.success:
+                verification.delta_summary = _snapshot_delta(listing_before_snapshot, current_snapshot)
+                return verification, current_snapshot, continuation_trace, continuation_recoveries, continuation_notes
+            last_failure = verification
+        except Exception as exc:
+            last_error = str(exc)[:300]
+            blocker_events = await dismiss_blockers(page, "post_failure")
+            continuation_recoveries.extend(blocker_events)
+            _append_recovery_notes(continuation_notes, blocker_events)
+            current_snapshot = await _capture_page_snapshot(page)
+            verification = await verify_action_success(
+                page,
+                continuation_step,
+                state,
+                add_before_snapshot,
+                current_snapshot,
+            )
+            if verification.success:
+                verification.delta_summary = _snapshot_delta(listing_before_snapshot, current_snapshot)
+                continuation_notes.append(f"PDP add-to-cart recovered after action error: {last_error}")
+                return verification, current_snapshot, continuation_trace, continuation_recoveries, continuation_notes
+            last_failure = VerificationResult(
+                success=False,
+                passed_signals=verification.passed_signals,
+                failed_signals=verification.failed_signals,
+                delta_summary=_snapshot_delta(listing_before_snapshot, current_snapshot),
+                failure_type="action_resolution_failed" if not required_variants or variant_selection_attempted else "variant_required",
+                llm_used=verification.llm_used,
+            )
+
+    if last_failure is not None and last_error:
+        continuation_notes.append(f"PDP continuation failed: {last_error}")
+    return last_failure, current_snapshot, continuation_trace, continuation_recoveries, continuation_notes
+
+
+async def _detect_cart_state_from_dom(page) -> dict[str, Any] | None:
+    badge_selectors = [
+        "[data-testid*='cart-count']",
+        "[data-test*='cart-count']",
+        "[data-testid*='bag-count']",
+        "[data-test*='bag-count']",
+        "[class*='cart-count']",
+        "[class*='cartCount']",
+        "[class*='bag-count']",
+        "[class*='bagCount']",
+        "[class*='basket-count']",
+        "[class*='basketCount']",
+        "a[href*='cart'] [class*='count']",
+        "button[aria-label*='cart' i] [class*='count']",
+        "button[aria-label*='bag' i] [class*='count']",
+    ]
+    for selector in badge_selectors:
+        try:
+            texts = await page.locator(selector).all_inner_texts()
+        except Exception:
+            continue
+        for text in texts:
+            digits = re.findall(r"\d+", str(text))
+            if digits and any(int(digit) > 0 for digit in digits):
+                return {"type": "dom_cart_badge", "value": selector}
+
+    visible_selectors = [
+        "[data-testid*='cart-item']",
+        "[data-test*='cart-item']",
+        "[class*='cart-item']",
+        "[class*='bag-item']",
+        "[class*='basket-item']",
+        "[class*='mini-cart']",
+        "[class*='minicart']",
+        "[class*='cart-drawer']",
+        "[class*='bag-drawer']",
+        "[class*='side-cart']",
+        "[role='dialog'] [href*='checkout']",
+        "[role='dialog'] button:has-text('Checkout')",
+        "[role='dialog'] a:has-text('Checkout')",
+        "[role='dialog'] button:has-text('View bag')",
+        "[role='dialog'] a:has-text('View bag')",
+        "[role='dialog'] button:has-text('View basket')",
+        "[role='dialog'] a:has-text('View basket')",
+        "[role='dialog'] button:has-text('View cart')",
+        "[role='dialog'] a:has-text('View cart')",
+    ]
+    for selector in visible_selectors:
+        try:
+            if await page.locator(selector).first.is_visible(timeout=800):
+                return {"type": "dom_cart_visible", "value": selector}
+        except Exception:
+            continue
+
+    try:
+        body_text = (await page.locator("body").inner_text(timeout=1200)).lower()
+    except Exception:
+        body_text = ""
+    
+    # Expanded confirmation text markers
+    cart_confirmation_markers = (
+        "added to cart",
+        "added to bag",
+        "added to basket",
+        "item added",
+        "product added",
+        "successfully added",
+        "view bag",
+        "view basket",
+        "view cart",
+        "your bag",
+        "your basket",
+        "your cart",
+        "cart subtotal",
+        "bag subtotal",
+        "basket subtotal",
+        "proceed to checkout",
+        "checkout securely",
+        "continue to checkout",
+        "go to checkout",
+        "review your cart",
+        "review your bag",
+        "order summary",
+        "1 item in",
+        "items in",
+        "shipping address",
+        "billing address",
+        "payment method",
+    )
+    for marker in cart_confirmation_markers:
+        if marker in body_text:
+            return {"type": "dom_cart_text", "value": marker}
+
+    return None
 
 
 async def verify_action_success(
@@ -862,6 +1248,11 @@ async def verify_action_success(
         cart_success_markers = ("view basket", "view cart", "added to cart", "added to basket", " items", "cart (", "basket (")
         if any(marker in after_text for marker in cart_success_markers) or "cart" in after_url:
             derived_state["cart_has_items"] = True
+        else:
+            cart_signal = await _detect_cart_state_from_dom(page)
+            if cart_signal:
+                derived_state["cart_has_items"] = True
+                passed_signals.append(cart_signal)
     if step.goal == "create_record":
         expected_text = _resolve_state_reference(step.input_bindings.get("value"), state) or step.input_bindings.get("value")
         if expected_text and str(expected_text).lower() in after_text:
@@ -971,12 +1362,184 @@ def _append_recovery_notes(notes: list[str], events: list[RecoveryEvent]) -> Non
             notes.append(event.notes)
 
 
+def _attach_diagnostic_to_failure(
+    verification_result: dict[str, Any],
+    step: JourneyStep,
+    candidates: list[dict[str, Any]],
+    before_snapshot: dict[str, Any],
+    after_snapshot: dict[str, Any],
+) -> dict[str, Any] | None:
+    """
+    Generate diagnostic info for a failed step.
+    Attaches rich failure context to help understand step execution failures.
+    
+    Returns DiagnosticInfo as dict, or None if not applicable.
+    """
+    try:
+        failure_type = verification_result.get("failure_type", "unknown")
+        if failure_type == "unknown":
+            return None
+        
+        # Extract relevant context for the diagnostic generator
+        expected_signals = []
+        if step.success_signals:
+            for s in step.success_signals:
+                # Handle both SuccessSignal objects and dicts
+                if hasattr(s, 'value'):
+                    expected_signals.append(str(s.value))
+                elif isinstance(s, dict) and 'value' in s:
+                    expected_signals.append(str(s['value']))
+        
+        context = {
+            "intent": step.intent or "",
+            "selectors": [c.get("selectors", []) for c in candidates][:5] if candidates else [],
+            "expected_signals": expected_signals,
+            "found_signals": [s.get("text") or s.get("value") for s in verification_result.get("passed_signals", [])],
+            "before_state": before_snapshot,
+            "after_state": after_snapshot,
+            "delta": verification_result.get("delta_summary", ""),
+        }
+        
+        # Generate diagnostic using the appropriate handler
+        diagnostic = generate_diagnostic_for_failure(
+            failure_type=failure_type,
+            goal=step.goal,
+            context=context,
+        )
+        
+        return to_dict(diagnostic) if diagnostic else None
+    except Exception as e:
+        # Diagnostics are observational; don't break execution if they fail
+        # Return structured fallback to ensure consistent output shape
+        fallback = DiagnosticInfo(
+            reason="diagnostic_generation_failed",
+            expected="diagnostic_generated",
+            actual="exception_during_diagnostic_generation",
+            evidence=[str(e)[:200]],
+            recommendations=["Check exception details in logs"],
+            pattern_category="internal_error",
+        )
+        return to_dict(fallback)
+
+
+def _record_decision_trace(
+    phase: str,
+    step_goal: str,
+    decision: str,
+    outcome: str,
+    confidence: float = 0.5,
+    data: dict[str, Any] | None = None,
+) -> DecisionTrace:
+    """
+    Record a decision made during step execution.
+    Lightweight trace capturing action, selector, retry count, recovery used.
+    
+    Args:
+        phase: "action_resolution", "action_execution", "verification", "recovery"
+        step_goal: Goal of the step
+        decision: What decision was made (e.g., "selected_selector_0_click")
+        outcome: What happened (e.g., "success", "timeout", "blocked")
+        confidence: 0.0-1.0 confidence in decision
+        data: Additional context (selector, attempt_count, recovery_type, etc)
+    """
+    import asyncio
+    import time
+    try:
+        timestamp = asyncio.get_running_loop().time()
+    except RuntimeError:
+        # Fallback for non-async context (e.g., testing)
+        timestamp = time.time()
+    
+    return DecisionTrace(
+        timestamp=timestamp,
+        phase=phase,
+        step_goal=step_goal,
+        decision=decision,
+        outcome=outcome,
+        confidence=confidence,
+        data=data or {},
+    )
+
+
+def _normalize_and_limit_decision_traces(traces: list[DecisionTrace]) -> list[dict[str, Any]]:
+    """
+    Normalize decision traces and limit payload size.
+    
+    Ensures:
+    - Phase names are consistent
+    - Confidence is meaningful (0.0-1.0, not arbitrary)
+    - Payload doesn't exceed MAX_DECISION_TRACES_PER_STEP
+    
+    Args:
+        traces: List of DecisionTrace objects
+    
+    Returns:
+        List of normalized dict traces, limited to MAX_DECISION_TRACES_PER_STEP
+    """
+    # Normalize phases to valid set
+    VALID_PHASES = {"action_resolution", "action_execution", "verification", "recovery"}
+    
+    normalized = []
+    for trace in traces:
+        # Ensure phase is from valid set (normalize if needed)
+        phase = trace.phase.lower().strip() if trace.phase else "action_execution"
+        if phase not in VALID_PHASES:
+            phase = "action_execution"  # Fallback
+        
+        # Ensure confidence is in [0.0, 1.0]
+        confidence = max(0.0, min(1.0, trace.confidence))
+        
+        # Convert to dict
+        trace_dict = to_dict(trace)
+        trace_dict["phase"] = phase
+        trace_dict["confidence"] = confidence
+        normalized.append(trace_dict)
+    
+    # Limit to prevent payload bloat
+    return normalized[:MAX_DECISION_TRACES_PER_STEP]
+
+
+
 async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, *, should_cancel: Callable[[], bool] | None = None) -> dict[str, Any]:
     step_results: list[dict[str, Any]] = []
     journey_status = "PASSED"
+    consecutive_failures = 0
+    journey_start_time = asyncio.get_running_loop().time()
+    max_journey_duration_seconds = 90  # Phase 2: enforce max 60-90 seconds per journey
+    early_stop_threshold = 3  # Phase 2: stop after 3 consecutive step failures
 
     for step_index, step in enumerate(plan.steps[:MAX_TOTAL_STEPS_PER_JOURNEY]):
         _raise_if_canceled(should_cancel)
+        
+        # Check journey duration (Phase 2 enhancement)
+        elapsed_seconds = asyncio.get_running_loop().time() - journey_start_time
+        if elapsed_seconds > max_journey_duration_seconds:
+            journey_status = "FAILED"
+            # Phase 3b: Attach diagnostic for timeout
+            timeout_diagnostic = generate_diagnostic_for_failure(
+                failure_type="timeout",
+                goal="journey_timeout",
+                context={
+                    "elapsed_seconds": elapsed_seconds,
+                    "max_duration": max_journey_duration_seconds,
+                    "step_count": len(step_results),
+                },
+            )
+            step_results.append(
+                to_dict(
+                    StepResult(
+                        step_name="journey_timeout",
+                        goal="journey_timeout",
+                        status="failed",
+                        failure_type="timeout",
+                        error=f"Journey exceeded {max_journey_duration_seconds}s time limit (elapsed: {elapsed_seconds:.1f}s)",
+                        diagnostic=to_dict(timeout_diagnostic) if timeout_diagnostic else None,
+                        decision_trace=[],  # Phase 3b: No step-level decisions for journey timeout
+                    )
+                )
+            )
+            break
+        
         step = _as_journey_step(step)
         recovery_attempts: list[RecoveryEvent] = []
         notes: list[str] = []
@@ -988,6 +1551,15 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
                 "Cloudflare or equivalent bot protection active — this is a site configuration issue, not an engine failure"
                 if blocked_failure == FailureType.BLOCKED_BY_BOT_PROTECTION
                 else "CAPTCHA or human-verification wall active — manual intervention required"
+            )
+            # Phase 3b: Attach diagnostic for bot protection
+            bot_diagnostic = generate_diagnostic_for_failure(
+                failure_type=blocked_failure.value,
+                goal=step.goal,
+                context={
+                    "reason": reason,
+                    "snapshot": before_snapshot,
+                },
             )
             step_results.append(
                 to_dict(
@@ -1010,6 +1582,8 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
                         notes=[reason],
                         before_snapshot=before_snapshot,
                         after_snapshot=before_snapshot,
+                        diagnostic=to_dict(bot_diagnostic) if bot_diagnostic else None,
+                        decision_trace=[],  # Phase 3b: Bot block is pre-action, no decisions
                     )
                 )
             )
@@ -1020,6 +1594,7 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
         verification_result = VerificationResult(success=False, failure_type="unknown")
         chosen_action: dict[str, Any] | None = None
         error_text: str | None = None
+        decisions: list[DecisionTrace] = []  # Phase 3b: Decision trace collection
 
         for attempt in range(MAX_RETRIES_PER_STEP):
             action_trace: list[dict[str, Any]] = []
@@ -1027,10 +1602,28 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
             if not candidates:
                 error_text = f"No action candidates available for step {step.goal}"
                 verification_result = VerificationResult(success=False, failure_type="action_resolution_failed")
+                # Phase 3b: Record decision for no candidates
+                decisions.append(_record_decision_trace(
+                    phase="action_resolution",
+                    step_goal=step.goal,
+                    decision="no_candidates",
+                    outcome="failure",
+                    confidence=1.0,
+                    data={"attempt": attempt + 1, "reason": "No action candidates available"},
+                ))
                 break
 
             try:
                 if _step_uses_fallback_candidates(step):
+                    # Phase 3b: Record decision for fallback mode
+                    decisions.append(_record_decision_trace(
+                        phase="action_resolution",
+                        step_goal=step.goal,
+                        decision="using_fallback_candidates",
+                        outcome="process_started",
+                        confidence=0.7,
+                        data={"attempt": attempt + 1, "candidate_count": len(candidates)},
+                    ))
                     last_after_snapshot = before_snapshot
                     last_failure: VerificationResult | None = None
                     for candidate in candidates:
@@ -1054,9 +1647,46 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
                                 before_snapshot,
                                 after_snapshot,
                             )
+                            # Phase 3b: Record action decision
+                            decisions.append(_record_decision_trace(
+                                phase="action_execution",
+                                step_goal=step.goal,
+                                decision=f"executed_{executed_action.get('type', 'action')}",
+                                outcome="verified" if candidate_verification.success else "verification_failed",
+                                confidence=0.8 if candidate_verification.success else 0.3,
+                                data={
+                                    "action_type": executed_action.get('type', 'unknown'),
+                                    "selector": executed_action.get('selector', ''),
+                                    "verification_success": candidate_verification.success,
+                                },
+                            ))
                             if candidate_verification.success:
                                 verification_result = candidate_verification
                                 chosen_action = {"fallback_sequence": action_trace}
+                                break
+                            pdp_verification, pdp_snapshot, pdp_trace, pdp_recoveries, pdp_notes = await _continue_add_to_cart_from_pdp(
+                                page,
+                                state,
+                                step,
+                                before_snapshot,
+                                after_snapshot,
+                            )
+                            if pdp_recoveries:
+                                recovery_attempts.extend(pdp_recoveries)
+                            if pdp_notes:
+                                notes.extend(pdp_notes)
+                            if pdp_trace:
+                                action_trace.extend(pdp_trace)
+                            if pdp_verification and pdp_verification.success:
+                                verification_result = pdp_verification
+                                after_snapshot = pdp_snapshot
+                                last_after_snapshot = pdp_snapshot
+                                chosen_action = {"fallback_sequence": action_trace}
+                                break
+                            if pdp_verification is not None:
+                                last_after_snapshot = pdp_snapshot
+                                last_failure = pdp_verification
+                                chosen_action = {"fallback_sequence": action_trace} if action_trace else None
                                 break
                             last_failure = candidate_verification
                         except Exception as candidate_exc:
@@ -1119,6 +1749,8 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
                     )
                 if verification_result.success:
                     _update_state_after_step(state, step, after_snapshot.get("url") or state.current_url, verification_result)
+                    # Phase 3b: Success cases have minimal diagnostics (observational only)
+                    success_diagnostic = None
                     step_results.append(
                         to_dict(
                             StepResult(
@@ -1132,6 +1764,8 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
                                 before_snapshot=before_snapshot,
                                 after_snapshot=after_snapshot,
                                 notes=notes,
+                                diagnostic=success_diagnostic,
+                                decision_trace=_normalize_and_limit_decision_traces(decisions),  # Phase 3b: Attach decision trace
                             )
                         )
                     )
@@ -1168,6 +1802,17 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
                         after_snapshot.get("url") or state.current_url,
                         verification_result,
                     )
+                    # Phase 3b: Recovery diagnostic for exception that was masked by signals
+                    recovery_diagnostic = generate_diagnostic_for_failure(
+                        failure_type="action_resolution_failed",
+                        goal=step.goal,
+                        context={
+                            "intent": step.intent or "",
+                            "error": error_text,
+                            "recovery_method": "success_signals_override",
+                            "found_signals": [s.get("text") for s in verification_result.passed_signals],
+                        },
+                    )
                     step_results.append(
                         to_dict(
                             StepResult(
@@ -1181,6 +1826,8 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
                                 before_snapshot=before_snapshot,
                                 after_snapshot=after_snapshot,
                                 notes=notes,
+                                diagnostic=to_dict(recovery_diagnostic) if recovery_diagnostic else None,
+                                decision_trace=_normalize_and_limit_decision_traces(decisions),  # Phase 3b: Attach decision trace
                             )
                         )
                     )
@@ -1196,7 +1843,18 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
 
         if not verification_result.success:
             journey_status = "FAILED"
+            consecutive_failures += 1  # Phase 2: track consecutive failures
             final_snapshot = await _capture_page_snapshot(page)
+            
+            # Phase 3b: Attach comprehensive diagnostic for failed step (PRIMARY INTEGRATION POINT)
+            failure_diagnostic = _attach_diagnostic_to_failure(
+                verification_result=to_dict(verification_result),
+                step=step,
+                candidates=candidates,
+                before_snapshot=before_snapshot,
+                after_snapshot=final_snapshot,
+            )
+            
             step_results.append(
                 to_dict(
                     StepResult(
@@ -1212,13 +1870,34 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
                         notes=notes,
                         before_snapshot=before_snapshot,
                         after_snapshot=final_snapshot,
+                        diagnostic=failure_diagnostic,
+                        decision_trace=_normalize_and_limit_decision_traces(decisions),  # Phase 3b: Attach decision trace (PRIMARY)
                     )
                 )
             )
-            break
+            
+            # Phase 2: Early stop after N consecutive failures
+            if consecutive_failures >= early_stop_threshold:
+                notes.append(f"Early stop: {consecutive_failures} consecutive step failures —stopping journey")
+                step_results[-1]["notes"] = notes
+                break
+            # Don't break on first failure; continue to next step (unless early stop threshold reached)
+            continue
+        else:
+            # Reset consecutive failures counter on success
+            consecutive_failures = 0
 
         if step_index + 1 >= MAX_TOTAL_STEPS_PER_JOURNEY:
             journey_status = "FAILED"
+            # Phase 3b: Attach diagnostic for journey step limit
+            limit_diagnostic = generate_diagnostic_for_failure(
+                failure_type="timeout",
+                goal="journey_limit",
+                context={
+                    "max_steps": MAX_TOTAL_STEPS_PER_JOURNEY,
+                    "steps_completed": len(step_results),
+                },
+            )
             step_results.append(
                 to_dict(
                     StepResult(
@@ -1227,6 +1906,8 @@ async def _run_structured_journey(page, plan: JourneyPlan, state: SessionState, 
                         status="failed",
                         failure_type="timeout",
                         error="Exceeded MAX_TOTAL_STEPS_PER_JOURNEY",
+                        diagnostic=to_dict(limit_diagnostic) if limit_diagnostic else None,
+                        decision_trace=[],  # Phase 3b: No step-level decisions for journey limit
                     )
                 )
             )

@@ -1,0 +1,289 @@
+{
+  "Asif Mani Jewellers": {
+    "status": "timeout",
+    "elapsed": 630,
+    "url": "https://asifmanijewellers.com"
+  },
+  "Pingstore": {
+    "status": "done",
+    "elapsed": 234,
+    "url": "https://getping.store",
+    "final": {
+      "audit_id": "f8f98e61-ac87-459e-ac44-193cde2e87d6",
+      "status": "done",
+      "url": "https://getping.store",
+      "tier": "deep",
+      "score": 60,
+      "confidence": 80,
+      "findings": [
+        {
+          "severity": "critical",
+          "category": "functionality",
+          "title": "Security Checkpoint Error",
+          "description": "The page displays a security checkpoint error, indicating a failure to verify the browser. This suggests an issue with the verification process or the server's ability to handle requests.",
+          "fix_prompt": "Investigate and resolve server-side issues causing the 429 status code and implement proper error handling for security checkpoints.",
+          "confidence": 80
+        },
+        {
+          "severity": "high",
+          "category": "performance",
+          "title": "Console Errors",
+          "description": "Console errors indicate a failed resource load with a 429 status code, suggesting server overload or rate limiting issues.",
+          "fix_prompt": "Identify and address server-side rate limiting or overload issues to prevent 429 status code errors.",
+          "confidence": 80
+        },
+        {
+          "severity": "medium",
+          "category": "content",
+          "title": "Lack of User Guidance",
+          "description": "The page lacks clear guidance or next steps for users encountering the security checkpoint error, leading to a poor user experience.",
+          "fix_prompt": "Add clear instructions or support links for users encountering the security checkpoint error to improve user experience.",
+          "confidence": 80
+        },
+        {
+          "severity": "low",
+          "category": "accessibility",
+          "title": "Insufficient Text Contrast",
+          "description": "The text on the page may have insufficient contrast with the background, potentially affecting readability for some users.",
+          "fix_prompt": "Ensure text meets accessibility contrast standards (WCAG 2.1) to improve readability for all users.",
+          "confidence": 80
+        }
+      ],
+      "summary": "The page encounters a security checkpoint error with a 429 status code, indicating server-side issues. Improvements are needed in error handling, user guidance, and accessibility.",
+      "bundled_fix_prompt": "I ran a reliability audit on https://getping.store and found the following issues.\nPlease fix all of them:\n\n1. [CRITICAL] Security Checkpoint Error\n   Fix: Investigate and resolve server-side issues causing the 429 status code and implement proper error handling for security checkpoints.\n\n2. [HIGH] Console Errors\n   Fix: Identify and address server-side rate limiting or overload issues to prevent 429 status code errors.\n\n3. [MEDIUM] Lack of User Guidance\n   Fix: Add clear instructions or support links for users encountering the security checkpoint error to improve user experience.\n\n4. [LOW] Insufficient Text Contrast\n   Fix: Ensure text meets accessibility contrast standards (WCAG 2.1) to improve readability for all users.\n\nAfter fixing all issues, make sure the site works correctly on both desktop (1280px) and mobile (390px) viewports.\n\nJourney context:\nState context: {\"base_url\": \"https://getping.store\", \"current_url\": \"https://getping.store\", \"auth\": {}, \"generated_credentials\": {}, \"inferred_context\": {\"app_type\": \"saas_auth\", \"features\": [\"login\", \"dashboard\", \"navigation\"], \"primary_goal\": \"reach dashboard\", \"site_description\": \"Store-in-bio ecommerce SaaS platform for D2C sellers, WhatsApp orders\", \"requires_auth_first\": true, \"confidence\": 80, \"reasoning\": \"The webpage is a Vercel Security Checkpoint, which suggests it is an authentication checkpoint for a SaaS platform.\"}, \"items\": {}, \"recovery_counters\": {\"login\": 1}, \"step_history\": []}\nJourney: register_login\n- Step login or sign in: failed | reason: Could not resolve action candidate: sign in button",
+      "journey_timeline": [
+        {
+          "journey": "register_login",
+          "app_type": "saas_auth",
+          "status": "FAILED",
+          "failed_step": "login or sign in",
+          "reason": "Could not resolve action candidate: sign in button",
+          "steps": [
+            {
+              "step": "login or sign in",
+              "status": "failed",
+              "failure_type": "action_resolution_failed",
+              "evidence_delta": [],
+              "recovery_attempts": [
+                {
+                  "choke_point": "after_failure",
+                  "blocker_type": "soft_recovery",
+                  "action_taken": "soft_recovery_home",
+                  "success": true,
+                  "selector_used": "",
+                  "notes": "Soft recovery executed to reset the page state"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "step_results": [
+        {
+          "step_name": "login or sign in",
+          "goal": "login",
+          "status": "failed",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [],
+            "failed_signals": [
+              {
+                "type": "expected_state_change",
+                "key": "is_logged_in",
+                "value": true,
+                "actual": null
+              }
+            ],
+            "delta_summary": [],
+            "failure_type": "action_resolution_failed",
+            "llm_used": true
+          },
+          "evidence_delta": [],
+          "recovery_attempts": [
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "soft_recovery",
+              "action_taken": "soft_recovery_home",
+              "success": true,
+              "selector_used": "",
+              "notes": "Soft recovery executed to reset the page state"
+            }
+          ],
+          "failure_type": "action_resolution_failed",
+          "error": "Could not resolve action candidate: sign in button",
+          "notes": [
+            "Soft recovery executed to reset the page state"
+          ],
+          "before_snapshot": {
+            "url": "https://getping.store/",
+            "title": "Vercel Security Checkpoint",
+            "text_snippet": "Failed to verify your browser\n\nCode 21\n\nVercel Security Checkpoint\n\n|\n\nfra1::1774220860-wtIZvvDYurmZqcHOqHiOiJfgo6xE2ZoH"
+          },
+          "after_snapshot": {
+            "url": "https://getping.store/",
+            "title": "Vercel Security Checkpoint",
+            "text_snippet": "We're verifying your browser\n\nVercel Security Checkpoint\n\n|\n\nfra1::1774220896-wtIZvvDYurmZqcHOqHiOiJfgo6xE2ZoH"
+          },
+          "screenshot_path": null
+        }
+      ],
+      "analysis_limited": false,
+      "video_url": "/agentic-qa/f8f98e61-ac87-459e-ac44-193cde2e87d6/video",
+      "desktop_screenshot_url": "/agentic-qa/f8f98e61-ac87-459e-ac44-193cde2e87d6/screenshot/desktop",
+      "mobile_screenshot_url": "/agentic-qa/f8f98e61-ac87-459e-ac44-193cde2e87d6/screenshot/mobile",
+      "created_at": "2026-03-22T23:04:28.655592+00:00"
+    }
+  },
+  "Planoraa": {
+    "status": "canceled",
+    "elapsed": 441,
+    "url": "https://planoraa.lovable.app",
+    "final": {
+      "audit_id": "2209bfff-ced2-43b0-b933-511e4265c85e",
+      "status": "canceled",
+      "url": "https://planoraa.lovable.app",
+      "tier": "deep",
+      "score": null,
+      "confidence": null,
+      "findings": null,
+      "summary": "Canceled by user",
+      "bundled_fix_prompt": null,
+      "journey_timeline": null,
+      "step_results": null,
+      "analysis_limited": false,
+      "video_url": null,
+      "desktop_screenshot_url": null,
+      "mobile_screenshot_url": null,
+      "created_at": "2026-03-22T23:08:39.260020+00:00"
+    }
+  },
+  "NicolasGrenie.com": {
+    "status": "timeout",
+    "elapsed": 632,
+    "url": "https://nicolasgrenie.com"
+  },
+  "REOR Consulting": {
+    "status": "done",
+    "elapsed": 505,
+    "url": "https://www.reorconsulting.com",
+    "final": {
+      "audit_id": "f364c721-10bc-4493-820f-ce532dbcc7dc",
+      "status": "done",
+      "url": "https://www.reorconsulting.com",
+      "tier": "deep",
+      "score": 90,
+      "confidence": 90,
+      "findings": [
+        {
+          "severity": "low",
+          "category": "performance",
+          "title": "Failed network requests",
+          "description": "There are 6 failed network requests for image files, which may impact page performance and user experience.",
+          "fix_prompt": "Investigate and fix the failed network requests by checking the URLs and ensuring the images are properly hosted and accessible.",
+          "confidence": 90
+        },
+        {
+          "severity": "medium",
+          "category": "content",
+          "title": "Missing alt text for images",
+          "description": "Some images on the page are missing alt text, which can impact accessibility and SEO.",
+          "fix_prompt": "Add alt text to all images on the page to improve accessibility and SEO.",
+          "confidence": 90
+        },
+        {
+          "severity": "low",
+          "category": "layout",
+          "title": "Inconsistent spacing",
+          "description": "There are some inconsistencies in spacing between elements on the page, which can impact visual appeal.",
+          "fix_prompt": "Review and adjust the spacing between elements to ensure a consistent design.",
+          "confidence": 90
+        }
+      ],
+      "summary": "The website has some minor issues with failed network requests, missing alt text, and inconsistent spacing, but overall it appears to be functional and visually appealing.",
+      "bundled_fix_prompt": "I ran a reliability audit on https://www.reorconsulting.com and found the following issues.\nPlease fix all of them:\n\n1. [LOW] Failed network requests\n   Fix: Investigate and fix the failed network requests by checking the URLs and ensuring the images are properly hosted and accessible.\n\n2. [MEDIUM] Missing alt text for images\n   Fix: Add alt text to all images on the page to improve accessibility and SEO.\n\n3. [LOW] Inconsistent spacing\n   Fix: Review and adjust the spacing between elements to ensure a consistent design.\n\nAfter fixing all issues, make sure the site works correctly on both desktop (1280px) and mobile (390px) viewports.\n\nJourney context:\nState context: {\"base_url\": \"https://www.reorconsulting.com\", \"current_url\": \"https://www.reorconsulting.com\", \"auth\": {}, \"generated_credentials\": {}, \"inferred_context\": {\"app_type\": \"saas_auth\", \"features\": [\"login\", \"dashboard\", \"navigation\"], \"primary_goal\": \"reach dashboard\", \"site_description\": \"AI-driven retail inventory SaaS B2B marketing site with pricing and demo CTA\", \"requires_auth_first\": false}, \"items\": {}, \"recovery_counters\": {\"login\": 1}, \"step_history\": []}\nJourney: register_login\n- Step login or sign in: failed | reason: Could not resolve action candidate: sign in button",
+      "journey_timeline": [
+        {
+          "journey": "register_login",
+          "app_type": "saas_auth",
+          "status": "FAILED",
+          "failed_step": "login or sign in",
+          "reason": "Could not resolve action candidate: sign in button",
+          "steps": [
+            {
+              "step": "login or sign in",
+              "status": "failed",
+              "failure_type": "action_resolution_failed",
+              "evidence_delta": [],
+              "recovery_attempts": [
+                {
+                  "choke_point": "after_failure",
+                  "blocker_type": "soft_recovery",
+                  "action_taken": "soft_recovery_home",
+                  "success": true,
+                  "selector_used": "",
+                  "notes": "Soft recovery executed to reset the page state"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "step_results": [
+        {
+          "step_name": "login or sign in",
+          "goal": "login",
+          "status": "failed",
+          "chosen_action": null,
+          "verification": {
+            "success": false,
+            "passed_signals": [],
+            "failed_signals": [
+              {
+                "type": "expected_state_change",
+                "key": "is_logged_in",
+                "value": true,
+                "actual": null
+              }
+            ],
+            "delta_summary": [],
+            "failure_type": "action_resolution_failed",
+            "llm_used": true
+          },
+          "evidence_delta": [],
+          "recovery_attempts": [
+            {
+              "choke_point": "after_failure",
+              "blocker_type": "soft_recovery",
+              "action_taken": "soft_recovery_home",
+              "success": true,
+              "selector_used": "",
+              "notes": "Soft recovery executed to reset the page state"
+            }
+          ],
+          "failure_type": "action_resolution_failed",
+          "error": "Could not resolve action candidate: sign in button",
+          "notes": [
+            "Soft recovery executed to reset the page state"
+          ],
+          "before_snapshot": {
+            "url": "https://www.reorconsulting.com/",
+            "title": "REOR Consulting | AI-Driven Retail Planning & Inventory Optimization",
+            "text_snippet": "Home\nAbout\nServices\nKnowledge Center\nBook a Demo\nUnlock the Future of Retail with Collaborative Intelligence\n\nREOR Consulting offers a unique Unified Data Warehouse that empowers businesses to optimize inventory and cash flow through advanced auto replenishment, allocation, demand forecasting, financial planning, and inventory control.\n\nOur platform provides actionable insights for effective decision-making, helping retailers streamline operations and drive growth.\n\nGet in Touch\nExplore Services\nPlanning\n\nWe offer end-to-end planning solution which covers financial budgeting, merchandising planning, markdown, margin and inventory planning (OTB/WSSI)\n\nInventory Optimization\n\nOur automation tool is an innovative solution that leverages artificial intelligence and machine learning to optimize"
+          },
+          "after_snapshot": {
+            "url": "https://www.reorconsulting.com/",
+            "title": "REOR Consulting - AI-Driven Retail Planning & Inventory Optimization",
+            "text_snippet": "Loading...\n\nEdit with"
+          },
+          "screenshot_path": null
+        }
+      ],
+      "analysis_limited": false,
+      "video_url": "/agentic-qa/f364c721-10bc-4493-820f-ce532dbcc7dc/video",
+      "desktop_screenshot_url": "/agentic-qa/f364c721-10bc-4493-820f-ce532dbcc7dc/screenshot/desktop",
+      "mobile_screenshot_url": "/agentic-qa/f364c721-10bc-4493-820f-ce532dbcc7dc/screenshot/mobile",
+      "created_at": "2026-03-22T23:27:05.973517+00:00"
+    }
+  }
+}

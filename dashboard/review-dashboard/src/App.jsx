@@ -1909,7 +1909,14 @@ export function ReportPage({ report, persona, overviewExtra = null }) {
   const bd = breakdownFromReport(report);
   const tf = topFailures(report);
   const rf = redFlags(report);
-  const results = report.results || [];
+  const aiResult = report.result || {};
+  const results = aiResult.findings || report.results || [];
+  const diagnosticsSummary = aiResult.diagnostics_summary;
+  const narrativeText =
+    typeof aiResult.summary_text === "string" ? aiResult.summary_text
+    : typeof aiResult.narrative === "string" ? aiResult.narrative
+    : aiResult.narrative?.executive_summary || "";
+  const decisionTrace = aiResult.decision_trace || aiResult.step_results || report.step_results;
 
   // PM view
   if (persona === 'pm') {
@@ -2165,10 +2172,23 @@ export function ReportPage({ report, persona, overviewExtra = null }) {
               ))}
             </div>
           )}
+          {diagnosticsSummary && (
+            <div className="card" style={{ marginBottom: 14 }}>
+              <div className="card-label">Diagnostics Overview</div>
+              <p style={{ fontSize: 13, color: 'var(--mid)', lineHeight: 1.5 }}>{diagnosticsSummary}</p>
+            </div>
+          )}
+          {narrativeText && (
+            <div className="card" style={{ marginBottom: 14 }}>
+              <div className="card-label">AI Narrative Summary</div>
+              <p style={{ fontSize: 13, color: 'var(--mid)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{narrativeText}</p>
+            </div>
+          )}
         </div>
       )}
 
       {tab === 'results' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="card">
           <div className="table-wrap">
             <table>
@@ -2184,11 +2204,11 @@ export function ReportPage({ report, persona, overviewExtra = null }) {
                   return [
                     <tr key={i} style={{ cursor: 'pointer' }} onClick={() => setOpen(p => { const s = new Set(p); s.has(i) ? s.delete(i) : s.add(i); return s; })}>
                       <td style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--mute)' }}>{i + 1}</td>
-                      <td><TypeChip type={r.test_type} /></td>
-                      <td style={{ color: 'var(--text)', maxWidth: 320 }}>{(r.question || '').slice(0, 80)}{r.question?.length > 80 ? '…' : ''}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: scoreColor(sc) }}>{sc.toFixed(1)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: r.hallucination ? 'var(--red)' : 'var(--green)', fontSize: 11 }}>
-                        {r.hallucination ? '⚠ yes' : '✓ no'}
+                      <td><TypeChip type={r.test_type || r.category} /></td>
+                      <td style={{ color: 'var(--text)', maxWidth: 320 }}>{(r.question || r.title || r.description || '').slice(0, 80)}{(r.question || r.title || r.description)?.length > 80 ? '…' : ''}</td>
+                      <td style={{ fontFamily: 'var(--mono)', color: scoreColor(sc || (r.confidence !== undefined ? r.confidence/10 : 5)) }}>{sc > 0 ? sc.toFixed(1) : (r.confidence !== undefined ? (r.confidence/10).toFixed(1) : '—')}</td>
+                      <td style={{ fontFamily: 'var(--mono)', color: ((r.hallucination || '').toString().toLowerCase() === 'true' || (r.severity || '').toString().toLowerCase() === 'critical') ? 'var(--red)' : 'var(--green)', fontSize: 11 }}>
+                        {((r.hallucination || '').toString().toLowerCase() === 'true' || (r.severity || '').toString().toLowerCase() === 'critical') ? '⚠ yes' : '✓ no'}
                       </td>
                     </tr>,
                     isOpen && (
@@ -2196,16 +2216,16 @@ export function ReportPage({ report, persona, overviewExtra = null }) {
                         <td colSpan={5} style={{ padding: '10px 14px', background: 'var(--bg2)' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                             <div>
-                              <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 4 }}>Model answer</div>
-                              <div style={{ fontSize: 12, color: 'var(--mid)' }}>{r.model_answer || '—'}</div>
+                              <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 4 }}>Model answer / Fix Prompt</div>
+                              <div style={{ fontSize: 12, color: 'var(--mid)' }}>{r.model_answer || r.fix_prompt || '—'}</div>
                             </div>
                             <div>
-                              <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 4 }}>Ground truth</div>
-                              <div style={{ fontSize: 12, color: 'var(--mid)' }}>{r.ground_truth || '—'}</div>
+                              <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 4 }}>Ground truth / Description</div>
+                              <div style={{ fontSize: 12, color: 'var(--mid)' }}>{r.ground_truth || r.description || '—'}</div>
                             </div>
                             <div style={{ gridColumn: '1 / -1' }}>
-                              <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 4 }}>Judge reasoning</div>
-                              <div style={{ fontSize: 11.5, color: 'var(--mute)' }}>{r.reason || '—'}</div>
+                              <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 4 }}>Judge reasoning / Extra Intel</div>
+                              <div style={{ fontSize: 11.5, color: 'var(--mute)' }}>{r.reason || `Severity: ${r.severity} - Confidence: ${r.confidence}`}</div>
                             </div>
                           </div>
                           {r.judges && Object.keys(r.judges).length > 1 && (
@@ -2241,6 +2261,19 @@ export function ReportPage({ report, persona, overviewExtra = null }) {
               </tbody>
             </table>
           </div>
+        </div>
+        
+        {decisionTrace && decisionTrace.length > 0 && (
+          <div className="card" style={{ marginTop: 14 }}>
+            <div className="card-label">Debug Panel · Decision Trace</div>
+            <div style={{ background: 'var(--bg2)', padding: 14, borderRadius: 6, maxHeight: 400, overflowY: 'auto' }}>
+              <pre style={{ margin: 0, fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--mute)' }}>
+                {Array.isArray(decisionTrace) ? decisionTrace.map(d => JSON.stringify(d)).join('\n') : JSON.stringify(decisionTrace, null, 2)}
+              </pre>
+            </div>
+          </div>
+        )}
+        
         </div>
       )}
 

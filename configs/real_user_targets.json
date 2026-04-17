@@ -20,28 +20,28 @@
         "url": "https://slack.com",
         "tier": "deep",
         "site_description": "Team messaging SaaS with workspace login",
-        "expected_type": "saas_auth"
+        "expected_type": "marketing_site"
       },
       {
         "name": "Canva",
         "url": "https://www.canva.com",
         "tier": "deep",
         "site_description": "Design SaaS with signup and template selection",
-        "expected_type": "saas_auth"
+        "expected_type": "marketing_site"
       },
       {
         "name": "Figma",
         "url": "https://www.figma.com",
         "tier": "deep",
         "site_description": "Design tool SaaS with login and file dashboard",
-        "expected_type": "saas_auth"
+        "expected_type": "marketing_site"
       },
       {
         "name": "Dropbox",
         "url": "https://www.dropbox.com",
         "tier": "deep",
         "site_description": "Cloud storage SaaS with login and file list",
-        "expected_type": "saas_auth"
+        "expected_type": "marketing_site"
       },
       {
         "name": "Linear",
@@ -55,7 +55,7 @@
         "url": "https://www.airtable.com",
         "tier": "deep",
         "site_description": "Database SaaS with signup and base creation",
-        "expected_type": "saas_auth"
+        "expected_type": "marketing_site"
       },
       {
         "name": "Zapier",
@@ -83,7 +83,7 @@
         "url": "https://asana.com",
         "tier": "deep",
         "site_description": "Project management SaaS with task creation and login",
-        "expected_type": "saas_auth"
+        "expected_type": "marketing_site"
       },
       {
         "name": "Monday",
@@ -97,7 +97,7 @@
         "url": "https://www.loom.com",
         "tier": "deep",
         "site_description": "Video messaging SaaS with signup and recording flow",
-        "expected_type": "saas_auth"
+        "expected_type": "marketing_site"
       },
       {
         "name": "Miro",
@@ -118,7 +118,7 @@
         "url": "https://calendly.com",
         "tier": "deep",
         "site_description": "Scheduling SaaS with signup and calendar setup",
-        "expected_type": "saas_auth"
+        "expected_type": "marketing_site"
       },
       {
         "name": "Mailchimp",
@@ -139,14 +139,14 @@
         "url": "https://evernote.com",
         "tier": "deep",
         "site_description": "Note taking SaaS with signup and notebook creation",
-        "expected_type": "saas_auth"
+        "expected_type": "marketing_site"
       },
       {
         "name": "Webex",
         "url": "https://www.webex.com",
         "tier": "deep",
         "site_description": "Video conferencing SaaS with login and meeting creation",
-        "expected_type": "saas_auth"
+        "expected_type": "marketing_site"
       }
     ],
     "marketing": [

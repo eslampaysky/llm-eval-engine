@@ -1,0 +1,1501 @@
+{
+  "timestamp": "1776351159.517368",
+  "validation_type": "REAL_ENGINE_TEST",
+  "overall_success_rate": 83.33333333333334,
+  "total_sites": 6,
+  "total_passed": 5,
+  "gate_passed": true,
+  "suites": [
+    {
+      "suite": "Ecommerce Hardening",
+      "total": 3,
+      "passed": 3,
+      "success_rate": 100.0,
+      "results": [
+        {
+          "site": "https://www.demoblaze.com",
+          "app_type": "ecommerce",
+          "primary_action_attempted": "add_to_cart_listing",
+          "success": true,
+          "failure_reason": "",
+          "recovery_count": 0,
+          "execution_time_seconds": 0.0,
+          "notes": "DemoBlaze - Simple product catalog with add-to-cart",
+          "journey_results": [
+            {
+              "journey": "direct_add_to_cart",
+              "app_type": "ecommerce",
+              "status": "PASSED",
+              "steps": [
+                {
+                  "step_name": "add to cart button on listing page",
+                  "goal": "add_to_cart",
+                  "status": "passed",
+                  "chosen_action": {
+                    "fallback_sequence": [
+                      {
+                        "type": "click",
+                        "intent": "add to cart button",
+                        "selectors": [
+                          ".product-card [data-test*='add-to-cart']",
+                          ".product-item [data-test*='add-to-cart']",
+                          ".product-card [data-testid*='add-to-cart']",
+                          ".product-item [data-testid*='add-to-cart']",
+                          "[data-test*='add-to-cart']",
+                          "[data-testid*='add-to-cart']",
+                          "[data-cy*='add-to-cart']",
+                          "[data-action*='add-to-cart']",
+                          "[data-action*='quick-add']",
+                          "[data-action*='quickadd']",
+                          "[data-qa*='add-to-cart']",
+                          "[aria-label*='add to cart' i]",
+                          "[aria-label*='add to bag' i]",
+                          "[aria-label*='add to basket' i]",
+                          "button:has-text('Add to cart')",
+                          "button:has-text('ADD TO CART')",
+                          "button:has-text('Add To Cart')",
+                          "button:has-text('Add to Cart')",
+                          "button:has-text('Add to bag')",
+                          "button:has-text('Add to Bag')",
+                          "button:has-text('ADD TO BAG')",
+                          "button:has-text('Add to basket')",
+                          "button:has-text('Add to Basket')",
+                          "button:has-text('ADD TO BASKET')",
+                          "button:has-text('Quick add')",
+                          "button:has-text('Quick Add')",
+                          "button:has-text('QUICK ADD')",
+                          "button:has-text('Quick shop')",
+                          "button:has-text('Quick Shop')",
+                          "button:has-text('Select options')",
+                          "button:has-text('Select Options')",
+                          "button:has-text('Choose size')",
+                          "button:has-text('Choose Size')",
+                          "button:has-text('View options')",
+                          "button:has-text('View Options')",
+                          "a:has-text('Add to cart')",
+                          "a:has-text('Add to Cart')",
+                          "a:has-text('Add to bag')",
+                          "a:has-text('ADD TO BASKET')",
+                          "a:has-text('Quick add')",
+                          "a:has-text('Quick Add')",
+                          "a:has-text('Quick shop')",
+                          "a:has-text('Select options')",
+                          "a:has-text('View options')",
+                          "button[class*='add-to-cart']",
+                          "button[class*='addtocart']",
+                          "button[class*='add_to_cart']",
+                          "button[class*='atc']",
+                          "button[class*='btn-cart']",
+                          "button[class*='quick-add']",
+                          "button[class*='quickadd']",
+                          "button[class*='quick-shop']",
+                          "button[class*='quickshop']",
+                          "button[class*='select-option']",
+                          "button[class*='selectOption']",
+                          "button[class*='choose-size']",
+                          "button[class*='chooseSize']",
+                          "button[class*='view-option']",
+                          "button[class*='viewOption']",
+                          "a[class*='add_to_cart_button']",
+                          "button[class*='AddToCart']",
+                          "button[name='add']",
+                          "button[name='add-to-cart']",
+                          "button[data-testid*='add-to-cart']",
+                          "button[data-testid*='quickAdd']",
+                          "button[data-testid*='quick-add']",
+                          "button[data-testid*='select-options']",
+                          "button[data-testid*='view-options']",
+                          "input[name='add-to-cart']",
+                          "input[name='submit.add-to-cart']",
+                          "input[id='add-to-cart-button']",
+                          "#add-to-cart-button",
+                          ".btn-cart",
+                          "button[id*='add-to-cart']",
+                          "button[id*='addtocart']",
+                          "[data-action*='cart']",
+                          "[onclick*='addToCart']",
+                          "[onclick*='add_to_cart']",
+                          "form[action*='cart'] button[type='submit']",
+                          "form[action*='cart'] input[type='submit']",
+                          ".product-card button",
+                          ".product-item button"
+                        ],
+                        "role": "button",
+                        "name": "Add to cart",
+                        "value": null
+                      },
+                      {
+                        "type": "click",
+                        "intent": "add to cart button",
+                        "selectors": [
+                          "[translate='ADD_TO_CART']",
+                          "[ng-click*='addToCart']",
+                          "[ng-click*='AddToCart']",
+                          "button:has-text('Add to cart')",
+                          "button:has-text('ADD TO CART')",
+                          "button:has-text('Add To Cart')",
+                          "button:has-text('ADD TO BASKET')",
+                          "button:has-text('Add to bag')",
+                          "button:has-text('ADD TO BAG')",
+                          "a:has-text('Add to cart')",
+                          "a:has-text('ADD TO BASKET')",
+                          "button[name='save_to_cart']",
+                          "button[name='add']",
+                          "button[data-testid='add-to-cart']",
+                          "[onclick*='addToCart']",
+                          "[onclick*='add_to_cart']",
+                          ".btn-cart",
+                          "a.btn-success",
+                          "a[class*='add_to_cart_button']",
+                          "div.button_add_to_cart",
+                          "input[name='submit.add-to-cart']",
+                          "input[id='add-to-cart-button']",
+                          "#add-to-cart-button"
+                        ],
+                        "role": "button",
+                        "name": "Add to cart",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "verification": {
+                    "success": true,
+                    "passed_signals": [
+                      {
+                        "type": "element_visible",
+                        "value": "Cart",
+                        "priority": "medium",
+                        "required": false
+                      },
+                      {
+                        "type": "text_present",
+                        "value": "Cart",
+                        "priority": "medium",
+                        "required": false
+                      },
+                      {
+                        "type": "pdp_cart_continuation",
+                        "value": true
+                      }
+                    ],
+                    "failed_signals": [],
+                    "delta_summary": [
+                      "URL changed from https://www.demoblaze.com/ to https://www.demoblaze.com/prod.html?idp_=1#",
+                      "New text appeared: '$360 *includes tax'",
+                      "New text appeared: 'About Us'",
+                      "New text appeared: 'Add to cart'"
+                    ],
+                    "failure_type": "none",
+                    "llm_used": false
+                  },
+                  "evidence_delta": [
+                    "URL changed from https://www.demoblaze.com/ to https://www.demoblaze.com/prod.html?idp_=1#",
+                    "New text appeared: '$360 *includes tax'",
+                    "New text appeared: 'About Us'",
+                    "New text appeared: 'Add to cart'"
+                  ],
+                  "recovery_attempts": [],
+                  "failure_type": null,
+                  "error": null,
+                  "notes": [
+                    "Listing fallback opened PDP; continuing add-to-cart on product detail page.",
+                    "PDP continuation failed: Could not resolve action candidate: add to cart button",
+                    "Listing fallback opened PDP; continuing add-to-cart on product detail page.",
+                    "PDP continuation treated strong cart signals as success for listing add-to-cart."
+                  ],
+                  "before_snapshot": {
+                    "url": "https://www.demoblaze.com/",
+                    "title": "STORE",
+                    "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nSamsung galaxy s6\n$360\n\nThe Samsung Galaxy S6 is powered by 1.5GHz octa-core Samsung Exynos 7420 processor and it comes with 3GB of RAM. The phone packs 32GB of internal storage cannot be expanded.\n\nNokia lumia 1520\n$820\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nNexus 6\n$650\n\nThe Motorola Google Nexus 6 is powered by 2.7GHz quad-core Qualcomm Snapdragon 805 processor and it comes with 3GB of RAM.\n\nSamsung galaxy s7\n$800\n\nThe Samsung Galaxy S7 is powered by 1.6GHz octa-core it comes with 4GB of RAM. The phone packs 32GB of internal storage that can be expanded up to 200GB via a microSD card.\n\nIphone 6 "
+                  },
+                  "after_snapshot": {
+                    "url": "https://www.demoblaze.com/prod.html?idp_=1#",
+                    "title": "STORE",
+                    "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nSamsung galaxy s6\n$360 *includes tax\n\nProduct description\n\nThe Samsung Galaxy S6 is powered by 1.5GHz octa-core Samsung Exynos 7420 processor and it comes with 3GB of RAM. The phone packs 32GB of internal storage cannot be expanded.\n\nAdd to cart\nAbout Us\n\nWe believe performance needs to be validated at every stage of the software development cycle and our open source compatible, massively scalable platform makes that a reality.\n\nGet in Touch\n\nAddress: 2390 El Camino Real\n\nPhone: +440 123456\n\nEmail: demo@blazemeter.com\n\n PRODUCT STORE\n\nCopyright \u00a9 Product Store"
+                  },
+                  "screenshot_path": null
+                }
+              ],
+              "state_snapshot_summary": {
+                "base_url": "https://www.demoblaze.com",
+                "current_url": "https://www.demoblaze.com/prod.html?idp_=1#",
+                "auth": {},
+                "generated_credentials": {},
+                "inferred_context": {
+                  "app_type": "ecommerce",
+                  "features": [
+                    "search",
+                    "cart",
+                    "checkout"
+                  ],
+                  "primary_goal": "purchase item",
+                  "site_description": null,
+                  "requires_auth_first": false,
+                  "classification_source": "structural"
+                },
+                "items": {
+                  "cart_has_items": true
+                },
+                "recovery_counters": {},
+                "step_history": [
+                  {
+                    "goal": "add_to_cart",
+                    "url": "https://www.demoblaze.com/prod.html?idp_=1#",
+                    "verification_success": true
+                  }
+                ]
+              }
+            },
+            {
+              "journey": "detail_then_cart",
+              "app_type": "ecommerce",
+              "status": "FAILED",
+              "steps": [
+                {
+                  "step_name": "product detail link or view details button",
+                  "goal": "open_product",
+                  "status": "passed",
+                  "chosen_action": {
+                    "fallback_sequence": [
+                      {
+                        "type": "click",
+                        "intent": "view details link",
+                        "selectors": [
+                          "a:has-text('View Details')",
+                          "a:has-text('View Product')",
+                          "a:has-text('See Details')",
+                          "a:has-text('More Info')",
+                          "a:has-text('Select options')",
+                          "a:has-text('Select Options')",
+                          "a:has-text('Choose size')",
+                          "a:has-text('Choose Size')",
+                          "a:has-text('View options')",
+                          "a:has-text('View Options')",
+                          "button:has-text('View product')",
+                          "button:has-text('View Product')",
+                          "button:has-text('View details')",
+                          "button:has-text('View Details')",
+                          "a.productName",
+                          "a[data-testid='product-card-link']",
+                          ".product-card_product-title-link__nDARd",
+                          "a[href*='product_details']",
+                          ".card-block h4.card-title a:visible",
+                          ".card h4.card-title a:visible",
+                          "a[href*='prod.html']:visible",
+                          "a.hrefch:visible",
+                          "a[href*='/products/'][href*='-']:not([href*='/collections/'])",
+                          "a[href*='/product/']",
+                          "a[href*='/book/']",
+                          "a[href*='/books/']",
+                          "a[href*='item']",
+                          "a[href*='/dp/']",
+                          ".card-title a",
+                          ".product-item-link",
+                          ".product-name a",
+                          ".product-title a",
+                          ".product-card [href*='/products/']",
+                          ".product-item [href*='/products/']",
+                          ".product-card [href*='/product/']",
+                          ".product-item [href*='/product/']",
+                          "h2 a",
+                          "h3 a",
+                          ".product-card a",
+                          ".product-item a",
+                          "div[id*='Img']",
+                          "[aria-label*='Category']"
+                        ],
+                        "role": "link",
+                        "name": "Product Link",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "verification": {
+                    "success": true,
+                    "passed_signals": [
+                      {
+                        "type": "url_matches",
+                        "value": "(?:/product/|/products/[^/?#]+(?:-[^/?#]+)+|/product_details/|/book/|/books/|/dp/|prod\\.html(?:\\?|#|$))",
+                        "priority": "high",
+                        "required": true
+                      },
+                      {
+                        "type": "url_contains",
+                        "value": "prod.html",
+                        "priority": "high",
+                        "required": false
+                      }
+                    ],
+                    "failed_signals": [],
+                    "delta_summary": [
+                      "URL changed from https://www.demoblaze.com/ to https://www.demoblaze.com/prod.html?idp_=1",
+                      "Visible text changed"
+                    ],
+                    "failure_type": "none",
+                    "llm_used": false
+                  },
+                  "evidence_delta": [
+                    "URL changed from https://www.demoblaze.com/ to https://www.demoblaze.com/prod.html?idp_=1",
+                    "Visible text changed"
+                  ],
+                  "recovery_attempts": [],
+                  "failure_type": null,
+                  "error": null,
+                  "notes": [],
+                  "before_snapshot": {
+                    "url": "https://www.demoblaze.com/",
+                    "title": "STORE",
+                    "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nPrevious\nNext\nCATEGORIES\nPhones\nLaptops\nMonitors\nSamsung galaxy s6\n$360\n\nThe Samsung Galaxy S6 is powered by 1.5GHz octa-core Samsung Exynos 7420 processor and it comes with 3GB of RAM. The phone packs 32GB of internal storage cannot be expanded.\n\nNokia lumia 1520\n$820\n\nThe Nokia Lumia 1520 is powered by 2.2GHz quad-core Qualcomm Snapdragon 800 processor and it comes with 2GB of RAM.\n\nNexus 6\n$650\n\nThe Motorola Google Nexus 6 is powered by 2.7GHz quad-core Qualcomm Snapdragon 805 processor and it comes with 3GB of RAM.\n\nSamsung galaxy s7\n$800\n\nThe Samsung Galaxy S7 is powered by 1.6GHz octa-core it comes with 4GB of RAM. The phone packs 32GB of internal storage that can be expanded up to 200GB via a microSD card.\n\nIphone 6 "
+                  },
+                  "after_snapshot": {
+                    "url": "https://www.demoblaze.com/prod.html?idp_=1",
+                    "title": "STORE",
+                    "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up"
+                  },
+                  "screenshot_path": null
+                },
+                {
+                  "step_name": "add to cart button on product detail page",
+                  "goal": "add_to_cart_from_detail",
+                  "status": "failed",
+                  "chosen_action": null,
+                  "verification": {
+                    "success": false,
+                    "passed_signals": [
+                      {
+                        "type": "element_visible",
+                        "value": "Cart",
+                        "priority": "medium",
+                        "required": false
+                      },
+                      {
+                        "type": "text_present",
+                        "value": "Cart",
+                        "priority": "medium",
+                        "required": false
+                      }
+                    ],
+                    "failed_signals": [
+                      {
+                        "type": "expected_state_change",
+                        "key": "cart_has_items",
+                        "value": true,
+                        "actual": null
+                      }
+                    ],
+                    "delta_summary": [
+                      "New text appeared: '$360 *includes tax'",
+                      "New text appeared: 'About Us'",
+                      "New text appeared: 'Add to cart'"
+                    ],
+                    "failure_type": "action_resolution_failed",
+                    "llm_used": true
+                  },
+                  "evidence_delta": [
+                    "New text appeared: '$360 *includes tax'",
+                    "New text appeared: 'About Us'",
+                    "New text appeared: 'Add to cart'"
+                  ],
+                  "recovery_attempts": [
+                    {
+                      "choke_point": "after_failure",
+                      "blocker_type": "soft_recovery",
+                      "action_taken": "soft_recovery_skipped",
+                      "success": false,
+                      "selector_used": "",
+                      "notes": "Soft recovery was attempted but did not restore the page state"
+                    }
+                  ],
+                  "failure_type": "action_resolution_failed",
+                  "error": "Could not resolve action candidate: add to cart button",
+                  "notes": [
+                    "Soft recovery was attempted but did not restore the page state"
+                  ],
+                  "before_snapshot": {
+                    "url": "https://www.demoblaze.com/prod.html?idp_=1",
+                    "title": "STORE",
+                    "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up"
+                  },
+                  "after_snapshot": {
+                    "url": "https://www.demoblaze.com/prod.html?idp_=1",
+                    "title": "STORE",
+                    "text_snippet": " PRODUCT STORE\nHome\n(current)\nContact\nAbout us\nCart\nLog in\nSign up\nSamsung galaxy s6\n$360 *includes tax\n\nProduct description\n\nThe Samsung Galaxy S6 is powered by 1.5GHz octa-core Samsung Exynos 7420 processor and it comes with 3GB of RAM. The phone packs 32GB of internal storage cannot be expanded.\n\nAdd to cart\nAbout Us\n\nWe believe performance needs to be validated at every stage of the software development cycle and our open source compatible, massively scalable platform makes that a reality.\n\nGet in Touch\n\nAddress: 2390 El Camino Real\n\nPhone: +440 123456\n\nEmail: demo@blazemeter.com\n\n PRODUCT STORE\n\nCopyright \u00a9 Product Store"
+                  },
+                  "screenshot_path": null
+                }
+              ],
+              "state_snapshot_summary": {
+                "base_url": "https://www.demoblaze.com",
+                "current_url": "https://www.demoblaze.com/prod.html?idp_=1",
+                "auth": {},
+                "generated_credentials": {},
+                "inferred_context": {
+                  "app_type": "ecommerce",
+                  "features": [
+                    "search",
+                    "cart",
+                    "checkout"
+                  ],
+                  "primary_goal": "purchase item",
+                  "site_description": null,
+                  "requires_auth_first": false,
+                  "classification_source": "structural"
+                },
+                "items": {},
+                "recovery_counters": {},
+                "step_history": [
+                  {
+                    "goal": "open_product",
+                    "url": "https://www.demoblaze.com/prod.html?idp_=1",
+                    "verification_success": true
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "site": "https://www.gymshark.com",
+          "app_type": "ecommerce",
+          "primary_action_attempted": "add_to_cart_with_variant",
+          "success": true,
+          "failure_reason": "",
+          "recovery_count": 0,
+          "execution_time_seconds": 0.0,
+          "notes": "Gymshark - Ecommerce with size/color variants",
+          "journey_results": [
+            {
+              "journey": "direct_add_to_cart",
+              "app_type": "ecommerce",
+              "status": "PASSED",
+              "steps": [
+                {
+                  "step_name": "add to cart button on listing page",
+                  "goal": "add_to_cart",
+                  "status": "passed",
+                  "chosen_action": {
+                    "fallback_sequence": [
+                      {
+                        "type": "click",
+                        "intent": "add to cart button",
+                        "selectors": [
+                          ".product-card [data-test*='add-to-cart']",
+                          ".product-item [data-test*='add-to-cart']",
+                          ".product-card [data-testid*='add-to-cart']",
+                          ".product-item [data-testid*='add-to-cart']",
+                          "[data-test*='add-to-cart']",
+                          "[data-testid*='add-to-cart']",
+                          "[data-cy*='add-to-cart']",
+                          "[data-action*='add-to-cart']",
+                          "[data-action*='quick-add']",
+                          "[data-action*='quickadd']",
+                          "[data-qa*='add-to-cart']",
+                          "[aria-label*='add to cart' i]",
+                          "[aria-label*='add to bag' i]",
+                          "[aria-label*='add to basket' i]",
+                          "button:has-text('Add to cart')",
+                          "button:has-text('ADD TO CART')",
+                          "button:has-text('Add To Cart')",
+                          "button:has-text('Add to Cart')",
+                          "button:has-text('Add to bag')",
+                          "button:has-text('Add to Bag')",
+                          "button:has-text('ADD TO BAG')",
+                          "button:has-text('Add to basket')",
+                          "button:has-text('Add to Basket')",
+                          "button:has-text('ADD TO BASKET')",
+                          "button:has-text('Quick add')",
+                          "button:has-text('Quick Add')",
+                          "button:has-text('QUICK ADD')",
+                          "button:has-text('Quick shop')",
+                          "button:has-text('Quick Shop')",
+                          "button:has-text('Select options')",
+                          "button:has-text('Select Options')",
+                          "button:has-text('Choose size')",
+                          "button:has-text('Choose Size')",
+                          "button:has-text('View options')",
+                          "button:has-text('View Options')",
+                          "a:has-text('Add to cart')",
+                          "a:has-text('Add to Cart')",
+                          "a:has-text('Add to bag')",
+                          "a:has-text('ADD TO BASKET')",
+                          "a:has-text('Quick add')",
+                          "a:has-text('Quick Add')",
+                          "a:has-text('Quick shop')",
+                          "a:has-text('Select options')",
+                          "a:has-text('View options')",
+                          "button[class*='add-to-cart']",
+                          "button[class*='addtocart']",
+                          "button[class*='add_to_cart']",
+                          "button[class*='atc']",
+                          "button[class*='btn-cart']",
+                          "button[class*='quick-add']",
+                          "button[class*='quickadd']",
+                          "button[class*='quick-shop']",
+                          "button[class*='quickshop']",
+                          "button[class*='select-option']",
+                          "button[class*='selectOption']",
+                          "button[class*='choose-size']",
+                          "button[class*='chooseSize']",
+                          "button[class*='view-option']",
+                          "button[class*='viewOption']",
+                          "a[class*='add_to_cart_button']",
+                          "button[class*='AddToCart']",
+                          "button[name='add']",
+                          "button[name='add-to-cart']",
+                          "button[data-testid*='add-to-cart']",
+                          "button[data-testid*='quickAdd']",
+                          "button[data-testid*='quick-add']",
+                          "button[data-testid*='select-options']",
+                          "button[data-testid*='view-options']",
+                          "input[name='add-to-cart']",
+                          "input[name='submit.add-to-cart']",
+                          "input[id='add-to-cart-button']",
+                          "#add-to-cart-button",
+                          ".btn-cart",
+                          "button[id*='add-to-cart']",
+                          "button[id*='addtocart']",
+                          "[data-action*='cart']",
+                          "[onclick*='addToCart']",
+                          "[onclick*='add_to_cart']",
+                          "form[action*='cart'] button[type='submit']",
+                          "form[action*='cart'] input[type='submit']",
+                          ".product-card button",
+                          ".product-item button"
+                        ],
+                        "role": "button",
+                        "name": "Add to cart",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "verification": {
+                    "success": true,
+                    "passed_signals": [
+                      {
+                        "type": "dom_cart_visible",
+                        "value": "[class*='minicart']"
+                      },
+                      {
+                        "type": "expected_state_change",
+                        "key": "cart_has_items",
+                        "value": true
+                      }
+                    ],
+                    "failed_signals": [],
+                    "delta_summary": [
+                      "New text appeared: 'The Mid-Season Sale is live, just in time for the new gym'",
+                      "New text appeared: 'UP TO 50% OFF*'"
+                    ],
+                    "failure_type": "none",
+                    "llm_used": false
+                  },
+                  "evidence_delta": [
+                    "New text appeared: 'The Mid-Season Sale is live, just in time for the new gym'",
+                    "New text appeared: 'UP TO 50% OFF*'"
+                  ],
+                  "recovery_attempts": [
+                    {
+                      "choke_point": "after_navigation",
+                      "blocker_type": "cookie_consent",
+                      "action_taken": "clicked_accept",
+                      "success": false,
+                      "selector_used": "button:has-text('Accept')",
+                      "notes": "Failed to clear cookie_consent using button:has-text('Accept')"
+                    },
+                    {
+                      "choke_point": "after_navigation",
+                      "blocker_type": "cookie_consent",
+                      "action_taken": "clicked_accept",
+                      "success": true,
+                      "selector_used": "button:has-text('Accept all')",
+                      "notes": "Cleared cookie_consent using button:has-text('Accept all')"
+                    }
+                  ],
+                  "failure_type": null,
+                  "error": null,
+                  "notes": [
+                    "Failed to clear cookie_consent using button:has-text('Accept')",
+                    "Cleared cookie_consent using button:has-text('Accept all')"
+                  ],
+                  "before_snapshot": {
+                    "url": "https://www.gymshark.com/",
+                    "title": "Gymshark Official Store | Gym Clothes & Workout Wear | Gymshark",
+                    "text_snippet": "Pause slide rotation\n12% Student Discount \u200d\ud83c\udf93\nSHOP NOW FOR UP TO 50% OFF | The Mid-Season Sale is live.\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nSHOP NOW FOR UP TO 50% OFF | The Mid-Season Sale is live.\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nAccessibility Statement\nSkip to content\nskip to Women\nWomen\nExpand Women\nskip to Men\nMen\nExpand Men\nskip to Accessories\nAccessories\nExpand Accessories\nSale\nExpand Sale\nSign in to get exclusive rewards & benefits\nNew Customer? Create account\nMID-SEASON SALE\n"
+                  },
+                  "after_snapshot": {
+                    "url": "https://www.gymshark.com/",
+                    "title": "Gymshark Official Store | Gym Clothes & Workout Wear | Gymshark",
+                    "text_snippet": "Pause slide rotation\n12% Student Discount \u200d\ud83c\udf93\nSHOP NOW FOR UP TO 50% OFF | The Mid-Season Sale is live.\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nSHOP NOW FOR UP TO 50% OFF | The Mid-Season Sale is live.\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nAccessibility Statement\nSkip to content\nskip to Women\nWomen\nExpand Women\nskip to Men\nMen\nExpand Men\nskip to Accessories\nAccessories\nExpand Accessories\nSale\nExpand Sale\nMID-SEASON SALE\nUP TO 50% OFF*\n\nThe Mid-Season Sale is live, just in time for the new gym"
+                  },
+                  "screenshot_path": null
+                }
+              ],
+              "state_snapshot_summary": {
+                "base_url": "https://www.gymshark.com",
+                "current_url": "https://www.gymshark.com/",
+                "auth": {},
+                "generated_credentials": {},
+                "inferred_context": {
+                  "app_type": "ecommerce",
+                  "features": [
+                    "search",
+                    "cart",
+                    "checkout"
+                  ],
+                  "primary_goal": "purchase item",
+                  "site_description": null,
+                  "requires_auth_first": false,
+                  "classification_source": "structural"
+                },
+                "items": {
+                  "cart_has_items": true
+                },
+                "recovery_counters": {},
+                "step_history": [
+                  {
+                    "goal": "add_to_cart",
+                    "url": "https://www.gymshark.com/",
+                    "verification_success": true
+                  }
+                ]
+              }
+            },
+            {
+              "journey": "detail_then_cart",
+              "app_type": "ecommerce",
+              "status": "PASSED",
+              "steps": [
+                {
+                  "step_name": "product detail link or view details button",
+                  "goal": "open_product",
+                  "status": "passed",
+                  "chosen_action": {
+                    "fallback_sequence": [
+                      {
+                        "type": "click",
+                        "intent": "view details link",
+                        "selectors": [
+                          "a:has-text('View Details')",
+                          "a:has-text('View Product')",
+                          "a:has-text('See Details')",
+                          "a:has-text('More Info')",
+                          "a:has-text('Select options')",
+                          "a:has-text('Select Options')",
+                          "a:has-text('Choose size')",
+                          "a:has-text('Choose Size')",
+                          "a:has-text('View options')",
+                          "a:has-text('View Options')",
+                          "button:has-text('View product')",
+                          "button:has-text('View Product')",
+                          "button:has-text('View details')",
+                          "button:has-text('View Details')",
+                          "a.productName",
+                          "a[data-testid='product-card-link']",
+                          ".product-card_product-title-link__nDARd",
+                          "a[href*='product_details']",
+                          ".card-block h4.card-title a:visible",
+                          ".card h4.card-title a:visible",
+                          "a[href*='prod.html']:visible",
+                          "a.hrefch:visible",
+                          "a[href*='/products/'][href*='-']:not([href*='/collections/'])",
+                          "a[href*='/product/']",
+                          "a[href*='/book/']",
+                          "a[href*='/books/']",
+                          "a[href*='item']",
+                          "a[href*='/dp/']",
+                          ".card-title a",
+                          ".product-item-link",
+                          ".product-name a",
+                          ".product-title a",
+                          ".product-card [href*='/products/']",
+                          ".product-item [href*='/products/']",
+                          ".product-card [href*='/product/']",
+                          ".product-item [href*='/product/']",
+                          "h2 a",
+                          "h3 a",
+                          ".product-card a",
+                          ".product-item a",
+                          "div[id*='Img']",
+                          "[aria-label*='Category']"
+                        ],
+                        "role": "link",
+                        "name": "Product Link",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "verification": {
+                    "success": true,
+                    "passed_signals": [
+                      {
+                        "type": "url_matches",
+                        "value": "(?:/product/|/products/[^/?#]+(?:-[^/?#]+)+|/product_details/|/book/|/books/|/dp/|prod\\.html(?:\\?|#|$))",
+                        "priority": "high",
+                        "required": true
+                      },
+                      {
+                        "type": "url_contains",
+                        "value": "/products/",
+                        "priority": "high",
+                        "required": false
+                      }
+                    ],
+                    "failed_signals": [],
+                    "delta_summary": [
+                      "URL changed from https://www.gymshark.com/ to https://www.gymshark.com/products/gymshark-arrival-woven-joggers-silhouette-grey-aw22",
+                      "New text appeared: 'This is an image gallery carousel with clickable slides. Activate any of the but'"
+                    ],
+                    "failure_type": "none",
+                    "llm_used": false
+                  },
+                  "evidence_delta": [
+                    "URL changed from https://www.gymshark.com/ to https://www.gymshark.com/products/gymshark-arrival-woven-joggers-silhouette-grey-aw22",
+                    "New text appeared: 'This is an image gallery carousel with clickable slides. Activate any of the but'"
+                  ],
+                  "recovery_attempts": [],
+                  "failure_type": null,
+                  "error": null,
+                  "notes": [],
+                  "before_snapshot": {
+                    "url": "https://www.gymshark.com/",
+                    "title": "Gymshark Official Store | Gym Clothes & Workout Wear | Gymshark",
+                    "text_snippet": "Pause slide rotation\n12% Student Discount \u200d\ud83c\udf93\nSHOP NOW FOR UP TO 50% OFF | The Mid-Season Sale is live.\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nSHOP NOW FOR UP TO 50% OFF | The Mid-Season Sale is live.\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nAccessibility Statement\nSkip to content\nskip to Women\nWomen\nExpand Women\nskip to Men\nMen\nExpand Men\nskip to Accessories\nAccessories\nExpand Accessories\nSale\nExpand Sale\nSign in to get exclusive rewards & benefits\nNew Customer? Create account\nMID-SEASON SALE\n"
+                  },
+                  "after_snapshot": {
+                    "url": "https://www.gymshark.com/products/gymshark-arrival-woven-joggers-silhouette-grey-aw22",
+                    "title": "Gymshark Arrival Joggers - Silhouette Grey | Gymshark",
+                    "text_snippet": "Pause slide rotation\n12% Student Discount \u200d\ud83c\udf93\nSHOP NOW FOR UP TO 50% OFF | The Mid-Season Sale is live.\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nSHOP NOW FOR UP TO 50% OFF | The Mid-Season Sale is live.\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nAccessibility Statement\nSkip to content\nskip to Women\nWomen\nExpand Women\nskip to Men\nMen\nExpand Men\nskip to Accessories\nAccessories\nExpand Accessories\nSale\nExpand Sale\n\nThis is an image gallery carousel with clickable slides. Activate any of the buttons to "
+                  },
+                  "screenshot_path": null
+                },
+                {
+                  "step_name": "add to cart button on product detail page",
+                  "goal": "add_to_cart_from_detail",
+                  "status": "passed",
+                  "chosen_action": {
+                    "fallback_sequence": [
+                      {
+                        "type": "click",
+                        "intent": "add to cart button",
+                        "selectors": [
+                          "[translate='ADD_TO_CART']",
+                          "[ng-click*='addToCart']",
+                          "[ng-click*='AddToCart']",
+                          "button:has-text('Add to cart')",
+                          "button:has-text('ADD TO CART')",
+                          "button:has-text('Add To Cart')",
+                          "button:has-text('ADD TO BASKET')",
+                          "button:has-text('Add to bag')",
+                          "button:has-text('ADD TO BAG')",
+                          "a:has-text('Add to cart')",
+                          "a:has-text('ADD TO BASKET')",
+                          "button[name='save_to_cart']",
+                          "button[name='add']",
+                          "button[data-testid='add-to-cart']",
+                          "[onclick*='addToCart']",
+                          "[onclick*='add_to_cart']",
+                          ".btn-cart",
+                          "a.btn-success",
+                          "a[class*='add_to_cart_button']",
+                          "div.button_add_to_cart",
+                          "input[name='submit.add-to-cart']",
+                          "input[id='add-to-cart-button']",
+                          "#add-to-cart-button"
+                        ],
+                        "role": "button",
+                        "name": "Add to cart",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "verification": {
+                    "success": true,
+                    "passed_signals": [
+                      {
+                        "type": "element_visible",
+                        "value": "Checkout",
+                        "priority": "high",
+                        "required": false
+                      },
+                      {
+                        "type": "text_present",
+                        "value": "Shipping",
+                        "priority": "low",
+                        "required": false
+                      },
+                      {
+                        "type": "dom_cart_visible",
+                        "value": "[class*='minicart']"
+                      },
+                      {
+                        "type": "expected_state_change",
+                        "key": "cart_has_items",
+                        "value": true
+                      }
+                    ],
+                    "failed_signals": [],
+                    "delta_summary": [],
+                    "failure_type": "none",
+                    "llm_used": true
+                  },
+                  "evidence_delta": [],
+                  "recovery_attempts": [],
+                  "failure_type": null,
+                  "error": null,
+                  "notes": [],
+                  "before_snapshot": {
+                    "url": "https://www.gymshark.com/products/gymshark-arrival-woven-joggers-silhouette-grey-aw22",
+                    "title": "Gymshark Arrival Joggers - Silhouette Grey | Gymshark",
+                    "text_snippet": "Pause slide rotation\n12% Student Discount \u200d\ud83c\udf93\nSHOP NOW FOR UP TO 50% OFF | The Mid-Season Sale is live.\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nSHOP NOW FOR UP TO 50% OFF | The Mid-Season Sale is live.\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nAccessibility Statement\nSkip to content\nskip to Women\nWomen\nExpand Women\nskip to Men\nMen\nExpand Men\nskip to Accessories\nAccessories\nExpand Accessories\nSale\nExpand Sale\n\nThis is an image gallery carousel with clickable slides. Activate any of the buttons to "
+                  },
+                  "after_snapshot": {
+                    "url": "https://www.gymshark.com/products/gymshark-arrival-woven-joggers-silhouette-grey-aw22",
+                    "title": "Gymshark Arrival Joggers - Silhouette Grey | Gymshark",
+                    "text_snippet": "Pause slide rotation\n12% Student Discount \u200d\ud83c\udf93\nSHOP NOW FOR UP TO 50% OFF | The Mid-Season Sale is live.\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nSHOP NOW FOR UP TO 50% OFF | The Mid-Season Sale is live.\nFree standard shipping on orders over $75 \ud83d\ude9a\nRefer A Friend To Earn $10 Off Your Next Purchase Of $50+ \ud83d\udc6d\nGet 10% off your first order when you sign up to our emails \u2709\ufe0f\n12% Student Discount \u200d\ud83c\udf93\nAccessibility Statement\nSkip to content\nskip to Women\nWomen\nExpand Women\nskip to Men\nMen\nExpand Men\nskip to Accessories\nAccessories\nExpand Accessories\nSale\nExpand Sale\n\nThis is an image gallery carousel with clickable slides. Activate any of the buttons to "
+                  },
+                  "screenshot_path": null
+                }
+              ],
+              "state_snapshot_summary": {
+                "base_url": "https://www.gymshark.com",
+                "current_url": "https://www.gymshark.com/products/gymshark-arrival-woven-joggers-silhouette-grey-aw22",
+                "auth": {},
+                "generated_credentials": {},
+                "inferred_context": {
+                  "app_type": "ecommerce",
+                  "features": [
+                    "search",
+                    "cart",
+                    "checkout"
+                  ],
+                  "primary_goal": "purchase item",
+                  "site_description": null,
+                  "requires_auth_first": false,
+                  "classification_source": "structural"
+                },
+                "items": {
+                  "cart_has_items": true
+                },
+                "recovery_counters": {},
+                "step_history": [
+                  {
+                    "goal": "open_product",
+                    "url": "https://www.gymshark.com/products/gymshark-arrival-woven-joggers-silhouette-grey-aw22",
+                    "verification_success": true
+                  },
+                  {
+                    "goal": "add_to_cart_from_detail",
+                    "url": "https://www.gymshark.com/products/gymshark-arrival-woven-joggers-silhouette-grey-aw22",
+                    "verification_success": true
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "site": "https://www.advantageonlineshopping.com",
+          "app_type": "ecommerce",
+          "primary_action_attempted": "checkout_flow",
+          "success": true,
+          "failure_reason": "",
+          "recovery_count": 0,
+          "execution_time_seconds": 0.0,
+          "notes": "Advantage Online Shopping - Full checkout flow",
+          "journey_results": [
+            {
+              "journey": "direct_add_to_cart",
+              "app_type": "ecommerce",
+              "status": "PASSED",
+              "steps": [
+                {
+                  "step_name": "add to cart button on listing page",
+                  "goal": "add_to_cart",
+                  "status": "passed",
+                  "chosen_action": {
+                    "fallback_sequence": [
+                      {
+                        "type": "click",
+                        "intent": "first product detail link",
+                        "selectors": [
+                          ".product-card [href*='/products/']",
+                          ".product-item [href*='/products/']",
+                          ".product-card [href*='/product/']",
+                          ".product-item [href*='/product/']",
+                          ".card-block h4.card-title a:visible",
+                          ".card h4.card-title a:visible",
+                          "a[href*='prod.html']:visible",
+                          "a.hrefch:visible",
+                          "a[href*='/products/'][href*='-']:not([href*='/collections/'])",
+                          "a[href*='/product/']",
+                          "a[href*='/book/']",
+                          "a[href*='/books/']",
+                          "a[href*='item']",
+                          "a[href*='/dp/']",
+                          ".card-title a",
+                          ".product-item-link",
+                          ".product-name a",
+                          ".product-title a",
+                          ".product-item a:first-of-type",
+                          ".product-card a:first-of-type",
+                          "a[href*='/product/']:first-of-type"
+                        ],
+                        "role": "link",
+                        "name": "Product Link",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "verification": {
+                    "success": true,
+                    "passed_signals": [
+                      {
+                        "type": "text_present",
+                        "value": "item",
+                        "priority": "low",
+                        "required": false
+                      },
+                      {
+                        "type": "expected_state_change",
+                        "key": "cart_has_items",
+                        "value": true
+                      }
+                    ],
+                    "failed_signals": [],
+                    "delta_summary": [
+                      "URL changed from https://www.advantageonlineshopping.com/#/ to https://www.advantageonlineshopping.com/#/product/3"
+                    ],
+                    "failure_type": "none",
+                    "llm_used": false
+                  },
+                  "evidence_delta": [
+                    "URL changed from https://www.advantageonlineshopping.com/#/ to https://www.advantageonlineshopping.com/#/product/3"
+                  ],
+                  "recovery_attempts": [],
+                  "failure_type": null,
+                  "error": null,
+                  "notes": [],
+                  "before_snapshot": {
+                    "url": "https://www.advantageonlineshopping.com/#/",
+                    "title": "\u00a0Advantage Shopping",
+                    "text_snippet": " \n \n \n \n \n \nCONTACT US\n \nPOPULAR ITEMS\n \nSPECIAL OFFER\n \nOUR PRODUCTS\n dvantage DEMO\nSPEAKERS\nShop Now\n\t\nTABLETS\nShop Now\n\t\n\nLAPTOPS\nShop Now\n\t\nMICE\nShop Now\n\t\nHEADPHONES\nShop Now\nSPECIAL OFFER\n\t\nEXPLORE THE NEW DESIGN\nHP Pavilion 15z Touch Laptop\n\nSupremely thin, yet incredibly durable\n\nSEE OFFER\nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nEXPLORE OUR LATEST\nINNOVATIVE PRODUCTS\nEXPLORE NOW\nSTART EXPLORING HP NOTEBOOKS\nEXPLORE NOW\n \nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nPOPULAR ITEMS\n\nHP ELITEPAD 1000 G2 TABLET\n\nView Details\n\nHP ELITEBOOK FOLIO\n\nView Details\n\nHP ROAR PLUS WIRELESS SPEAKER\n\nView Details\nCHAT WITH US\n\t\nCONTACT US\nSelect Category\nLaptops\nHeadphones\nTablets\nSpeakers\nMice\nCategory\nSelect Product\nProduct\n*\nEmail\n \n*\nSubject\nSEND\nFOLLOW US\n  \n\u00a9 Advantage Inc, 2024. Release 3.3"
+                  },
+                  "after_snapshot": {
+                    "url": "https://www.advantageonlineshopping.com/#/product/3",
+                    "title": "\u00a0Advantage Shopping",
+                    "text_snippet": " \n \n \n \n \n \nCONTACT US\n \nPOPULAR ITEMS\n \nSPECIAL OFFER\n \nOUR PRODUCTS\n dvantage DEMO\nSPEAKERS\nShop Now\n\t\nTABLETS\nShop Now\n\t\n\nLAPTOPS\nShop Now\n\t\nMICE\nShop Now\n\t\nHEADPHONES\nShop Now\nSPECIAL OFFER\n\t\nEXPLORE THE NEW DESIGN\nHP Pavilion 15z Touch Laptop\n\nSupremely thin, yet incredibly durable\n\nSEE OFFER\nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nEXPLORE OUR LATEST\nINNOVATIVE PRODUCTS\nEXPLORE NOW\nSTART EXPLORING HP NOTEBOOKS\nEXPLORE NOW\n \nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nPOPULAR ITEMS\n\nHP ELITEPAD 1000 G2 TABLET\n\nView Details\n\nHP ELITEBOOK FOLIO\n\nView Details\n\nHP ROAR PLUS WIRELESS SPEAKER\n\nView Details\nCHAT WITH US\n\t\nCONTACT US\nSelect Category\nLaptops\nHeadphones\nTablets\nSpeakers\nMice\nCategory\nSelect Product\nProduct\n*\nEmail\n \n*\nSubject\nSEND\nFOLLOW US\n  \n\u00a9 Advantage Inc, 2024. Release 3.3"
+                  },
+                  "screenshot_path": null
+                }
+              ],
+              "state_snapshot_summary": {
+                "base_url": "https://www.advantageonlineshopping.com",
+                "current_url": "https://www.advantageonlineshopping.com/#/product/3",
+                "auth": {},
+                "generated_credentials": {},
+                "inferred_context": {
+                  "app_type": "ecommerce",
+                  "features": [
+                    "search",
+                    "cart",
+                    "checkout"
+                  ],
+                  "primary_goal": "purchase item",
+                  "site_description": null,
+                  "requires_auth_first": false,
+                  "classification_source": "structural"
+                },
+                "items": {
+                  "cart_has_items": true
+                },
+                "recovery_counters": {},
+                "step_history": [
+                  {
+                    "goal": "add_to_cart",
+                    "url": "https://www.advantageonlineshopping.com/#/product/3",
+                    "verification_success": true
+                  }
+                ]
+              }
+            },
+            {
+              "journey": "detail_then_cart",
+              "app_type": "ecommerce",
+              "status": "FAILED",
+              "steps": [
+                {
+                  "step_name": "product detail link or view details button",
+                  "goal": "open_product",
+                  "status": "passed",
+                  "chosen_action": {
+                    "fallback_sequence": [
+                      {
+                        "type": "click",
+                        "intent": "view details link",
+                        "selectors": [
+                          "a:has-text('View Details')",
+                          "a:has-text('View Product')",
+                          "a:has-text('See Details')",
+                          "a:has-text('More Info')",
+                          "a:has-text('Select options')",
+                          "a:has-text('Select Options')",
+                          "a:has-text('Choose size')",
+                          "a:has-text('Choose Size')",
+                          "a:has-text('View options')",
+                          "a:has-text('View Options')",
+                          "button:has-text('View product')",
+                          "button:has-text('View Product')",
+                          "button:has-text('View details')",
+                          "button:has-text('View Details')",
+                          "a.productName",
+                          "a[data-testid='product-card-link']",
+                          ".product-card_product-title-link__nDARd",
+                          "a[href*='product_details']",
+                          ".card-block h4.card-title a:visible",
+                          ".card h4.card-title a:visible",
+                          "a[href*='prod.html']:visible",
+                          "a.hrefch:visible",
+                          "a[href*='/products/'][href*='-']:not([href*='/collections/'])",
+                          "a[href*='/product/']",
+                          "a[href*='/book/']",
+                          "a[href*='/books/']",
+                          "a[href*='item']",
+                          "a[href*='/dp/']",
+                          ".card-title a",
+                          ".product-item-link",
+                          ".product-name a",
+                          ".product-title a",
+                          ".product-card [href*='/products/']",
+                          ".product-item [href*='/products/']",
+                          ".product-card [href*='/product/']",
+                          ".product-item [href*='/product/']",
+                          "h2 a",
+                          "h3 a",
+                          ".product-card a",
+                          ".product-item a",
+                          "div[id*='Img']",
+                          "[aria-label*='Category']"
+                        ],
+                        "role": "link",
+                        "name": "Product Link",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "verification": {
+                    "success": true,
+                    "passed_signals": [
+                      {
+                        "type": "url_matches",
+                        "value": "(?:/product/|/products/[^/?#]+(?:-[^/?#]+)+|/product_details/|/book/|/books/|/dp/|prod\\.html(?:\\?|#|$))",
+                        "priority": "high",
+                        "required": true
+                      },
+                      {
+                        "type": "url_contains",
+                        "value": "/product/",
+                        "priority": "high",
+                        "required": false
+                      }
+                    ],
+                    "failed_signals": [],
+                    "delta_summary": [
+                      "URL changed from https://www.advantageonlineshopping.com/#/ to https://www.advantageonlineshopping.com/#/product/16",
+                      "New text appeared: 'GO UP'",
+                      "New text appeared: '\u00a9 Advantage Inc, 2024. Release 3.'"
+                    ],
+                    "failure_type": "none",
+                    "llm_used": false
+                  },
+                  "evidence_delta": [
+                    "URL changed from https://www.advantageonlineshopping.com/#/ to https://www.advantageonlineshopping.com/#/product/16",
+                    "New text appeared: 'GO UP'",
+                    "New text appeared: '\u00a9 Advantage Inc, 2024. Release 3.'"
+                  ],
+                  "recovery_attempts": [],
+                  "failure_type": null,
+                  "error": null,
+                  "notes": [],
+                  "before_snapshot": {
+                    "url": "https://www.advantageonlineshopping.com/#/",
+                    "title": "\u00a0Advantage Shopping",
+                    "text_snippet": " \n \n \n \n \n \nCONTACT US\n \nPOPULAR ITEMS\n \nSPECIAL OFFER\n \nOUR PRODUCTS\n dvantage DEMO\nSPEAKERS\nShop Now\n\t\nTABLETS\nShop Now\n\t\n\nLAPTOPS\nShop Now\n\t\nMICE\nShop Now\n\t\nHEADPHONES\nShop Now\nSPECIAL OFFER\n\t\nEXPLORE THE NEW DESIGN\nHP Pavilion 15z Touch Laptop\n\nSupremely thin, yet incredibly durable\n\nSEE OFFER\nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nEXPLORE OUR LATEST\nINNOVATIVE PRODUCTS\nEXPLORE NOW\nSTART EXPLORING HP NOTEBOOKS\nEXPLORE NOW\n \nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nPOPULAR ITEMS\n\nHP ELITEPAD 1000 G2 TABLET\n\nView Details\n\nHP ELITEBOOK FOLIO\n\nView Details\n\nHP ROAR PLUS WIRELESS SPEAKER\n\nView Details\nCHAT WITH US\n\t\nCONTACT US\nSelect Category\nLaptops\nHeadphones\nTablets\nSpeakers\nMice\nCategory\nSelect Product\nProduct\n*\nEmail\n \n*\nSubject\nSEND\nFOLLOW US\n  \n\u00a9 Advantage Inc, 2024. Release 3.3"
+                  },
+                  "after_snapshot": {
+                    "url": "https://www.advantageonlineshopping.com/#/product/16",
+                    "title": "\u00a0Advantage Shopping",
+                    "text_snippet": " \n \n \n \n \n \nCONTACT US\n \nPOPULAR ITEMS\n \nSPECIAL OFFER\n \nOUR PRODUCTS\n dvantage DEMO\n\nGO UP\n\nSPEAKERS\nShop Now\n\t\nTABLETS\nShop Now\n\t\n\nLAPTOPS\nShop Now\n\t\nMICE\nShop Now\n\t\nHEADPHONES\nShop Now\nSPECIAL OFFER\n\t\nEXPLORE THE NEW DESIGN\nHP Pavilion 15z Touch Laptop\n\nSupremely thin, yet incredibly durable\n\nSEE OFFER\nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nEXPLORE OUR LATEST\nINNOVATIVE PRODUCTS\nEXPLORE NOW\nSTART EXPLORING HP NOTEBOOKS\nEXPLORE NOW\n \nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nPOPULAR ITEMS\n\nHP ELITEPAD 1000 G2 TABLET\n\nView Details\n\nHP ELITEBOOK FOLIO\n\nView Details\n\nHP ROAR PLUS WIRELESS SPEAKER\n\nView Details\nCHAT WITH US\n\t\nCONTACT US\nSelect Category\nLaptops\nHeadphones\nTablets\nSpeakers\nMice\nCategory\nSelect Product\nProduct\n*\nEmail\n \n*\nSubject\nSEND\nFOLLOW US\n  \n\u00a9 Advantage Inc, 2024. Release 3."
+                  },
+                  "screenshot_path": null
+                },
+                {
+                  "step_name": "add to cart button on product detail page",
+                  "goal": "add_to_cart_from_detail",
+                  "status": "failed",
+                  "chosen_action": null,
+                  "verification": {
+                    "success": false,
+                    "passed_signals": [
+                      {
+                        "type": "expected_state_change",
+                        "key": "cart_has_items",
+                        "value": true
+                      }
+                    ],
+                    "failed_signals": [],
+                    "delta_summary": [
+                      "New text appeared: '\u00a9 Advantage Inc, 2024. Release 3.3'"
+                    ],
+                    "failure_type": "action_resolution_failed",
+                    "llm_used": true
+                  },
+                  "evidence_delta": [
+                    "New text appeared: '\u00a9 Advantage Inc, 2024. Release 3.3'"
+                  ],
+                  "recovery_attempts": [
+                    {
+                      "choke_point": "after_failure",
+                      "blocker_type": "soft_recovery",
+                      "action_taken": "soft_recovery_skipped",
+                      "success": false,
+                      "selector_used": "",
+                      "notes": "Soft recovery was attempted but did not restore the page state"
+                    }
+                  ],
+                  "failure_type": "action_resolution_failed",
+                  "error": "Could not resolve action candidate: add to cart button",
+                  "notes": [
+                    "Soft recovery was attempted but did not restore the page state"
+                  ],
+                  "before_snapshot": {
+                    "url": "https://www.advantageonlineshopping.com/#/product/16",
+                    "title": "\u00a0Advantage Shopping",
+                    "text_snippet": " \n \n \n \n \n \nCONTACT US\n \nPOPULAR ITEMS\n \nSPECIAL OFFER\n \nOUR PRODUCTS\n dvantage DEMO\n\nGO UP\n\nSPEAKERS\nShop Now\n\t\nTABLETS\nShop Now\n\t\n\nLAPTOPS\nShop Now\n\t\nMICE\nShop Now\n\t\nHEADPHONES\nShop Now\nSPECIAL OFFER\n\t\nEXPLORE THE NEW DESIGN\nHP Pavilion 15z Touch Laptop\n\nSupremely thin, yet incredibly durable\n\nSEE OFFER\nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nEXPLORE OUR LATEST\nINNOVATIVE PRODUCTS\nEXPLORE NOW\nSTART EXPLORING HP NOTEBOOKS\nEXPLORE NOW\n \nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nPOPULAR ITEMS\n\nHP ELITEPAD 1000 G2 TABLET\n\nView Details\n\nHP ELITEBOOK FOLIO\n\nView Details\n\nHP ROAR PLUS WIRELESS SPEAKER\n\nView Details\nCHAT WITH US\n\t\nCONTACT US\nSelect Category\nLaptops\nHeadphones\nTablets\nSpeakers\nMice\nCategory\nSelect Product\nProduct\n*\nEmail\n \n*\nSubject\nSEND\nFOLLOW US\n  \n\u00a9 Advantage Inc, 2024. Release 3."
+                  },
+                  "after_snapshot": {
+                    "url": "https://www.advantageonlineshopping.com/#/product/16",
+                    "title": "\u00a0Advantage Shopping",
+                    "text_snippet": " \n \n \n \n \n    \n dvantage DEMO\n\nGO UP\n\nSPEAKERS\nShop Now\n\t\nTABLETS\nShop Now\n\t\n\nLAPTOPS\nShop Now\n\t\nMICE\nShop Now\n\t\nHEADPHONES\nShop Now\nSPECIAL OFFER\n\t\nEXPLORE THE NEW DESIGN\nHP Pavilion 15z Touch Laptop\n\nSupremely thin, yet incredibly durable\n\nSEE OFFER\nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nEXPLORE OUR LATEST\nINNOVATIVE PRODUCTS\nEXPLORE NOW\nSTART EXPLORING HP NOTEBOOKS\nEXPLORE NOW\n \nALL YOU WANT FROM A TABLET\nEXPLORE NOW\nPOPULAR ITEMS\n\nHP ELITEPAD 1000 G2 TABLET\n\nView Details\n\nHP ELITEBOOK FOLIO\n\nView Details\n\nHP ROAR PLUS WIRELESS SPEAKER\n\nView Details\nCHAT WITH US\n\t\nCONTACT US\nSelect Category\nLaptops\nHeadphones\nTablets\nSpeakers\nMice\nCategory\nSelect Product\nProduct\n*\nEmail\n \n*\nSubject\nSEND\nFOLLOW US\n  \n\u00a9 Advantage Inc, 2024. Release 3.3"
+                  },
+                  "screenshot_path": null
+                }
+              ],
+              "state_snapshot_summary": {
+                "base_url": "https://www.advantageonlineshopping.com",
+                "current_url": "https://www.advantageonlineshopping.com/#/product/16",
+                "auth": {},
+                "generated_credentials": {},
+                "inferred_context": {
+                  "app_type": "ecommerce",
+                  "features": [
+                    "search",
+                    "cart",
+                    "checkout"
+                  ],
+                  "primary_goal": "purchase item",
+                  "site_description": null,
+                  "requires_auth_first": false,
+                  "classification_source": "structural"
+                },
+                "items": {},
+                "recovery_counters": {},
+                "step_history": [
+                  {
+                    "goal": "open_product",
+                    "url": "https://www.advantageonlineshopping.com/#/product/16",
+                    "verification_success": true
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "suite": "Auth Flow Reliability",
+      "total": 2,
+      "passed": 2,
+      "success_rate": 100.0,
+      "results": [
+        {
+          "site": "https://the-internet.herokuapp.com/login",
+          "app_type": "saas_auth",
+          "primary_action_attempted": "login",
+          "success": true,
+          "failure_reason": "",
+          "recovery_count": 0,
+          "execution_time_seconds": 0.0,
+          "notes": "The Internet - Simple login form",
+          "journey_results": [
+            {
+              "journey": "register_login",
+              "app_type": "saas_auth",
+              "status": "PASSED",
+              "steps": [
+                {
+                  "step_name": "login or sign in",
+                  "goal": "login",
+                  "status": "passed",
+                  "chosen_action": {
+                    "fallback_sequence": [
+                      {
+                        "type": "fill",
+                        "intent": "username or email field",
+                        "selectors": [
+                          "input[data-test='username']",
+                          "input[data-test='user-name']",
+                          "input[data-test='email']",
+                          "input[data-testid='username']",
+                          "input[data-testid='email']",
+                          "input[name='username']",
+                          "input[name='login']",
+                          "input[name='user']",
+                          "input[name='email']",
+                          "input[name='userid']",
+                          "input[name='account']",
+                          "input[name*='user' i]",
+                          "input[name*='email' i]",
+                          "input[id='username']",
+                          "input[id='email']",
+                          "input[id='user']",
+                          "input[id*='user' i]",
+                          "input[id*='email' i]",
+                          "input[id*='login' i]",
+                          "input[placeholder*='username' i]",
+                          "input[placeholder*='email' i]",
+                          "input[placeholder*='user' i]",
+                          "input[placeholder*='login' i]",
+                          "input[aria-label*='username' i]",
+                          "input[aria-label*='email' i]",
+                          "input[aria-label*='user' i]",
+                          "input[type='email']",
+                          "input[type='text']:not([type='password'])",
+                          "form input[type='text']:not([type='password']):not([type='hidden']):first-of-type",
+                          "form input:not([type='password']):not([type='hidden']):not([type='submit']):first-of-type"
+                        ],
+                        "role": "textbox",
+                        "name": "Username",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "verification": {
+                    "success": true,
+                    "passed_signals": [
+                      {
+                        "type": "expected_state_change",
+                        "key": "is_logged_in",
+                        "value": true
+                      }
+                    ],
+                    "failed_signals": [],
+                    "delta_summary": [],
+                    "failure_type": "none",
+                    "llm_used": true
+                  },
+                  "evidence_delta": [],
+                  "recovery_attempts": [],
+                  "failure_type": null,
+                  "error": null,
+                  "notes": [],
+                  "before_snapshot": {
+                    "url": "https://the-internet.herokuapp.com/login",
+                    "title": "The Internet",
+                    "text_snippet": "Login Page\nThis is where you can log into the secure area. Enter tomsmith for the username and SuperSecretPassword! for the password. If the information is wrong you should see error messages.\nUsername\nPassword\n Login\nPowered by Elemental Selenium"
+                  },
+                  "after_snapshot": {
+                    "url": "https://the-internet.herokuapp.com/login",
+                    "title": "The Internet",
+                    "text_snippet": "Login Page\nThis is where you can log into the secure area. Enter tomsmith for the username and SuperSecretPassword! for the password. If the information is wrong you should see error messages.\nUsername\nPassword\n Login\nPowered by Elemental Selenium"
+                  },
+                  "screenshot_path": null
+                }
+              ],
+              "state_snapshot_summary": {
+                "base_url": "https://the-internet.herokuapp.com/login",
+                "current_url": "https://the-internet.herokuapp.com/login",
+                "auth": {
+                  "is_logged_in": true
+                },
+                "generated_credentials": {},
+                "inferred_context": {
+                  "app_type": "saas_auth",
+                  "features": [
+                    "login",
+                    "dashboard",
+                    "navigation"
+                  ],
+                  "primary_goal": "reach dashboard",
+                  "site_description": null,
+                  "requires_auth_first": false,
+                  "classification_source": "structural"
+                },
+                "items": {},
+                "recovery_counters": {},
+                "step_history": [
+                  {
+                    "goal": "login",
+                    "url": "https://the-internet.herokuapp.com/login",
+                    "verification_success": true
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "site": "https://opensource-demo.orangehrmlive.com/",
+          "app_type": "saas_auth",
+          "primary_action_attempted": "login",
+          "success": true,
+          "failure_reason": "",
+          "recovery_count": 0,
+          "execution_time_seconds": 0.0,
+          "notes": "OrangeHRM Demo - Enterprise auth",
+          "journey_results": [
+            {
+              "journey": "register_login",
+              "app_type": "saas_auth",
+              "status": "PASSED",
+              "steps": [
+                {
+                  "step_name": "login or sign in",
+                  "goal": "login",
+                  "status": "passed",
+                  "chosen_action": {
+                    "fallback_sequence": [
+                      {
+                        "type": "fill",
+                        "intent": "username or email field",
+                        "selectors": [
+                          "input[data-test='username']",
+                          "input[data-test='user-name']",
+                          "input[data-test='email']",
+                          "input[data-testid='username']",
+                          "input[data-testid='email']",
+                          "input[name='username']",
+                          "input[name='login']",
+                          "input[name='user']",
+                          "input[name='email']",
+                          "input[name='userid']",
+                          "input[name='account']",
+                          "input[name*='user' i]",
+                          "input[name*='email' i]",
+                          "input[id='username']",
+                          "input[id='email']",
+                          "input[id='user']",
+                          "input[id*='user' i]",
+                          "input[id*='email' i]",
+                          "input[id*='login' i]",
+                          "input[placeholder*='username' i]",
+                          "input[placeholder*='email' i]",
+                          "input[placeholder*='user' i]",
+                          "input[placeholder*='login' i]",
+                          "input[aria-label*='username' i]",
+                          "input[aria-label*='email' i]",
+                          "input[aria-label*='user' i]",
+                          "input[type='email']",
+                          "input[type='text']:not([type='password'])",
+                          "form input[type='text']:not([type='password']):not([type='hidden']):first-of-type",
+                          "form input:not([type='password']):not([type='hidden']):not([type='submit']):first-of-type"
+                        ],
+                        "role": "textbox",
+                        "name": "Username",
+                        "value": null
+                      }
+                    ]
+                  },
+                  "verification": {
+                    "success": true,
+                    "passed_signals": [
+                      {
+                        "type": "url_matches",
+                        "value": "/index",
+                        "priority": "high",
+                        "required": false
+                      },
+                      {
+                        "type": "expected_state_change",
+                        "key": "is_logged_in",
+                        "value": true
+                      }
+                    ],
+                    "failed_signals": [],
+                    "delta_summary": [],
+                    "failure_type": "none",
+                    "llm_used": true
+                  },
+                  "evidence_delta": [],
+                  "recovery_attempts": [],
+                  "failure_type": null,
+                  "error": null,
+                  "notes": [],
+                  "before_snapshot": {
+                    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+                    "title": "OrangeHRM",
+                    "text_snippet": "Login\n\nUsername : Admin\n\nPassword : admin123\n\nUsername\nPassword\nLogin\n\nForgot your password?\n\nOrangeHRM OS 5.8\n\n\u00a9 2005 - 2026 OrangeHRM, Inc. All rights reserved."
+                  },
+                  "after_snapshot": {
+                    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+                    "title": "OrangeHRM",
+                    "text_snippet": "Login\n\nUsername : Admin\n\nPassword : admin123\n\nUsername\nPassword\nLogin\n\nForgot your password?\n\nOrangeHRM OS 5.8\n\n\u00a9 2005 - 2026 OrangeHRM, Inc. All rights reserved."
+                  },
+                  "screenshot_path": null
+                }
+              ],
+              "state_snapshot_summary": {
+                "base_url": "https://opensource-demo.orangehrmlive.com/",
+                "current_url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+                "auth": {
+                  "is_logged_in": true
+                },
+                "generated_credentials": {},
+                "inferred_context": {
+                  "app_type": "saas_auth",
+                  "features": [
+                    "login",
+                    "dashboard",
+                    "navigation"
+                  ],
+                  "primary_goal": "reach dashboard",
+                  "site_description": null,
+                  "requires_auth_first": false,
+                  "classification_source": "structural"
+                },
+                "items": {},
+                "recovery_counters": {},
+                "step_history": [
+                  {
+                    "goal": "login",
+                    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+                    "verification_success": true
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "suite": "Sanity Checks",
+      "total": 1,
+      "passed": 0,
+      "success_rate": 0.0,
+      "results": [
+        {
+          "site": "https://www.wikipedia.org/",
+          "app_type": "ecommerce",
+          "primary_action_attempted": "explore",
+          "success": false,
+          "failure_reason": "unknown_failure",
+          "recovery_count": 0,
+          "execution_time_seconds": 0.0,
+          "notes": "Wikipedia - Large stable site exploration",
+          "journey_results": []
+        }
+      ]
+    }
+  ]
+}

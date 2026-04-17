@@ -19,11 +19,16 @@ import time
 from dataclasses import dataclass, field, asdict
 from typing import Any, Callable
 
-from core.models import AppType, JourneyPlan, JourneyStep, SuccessSignal, ActionCandidate, StepType, to_dict
+from core.models import AppType, JourneyPlan, JourneyStep, LLMTrace, SuccessSignal, ActionCandidate, StepType, to_dict
+from core.report_builder import build_fix_prompt_context, build_journey_timeline
 from core.web_agent import AuditCanceledError, run_structured_journeys, run_web_audit
 from core.gemini_judge import judge_visual
+from core.app_classifier import classify_site_with_llm
 
 _log = logging.getLogger(__name__)
+
+# Phase 3b: LLM Trace constraints
+MAX_REASONING_LEN = 200  # Limit LLM reasoning text to prevent payload bloat
 
 
 class AuditTimeoutError(RuntimeError):
@@ -48,6 +53,10 @@ class AgenticQAResult:
     tier: str
     score: int | None           # 0-100, None when no AI analysis available
     confidence: int | None      # 0-100, None when using fallback only
+    app_type: str | None = None
+    classifier_confidence: int | None = None
+    classifier_source: str | None = None
+    classifier_signals: list[str] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
     summary: str = ""
     bundled_fix_prompt: str | None = None
@@ -57,6 +66,7 @@ class AgenticQAResult:
     journey_results: list[dict] | None = None
     journey_timeline: list[dict] | None = None
     step_results: list[dict] | None = None
+    llm_trace: dict[str, Any] | None = None  # Phase 3b: LLM classification trace
     error: str | None = None
     analysis_limited: bool = False      # True when AI analysis was unavailable
     user_key_exhausted: bool = False     # True when user's own API key hit quota
@@ -367,118 +377,143 @@ def _detect_pre_journey_blocker(crawl: dict[str, Any]) -> dict[str, str] | None:
             "error": "Site is currently unavailable",
         }
 
+
+def _capture_llm_classification_trace(llm_context: dict[str, Any]) -> dict[str, Any] | None:
+    """
+    Create LLMTrace from classification result.
+    
+    Captures: model name, decision (app type), reasoning, confidence
+    Phase 3b: Track AI reasoning for transparency
+    """
+    if not llm_context:
+        return None
+    
+    try:
+        # Extract model info - Groq is the classifier
+        model_name = os.getenv("AIBREAKER_CLASSIFIER_MODEL", "llama-3.3-70b-versatile")
+        
+        # Trim reasoning to prevent payload bloat
+        reasoning = (llm_context.get("reasoning") or "")[:MAX_REASONING_LEN]
+        
+        trace = LLMTrace(
+            used=True,
+            model=model_name,
+            decision=llm_context.get("app_type", "unknown"),
+            reasoning=reasoning,
+            confidence=min(1.0, max(0.0, (llm_context.get("confidence", 0) or 0) / 100.0)),
+            phase="classification",
+            tokens_input=0,  # Not tracked by Groq API call
+            tokens_output=0,
+            input_data={
+                "classification_source": llm_context.get("classification_source", "llm"),
+                "signals": llm_context.get("signals", []),
+                "app_type": llm_context.get("app_type"),
+            }
+        )
+        return to_dict(trace)
+    except Exception as e:
+        # Trace capture is observational; don't break flow
+        _log.debug(f"[LLMTrace] Capture failed: {e}")
+        return None
+
     return None
 
 
 def discover_site(crawl: dict, description: str | None = None) -> dict[str, Any]:
-    groq_key = os.getenv("GROQ_API_KEY", "").strip()
-    if groq_key:
-        try:
-            import requests
-            nav_links = crawl.get("nav_links") or []
-            nav_info = []
-            for item in nav_links:
-                if isinstance(item, dict):
-                    t = str(item.get("text") or "").strip()
-                    h = str(item.get("href") or "").strip()
-                    if t or h:
-                        nav_info.append(f"{t} ({h})")
-            
-            forms = crawl.get("forms") or []
-            form_actions = [str(item.get("action") or "").strip() for item in forms if isinstance(item, dict)]
-            
-            prompt = f"""You are an expert web application classifier.
-Analyze the following webpage data and return exactly valid JSON containing the app type and auth requirement.
+    llm_context = classify_site_with_llm(crawl, description)
+    if llm_context:
+        context = _build_discovery_context(
+            app_type=str(llm_context.get("app_type") or AppType.GENERIC.value),
+            description=description,
+            requires_auth_first=bool(llm_context.get("requires_auth_first", False)),
+            confidence=llm_context.get("confidence"),
+            reasoning=llm_context.get("reasoning"),
+            signals=llm_context.get("signals"),
+            classification_source=str(llm_context.get("classification_source") or "llm"),
+        )
+        _log.info(
+            "[Classifier] Using llm classifier: app_type=%s confidence=%s",
+            context.get("app_type"),
+            context.get("confidence"),
+        )
+        return context
 
-Input Data:
-- Title: {crawl.get('title', '')}
-- Description provided by user: {description or 'None'}
-- Text Snippet (first 500 chars): {str(crawl.get('text_snippet') or '')[:500]}
-- Nav Links: {', '.join(nav_info[:15])}
-- Buttons: {', '.join([str(b) for b in (crawl.get('buttons') or [])[:15]])}
-- Form count: {len(forms)}, Actions: {', '.join(form_actions)}
-- HTML Snippet (first 2000 chars):
-{str(crawl.get('page_html') or '')[:2000]}
+    structural = _discover_site_structural(crawl, description)
+    boosted = _apply_description_boost(structural, crawl, description)
+    if boosted.get("app_type") != structural.get("app_type"):
+        boosted["classification_source"] = "description_boost"
+        _log.info(
+            "[Classifier] Using description boost: app_type=%s description=%s",
+            boosted.get("app_type"),
+            (description or "")[:120],
+        )
+        return boosted
 
-App Types:
-- "ecommerce": has product catalog, shopping cart, add-to-cart buttons
-- "saas_auth": login/signup is the PRIMARY purpose of the page, leads directly to app dashboard
-- "marketing_site": promotes a product, has pricing/features/contact pages, login is secondary CTA
-- "task_manager": todo lists, task boards, CRUD interface
-- "dom_mutation": simple add/remove element demos
-- "generic": none of the above
+    if structural.get("app_type") != AppType.GENERIC.value:
+        structural["classification_source"] = "structural"
+        _log.info(
+            "[Classifier] Using structural classifier: app_type=%s requires_auth_first=%s",
+            structural.get("app_type"),
+            structural.get("requires_auth_first"),
+        )
+        return structural
 
-You MUST return one of exactly these strings, no variations: ecommerce, saas_auth, task_manager, dom_mutation, marketing_site, generic
-
-Return JSON only with this exact shape:
-{{
-  "app_type": "ecommerce|saas_auth|task_manager|dom_mutation|marketing_site|generic",
-  "requires_auth_first": true|false,
-  "confidence": 0-100,
-  "reasoning": "one sentence"
-}}
-"""
-            response = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "temperature": 0.0,
-                    "messages": [{"role": "user", "content": prompt}]
-                },
-                timeout=30,
-            )
-            raw_response = response.json()["choices"][0]["message"]["content"]
-            
-            # Simple JSON parsing handling potential markdown blocks
-            text = raw_response.strip()
-            import re
-            match = re.search(r"\{.*\}", text, flags=re.DOTALL)
-            if match:
-                text = match.group(0)
-                
-            parsed = json.loads(text)
-            
-            app_type = parsed.get("app_type", "generic").lower()
-            if app_type not in ("ecommerce", "saas_auth", "task_manager", "dom_mutation", "marketing_site", "generic"):
-                app_type = "generic"
-                
-            features = []
-            primary_goal = "explore site"
-            if app_type == "ecommerce":
-                features = ["login", "search", "cart", "checkout"] if parsed.get("requires_auth_first") else ["search", "cart", "checkout"]
-                primary_goal = "purchase item"
-            elif app_type == "task_manager":
-                features = ["create", "edit", "delete"]
-                primary_goal = "manage records"
-            elif app_type == "dom_mutation":
-                features = ["add", "remove"]
-                primary_goal = "mutate DOM elements"
-            elif app_type == "saas_auth":
-                features = ["login", "dashboard", "navigation"]
-                primary_goal = "reach dashboard"
-            elif app_type == "marketing_site":
-                features = ["pricing", "features", "contact"]
-                primary_goal = "explore marketing paths"
-                
-            return {
-                "app_type": app_type,
-                "features": features,
-                "primary_goal": primary_goal,
-                "site_description": description,
-                "requires_auth_first": bool(parsed.get("requires_auth_first", False)),
-                "confidence": parsed.get("confidence", 0),
-                "reasoning": parsed.get("reasoning", "")
-            }
-        except Exception:
-            pass
-
-    return _discover_site_fallback(crawl, description)
+    generic = dict(boosted)
+    generic["classification_source"] = "generic_fallback"
+    _log.info("[Classifier] Falling back to generic classifier")
+    return generic
 
 
-def _discover_site_fallback(crawl: dict, description: str | None = None) -> dict[str, Any]:
+def _build_discovery_context(
+    *,
+    app_type: str,
+    description: str | None = None,
+    requires_auth_first: bool = False,
+    confidence: int | None = None,
+    reasoning: str | None = None,
+    signals: list[str] | None = None,
+    classification_source: str | None = None,
+) -> dict[str, Any]:
+    features: list[str] = []
+    primary_goal = "explore site"
+
+    if app_type == AppType.ECOMMERCE.value:
+        features = ["login", "search", "cart", "checkout"] if requires_auth_first else ["search", "cart", "checkout"]
+        primary_goal = "purchase item"
+    elif app_type == AppType.TASK_MANAGER.value:
+        features = ["create", "edit", "delete"]
+        primary_goal = "manage records"
+    elif app_type == AppType.DOM_MUTATION.value:
+        features = ["add", "remove"]
+        primary_goal = "mutate DOM elements"
+    elif app_type == AppType.SAAS_AUTH.value:
+        features = ["login", "dashboard", "navigation"]
+        primary_goal = "reach dashboard"
+    elif app_type == AppType.MARKETING.value:
+        features = ["pricing", "features", "contact"]
+        primary_goal = "explore marketing paths"
+
+    context = {
+        "app_type": app_type,
+        "features": features,
+        "primary_goal": primary_goal,
+        "site_description": description,
+        "requires_auth_first": requires_auth_first,
+    }
+    if confidence is not None:
+        context["confidence"] = confidence
+    if reasoning:
+        context["reasoning"] = reasoning
+    if signals:
+        context["signals"] = signals
+    if classification_source:
+        context["classification_source"] = classification_source
+    return context
+
+
+def _discover_site_structural(crawl: dict, description: str | None = None) -> dict[str, Any]:
     nav_texts = _nav_texts(crawl)
-    text = _combined_text(crawl, description)
+    text = _combined_text(crawl, None)
     structural = _structural_counts(crawl)
 
     app_type = AppType.GENERIC.value
@@ -550,57 +585,66 @@ def _discover_site_fallback(crawl: dict, description: str | None = None) -> dict
         features = ["pricing", "features", "contact"]
         primary_goal = "explore marketing paths"
 
-    inferred = {
-        "app_type": app_type,
-        "features": features,
-        "primary_goal": primary_goal,
-        "site_description": description,
-        "requires_auth_first": has_login_first_commerce,
-    }
+    return _build_discovery_context(
+        app_type=app_type,
+        description=description,
+        requires_auth_first=has_login_first_commerce,
+    )
 
-    # Description-based boost - user hint overrides structural classifier
-    # when structural signals are weak (generic fallback)
-    if description:
-        desc_lower = description.lower()
-        if any(t in desc_lower for t in (
-            "shop", "store", "cart", "checkout", "buy",
-            "ecommerce", "e-commerce", "product catalog"
-        )):
-            if inferred.get("app_type") == AppType.GENERIC.value:
-                inferred["app_type"] = AppType.ECOMMERCE.value
-                inferred["features"] = ["search", "cart", "checkout"]
-                inferred["primary_goal"] = "purchase item"
-        elif (
-            any(t in desc_lower for t in ("login", "sign in", "dashboard", "saas"))
-            or (
-                any(t in desc_lower for t in ("workspace", "app", "platform"))
-                and not any(t in desc_lower for t in ("marketing", "pricing", "landing page", "product page"))
-            )
-        ):
-            if inferred.get("app_type") in (
-                AppType.GENERIC.value, AppType.MARKETING.value
-            ):
-                inferred["app_type"] = AppType.SAAS_AUTH.value
-                inferred["features"] = ["login", "dashboard", "navigation"]
-                inferred["primary_goal"] = "reach dashboard"
-        elif any(t in desc_lower for t in (
-            "marketing", "pricing", "landing page", "product page"
-        )):
-            if inferred.get("app_type") == AppType.GENERIC.value:
-                inferred["app_type"] = AppType.MARKETING.value
-                inferred["features"] = ["pricing", "features", "contact"]
-                inferred["primary_goal"] = "explore marketing paths"
-        if (
-            inferred.get("app_type") == AppType.ECOMMERCE.value
-            and not has_cart_or_checkout
-            and not structural.get("has_add_to_cart_button")
-            and any(t in desc_lower for t in ("waitlist", "contact sales", "marketing", "landing page", "email client"))
-        ):
-            inferred["app_type"] = AppType.MARKETING.value
-            inferred["features"] = ["pricing", "features", "contact"]
-            inferred["primary_goal"] = "explore marketing paths"
 
-    return inferred
+def _apply_description_boost(
+    inferred: dict[str, Any],
+    crawl: dict[str, Any],
+    description: str | None = None,
+) -> dict[str, Any]:
+    boosted = dict(inferred)
+    if not description:
+        return boosted
+
+    desc_lower = description.lower()
+    text = _combined_text(crawl, description)
+    structural = _structural_counts(crawl)
+    has_cart_or_checkout = _has_cart_or_checkout(text) or bool(structural["has_add_to_cart_button"])
+
+    if any(t in desc_lower for t in (
+        "shop", "store", "cart", "checkout", "buy",
+        "ecommerce", "e-commerce", "product catalog"
+    )):
+        if boosted.get("app_type") == AppType.GENERIC.value:
+            boosted["app_type"] = AppType.ECOMMERCE.value
+            boosted["features"] = ["search", "cart", "checkout"]
+            boosted["primary_goal"] = "purchase item"
+    elif (
+        any(t in desc_lower for t in ("login", "sign in", "dashboard", "saas"))
+        or (
+            any(t in desc_lower for t in ("workspace", "app", "platform"))
+            and not any(t in desc_lower for t in ("marketing", "pricing", "landing page", "product page"))
+        )
+    ):
+        if boosted.get("app_type") in (
+            AppType.GENERIC.value, AppType.MARKETING.value
+        ):
+            boosted["app_type"] = AppType.SAAS_AUTH.value
+            boosted["features"] = ["login", "dashboard", "navigation"]
+            boosted["primary_goal"] = "reach dashboard"
+    elif any(t in desc_lower for t in (
+        "marketing", "pricing", "landing page", "product page"
+    )):
+        if boosted.get("app_type") == AppType.GENERIC.value:
+            boosted["app_type"] = AppType.MARKETING.value
+            boosted["features"] = ["pricing", "features", "contact"]
+            boosted["primary_goal"] = "explore marketing paths"
+    if (
+        boosted.get("app_type") == AppType.ECOMMERCE.value
+        and not has_cart_or_checkout
+        and not structural.get("has_add_to_cart_button")
+        and any(t in desc_lower for t in ("waitlist", "contact sales", "marketing", "landing page", "email client"))
+    ):
+        boosted["app_type"] = AppType.MARKETING.value
+        boosted["features"] = ["pricing", "features", "contact"]
+        boosted["primary_goal"] = "explore marketing paths"
+
+    return boosted
 
 
 def _login_step() -> JourneyStep:
@@ -612,29 +656,42 @@ def _login_step() -> JourneyStep:
                 type="fill",
                 intent="username or email field",
                 selectors=[
+                    # Data attributes
                     "input[data-test='username']",
                     "input[data-test='user-name']",
+                    "input[data-test='email']",
+                    "input[data-testid='username']",
+                    "input[data-testid='email']",
+                    # Name attributes
                     "input[name='username']",
                     "input[name='login']",
                     "input[name='user']",
-                    "input[id='username']",
-                    "input[name*='user' i]",
-                    "input[id*='user' i]",
                     "input[name='email']",
-                    "input[id='email']",
+                    "input[name='userid']",
+                    "input[name='account']",
+                    "input[name*='user' i]",
                     "input[name*='email' i]",
+                    # ID attributes
+                    "input[id='username']",
+                    "input[id='email']",
+                    "input[id='user']",
+                    "input[id*='user' i]",
                     "input[id*='email' i]",
+                    "input[id*='login' i]",
+                    # Placeholder and aria-label
                     "input[placeholder*='username' i]",
                     "input[placeholder*='email' i]",
                     "input[placeholder*='user' i]",
                     "input[placeholder*='login' i]",
                     "input[aria-label*='username' i]",
                     "input[aria-label*='email' i]",
-                    "input[id*='email' i]",
-                    "input[id*='user' i]",
+                    "input[aria-label*='user' i]",
+                    # Type-based fallbacks
                     "input[type='email']",
-                    "form input:not([type='password']):not([type='hidden'])",
-                    "input[type='text']",
+                    "input[type='text']:not([type='password'])",
+                    # Form-contextual
+                    "form input[type='text']:not([type='password']):not([type='hidden']):first-of-type",
+                    "form input:not([type='password']):not([type='hidden']):not([type='submit']):first-of-type",
                 ],
                 role="textbox",
                 name="Username",
@@ -644,15 +701,29 @@ def _login_step() -> JourneyStep:
                 type="fill",
                 intent="password field",
                 selectors=[
+                    # Data attributes
                     "input[data-test='password']",
-                    "input[type='password']",
+                    "input[data-testid='password']",
+                    "input[data-test='pass']",
+                    # Name attributes
                     "input[name='password']",
                     "input[name='pass']",
-                    "input[id='password']",
+                    "input[name='pwd']",
+                    "input[name='passcode']",
                     "input[name*='pass' i]",
-                    "input[placeholder*='password' i]",
-                    "input[aria-label*='password' i]",
+                    # ID attributes
+                    "input[id='password']",
+                    "input[id='pass']",
                     "input[id*='pass' i]",
+                    "input[id*='pwd' i]",
+                    # Placeholder and aria-label
+                    "input[placeholder*='password' i]",
+                    "input[placeholder*='pass' i]",
+                    "input[aria-label*='password' i]",
+                    "input[aria-label*='pass' i]",
+                    # Type-based
+                    "input[type='password']",
+                    "form input[type='password']",
                 ],
                 role="textbox",
                 name="Password",
@@ -660,20 +731,38 @@ def _login_step() -> JourneyStep:
             ),
             ActionCandidate(
                 type="click",
-                intent="login button",
+                intent="login/submit button",
                 selectors=[
+                    # Data attributes
                     "input[data-test='login-button']",
                     "*[data-test*='login']",
+                    "*[data-testid*='login']",
+                    "[data-test*='submit']",
+                    # ID-based
                     "#login-button",
+                    "#submit-button",
+                    "#login",
+                    # Input submit variants
                     "input[type='submit']",
                     "input[type='submit'][value='Login']",
+                    "input[type='submit'][value='Sign in']",
+                    "input[type='submit'][value='Log in']",
+                    "input[type='submit'][value='Submit']",
                     "input[value='Login']",
                     "input[value='Sign in']",
+                    "input[value='Log in']",
+                    # Button variants
                     "button[type='submit']",
                     "button:has-text('Login')",
                     "button:has-text('Log in')",
                     "button:has-text('Sign in')",
                     "button:has-text('Submit')",
+                    "button:has-text('Continue')",
+                    "button:has-text('Next')",
+                    "button:has-text('Proceed')",
+                    # Form-contextual
+                    "form button[type='submit']:visible:first-of-type",
+                    "form input[type='submit']:visible:first-of-type",
                 ],
                 role="button",
                 name="Login",
@@ -681,17 +770,20 @@ def _login_step() -> JourneyStep:
             ),
             ActionCandidate(
                 type="click",
-                intent="sign in button",
+                intent="continue or next button (for multi-step auth)",
                 selectors=[
-                    "input[type='submit']",
-                    "#login-button",
-                    "button:has-text('Sign in')",
-                    "button:has-text('Log in')",
-                    "button:has-text('Login')",
+                    "button:has-text('Continue')",
+                    "button:has-text('CONTINUE')",
+                    "button:has-text('Next')",
+                    "button:has-text('NEXT')",
+                    "button:has-text('Proceed')",
+                    "a:has-text('Continue')",
+                    "[data-test*='continue']",
+                    "[data-testid*='continue']",
                 ],
                 role="button",
-                name="Sign in",
-                text="Sign in",
+                name="Continue",
+                text="Continue",
             ),
         ],
         input_bindings={
@@ -699,6 +791,7 @@ def _login_step() -> JourneyStep:
             "Password": "state.generated_credentials.password",
         },
         success_signals=[
+            # URL-based success indicators (high priority)
             SuccessSignal(type="url_contains", value="/dashboard", priority="high", required=False),
             SuccessSignal(type="url_contains", value="/account", priority="high", required=False),
             SuccessSignal(type="url_contains", value="/home", priority="high", required=False),
@@ -707,17 +800,34 @@ def _login_step() -> JourneyStep:
             SuccessSignal(type="url_contains", value="/workspace", priority="high", required=False),
             SuccessSignal(type="url_contains", value="/portal", priority="high", required=False),
             SuccessSignal(type="url_contains", value="inventory.html", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/profile", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/user", priority="high", required=False),
             SuccessSignal(type="url_matches", value=r"/app\.html", priority="high", required=False),
             SuccessSignal(type="url_matches", value=r"/index", priority="high", required=False),
+            # User action indicators (medium-high priority)
             SuccessSignal(type="element_visible", value="Logout", priority="medium", required=False),
             SuccessSignal(type="element_visible", value="Log out", priority="medium", required=False),
             SuccessSignal(type="element_visible", value="Sign out", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="Logged in", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="Profile", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="Account", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="Settings", priority="medium", required=False),
+            # User menu/avatar indicators (medium priority)
+            SuccessSignal(type="element_visible", value="Avatar", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="User menu", priority="medium", required=False),
+            # Text-based success indicators (medium priority)
             SuccessSignal(type="text_present", value="Welcome", priority="medium", required=False),
             SuccessSignal(type="text_present", value="Dashboard", priority="medium", required=False),
             SuccessSignal(type="text_present", value="logged in", priority="medium", required=False),
-            SuccessSignal(type="llm_fallback", value="Did login succeed based on this page?", priority="low", required=False),
+            SuccessSignal(type="text_present", value="Successfully signed in", priority="high", required=False),
+            SuccessSignal(type="text_present", value="Welcome back", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="You are logged in", priority="high", required=False),
+            SuccessSignal(type="text_present", value="Your account", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Signed in as", priority="high", required=False),
+            # LLM fallback for unclear cases
+            SuccessSignal(type="llm_fallback", value="Did login succeed based on this page? Look for logout buttons, user profile, or dashboard indicators.", priority="low", required=False),
         ],
-        failure_hints=["Invalid credentials", "Incorrect password", "url still contains /login"],
+        failure_hints=["Invalid credentials", "Incorrect password", "url still contains /login", "url still contains /auth", "login form still visible"],
         expected_state_change={"is_logged_in": True},
         allow_soft_recovery=True,
     )
@@ -732,35 +842,74 @@ def _cart_step() -> JourneyStep:
                 type="click",
                 intent="add to cart button",
                 selectors=[
+                    ".product-card [data-test*='add-to-cart']",
+                    ".product-item [data-test*='add-to-cart']",
+                    ".product-card [data-testid*='add-to-cart']",
+                    ".product-item [data-testid*='add-to-cart']",
                     "[data-test*='add-to-cart']",
                     "[data-testid*='add-to-cart']",
                     "[data-cy*='add-to-cart']",
+                    "[data-action*='add-to-cart']",
+                    "[data-action*='quick-add']",
+                    "[data-action*='quickadd']",
+                    "[data-qa*='add-to-cart']",
+                    "[aria-label*='add to cart' i]",
+                    "[aria-label*='add to bag' i]",
+                    "[aria-label*='add to basket' i]",
                     "button:has-text('Add to cart')",
                     "button:has-text('ADD TO CART')",
                     "button:has-text('Add To Cart')",
                     "button:has-text('Add to Cart')",
                     "button:has-text('Add to bag')",
                     "button:has-text('Add to Bag')",
+                    "button:has-text('ADD TO BAG')",
                     "button:has-text('Add to basket')",
                     "button:has-text('Add to Basket')",
                     "button:has-text('ADD TO BASKET')",
+                    "button:has-text('Quick add')",
+                    "button:has-text('Quick Add')",
+                    "button:has-text('QUICK ADD')",
+                    "button:has-text('Quick shop')",
+                    "button:has-text('Quick Shop')",
+                    "button:has-text('Select options')",
+                    "button:has-text('Select Options')",
+                    "button:has-text('Choose size')",
+                    "button:has-text('Choose Size')",
+                    "button:has-text('View options')",
+                    "button:has-text('View Options')",
                     "a:has-text('Add to cart')",
                     "a:has-text('Add to Cart')",
+                    "a:has-text('Add to bag')",
                     "a:has-text('ADD TO BASKET')",
+                    "a:has-text('Quick add')",
+                    "a:has-text('Quick Add')",
+                    "a:has-text('Quick shop')",
+                    "a:has-text('Select options')",
+                    "a:has-text('View options')",
                     "button[class*='add-to-cart']",
                     "button[class*='addtocart']",
                     "button[class*='add_to_cart']",
                     "button[class*='atc']",
                     "button[class*='btn-cart']",
-                    "a[class*='add_to_cart_button']",
                     "button[class*='quick-add']",
+                    "button[class*='quickadd']",
+                    "button[class*='quick-shop']",
+                    "button[class*='quickshop']",
+                    "button[class*='select-option']",
+                    "button[class*='selectOption']",
+                    "button[class*='choose-size']",
+                    "button[class*='chooseSize']",
+                    "button[class*='view-option']",
+                    "button[class*='viewOption']",
+                    "a[class*='add_to_cart_button']",
                     "button[class*='AddToCart']",
                     "button[name='add']",
                     "button[name='add-to-cart']",
                     "button[data-testid*='add-to-cart']",
                     "button[data-testid*='quickAdd']",
-                    "button:has-text('Add to bag')",
-                    "button:has-text('ADD TO BAG')",
+                    "button[data-testid*='quick-add']",
+                    "button[data-testid*='select-options']",
+                    "button[data-testid*='view-options']",
                     "input[name='add-to-cart']",
                     "input[name='submit.add-to-cart']",
                     "input[id='add-to-cart-button']",
@@ -773,6 +922,8 @@ def _cart_step() -> JourneyStep:
                     "[onclick*='add_to_cart']",
                     "form[action*='cart'] button[type='submit']",
                     "form[action*='cart'] input[type='submit']",
+                    ".product-card button",
+                    ".product-item button",
                 ],
                 role="button",
                 name="Add to cart",
@@ -798,25 +949,63 @@ def _cart_step() -> JourneyStep:
             ),
             ActionCandidate(
                 type="click",
-                intent="shop now or first product",
+                intent="first product detail link",
                 selectors=[
-                    "a:has-text('Shop now')",
-                    "a:has-text('Shop Now')",
-                    "button:has-text('Shop now')",
+                    ".product-card [href*='/products/']",
+                    ".product-item [href*='/products/']",
+                    ".product-card [href*='/product/']",
+                    ".product-item [href*='/product/']",
+                    ".card-block h4.card-title a:visible",
+                    ".card h4.card-title a:visible",
+                    "a[href*='prod.html']:visible",
+                    "a.hrefch:visible",
+                    "a[href*='/products/'][href*='-']:not([href*='/collections/'])",
+                    "a[href*='/product/']",
+                    "a[href*='/book/']",
+                    "a[href*='/books/']",
+                    "a[href*='item']",
+                    "a[href*='/dp/']",
+                    ".card-title a",
+                    ".product-item-link",
+                    ".product-name a",
+                    ".product-title a",
                     ".product-item a:first-of-type",
                     ".product-card a:first-of-type",
                     "a[href*='/product/']:first-of-type",
                 ],
                 role="link",
-                name="Shop now",
-                text="Shop now",
+                name="Product Link",
+                text="Product Detail",
             ),
         ],
         success_signals=[
-            SuccessSignal(type="text_present", value="cart", priority="medium", required=False),
-            SuccessSignal(type="text_present", value="1", priority="medium", required=False),
+            # URL-based success signals (high priority)
+            SuccessSignal(type="url_contains", value="/cart", priority="high", required=False),
             SuccessSignal(type="url_contains", value="cart", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/basket", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/bag", priority="high", required=False),
+            # Confirmation text patterns (high priority)
+            SuccessSignal(type="text_present", value="added to cart", priority="high", required=False),
+            SuccessSignal(type="text_present", value="added to bag", priority="high", required=False),
+            SuccessSignal(type="text_present", value="added to basket", priority="high", required=False),
+            SuccessSignal(type="text_present", value="Item added", priority="high", required=False),
+            SuccessSignal(type="text_present", value="Product added", priority="high", required=False),
+            SuccessSignal(type="text_present", value="View bag", priority="high", required=False),
+            SuccessSignal(type="text_present", value="View cart", priority="high", required=False),
+            SuccessSignal(type="text_present", value="View basket", priority="high", required=False),
+            # Cart content visibility (medium priority)
             SuccessSignal(type="element_visible", value="Cart", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="Bag", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="Basket", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="Checkout", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="Proceed to Checkout", priority="medium", required=False),
+            # Cart count/item indicators (medium priority)
+            SuccessSignal(type="text_present", value="1 item", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="item", priority="low", required=False),
+            SuccessSignal(type="text_present", value="items in", priority="medium", required=False),
+            # Generic success indicators (low priority)
+            SuccessSignal(type="text_present", value="subtotal", priority="low", required=False),
+            SuccessSignal(type="text_present", value="total", priority="low", required=False),
             SuccessSignal(type="state_assertion", value={"cart_has_items": True}, priority="medium", required=False),
         ],
         failure_hints=["Cart count did not change", "Item not added"],
@@ -835,9 +1024,13 @@ def _open_product_step() -> JourneyStep:
                 type="click", 
                 intent="view details link", 
                 selectors=[
-                    "a:has-text('View Details')", "a:has-text('View Product')", "a:has-text('See Details')", "a:has-text('More Info')", 
+                    "a:has-text('View Details')", "a:has-text('View Product')", "a:has-text('See Details')", "a:has-text('More Info')",
+                    "a:has-text('Select options')", "a:has-text('Select Options')", "a:has-text('Choose size')", "a:has-text('Choose Size')",
+                    "a:has-text('View options')", "a:has-text('View Options')", "button:has-text('View product')", "button:has-text('View Product')",
+                    "button:has-text('View details')", "button:has-text('View Details')",
                     "a.productName", "a[data-testid='product-card-link']", ".product-card_product-title-link__nDARd", "a[href*='product_details']", ".card-block h4.card-title a:visible", ".card h4.card-title a:visible", "a[href*='prod.html']:visible", "a.hrefch:visible", "a[href*='/products/'][href*='-']:not([href*='/collections/'])", "a[href*='/product/']", "a[href*='/book/']", "a[href*='/books/']",
-                    "a[href*='item']", "a[href*='/dp/']", ".card-title a", ".product-item-link", ".product-name a", ".product-title a", 
+                    "a[href*='item']", "a[href*='/dp/']", ".card-title a", ".product-item-link", ".product-name a", ".product-title a",
+                    ".product-card [href*='/products/']", ".product-item [href*='/products/']", ".product-card [href*='/product/']", ".product-item [href*='/product/']",
                     "h2 a", "h3 a", ".product-card a", ".product-item a", "div[id*='Img']", "[aria-label*='Category']"
                 ], 
                 role="link", 
@@ -876,19 +1069,152 @@ def _cart_from_detail_step() -> JourneyStep:
             ActionCandidate(type="click", intent="add to cart button", selectors=["[translate='ADD_TO_CART']", "[ng-click*='addToCart']", "[ng-click*='AddToCart']", "button:has-text('Add to cart')", "button:has-text('ADD TO CART')", "button:has-text('Add To Cart')", "button:has-text('ADD TO BASKET')", "button:has-text('Add to bag')", "button:has-text('ADD TO BAG')", "a:has-text('Add to cart')", "a:has-text('ADD TO BASKET')", "button[name='save_to_cart']", "button[name='add']", "button[data-testid='add-to-cart']", "[onclick*='addToCart']", "[onclick*='add_to_cart']", ".btn-cart", "a.btn-success", "a[class*='add_to_cart_button']", "div.button_add_to_cart", "input[name='submit.add-to-cart']", "input[id='add-to-cart-button']", "#add-to-cart-button"], role="button", name="Add to cart", text="Add to cart"),
         ],
         success_signals=[
-            SuccessSignal(type="element_visible", value="Cart", priority="medium", required=False),
-            SuccessSignal(type="text_present", value="added", priority="medium", required=False),
+            # Confirmation text (high priority)
+            SuccessSignal(type="text_present", value="added to cart", priority="high", required=False),
+            SuccessSignal(type="text_present", value="added to bag", priority="high", required=False),
+            SuccessSignal(type="text_present", value="added to basket", priority="high", required=False),
+            SuccessSignal(type="text_present", value="Item added", priority="high", required=False),
             SuccessSignal(type="text_present", value="Product added", priority="high", required=False),
+            SuccessSignal(type="text_present", value="View bag", priority="high", required=False),
+            SuccessSignal(type="text_present", value="View basket", priority="high", required=False),
+            SuccessSignal(type="text_present", value="View Cart", priority="high", required=False),
+            # Cart drawer/modal visibility (high priority)
+            SuccessSignal(type="element_visible", value="Cart", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="Checkout", priority="high", required=False),
+            SuccessSignal(type="element_visible", value="View bag", priority="high", required=False),
+            SuccessSignal(type="element_visible", value="View basket", priority="high", required=False),
+            SuccessSignal(type="element_visible", value="Your bag", priority="high", required=False),
+            # Cart page indicators (medium priority)
+            SuccessSignal(type="text_present", value="Your bag", priority="high", required=False),
+            SuccessSignal(type="text_present", value="Your basket", priority="high", required=False),
+            SuccessSignal(type="text_present", value="Your cart", priority="high", required=False),
             SuccessSignal(type="text_present", value="Cart", priority="medium", required=False),
-            SuccessSignal(type="text_present", value="View Basket", priority="medium", required=False),
-            SuccessSignal(type="text_present", value="View Cart", priority="medium", required=False),
-            SuccessSignal(type="text_present", value="items", priority="medium", required=False),
-            SuccessSignal(type="url_contains", value="cart", priority="high", required=False),
-            SuccessSignal(type="url_contains", value="#", priority="high", required=False),
+            SuccessSignal(type="text_present", value="Basket", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Checkout", priority="high", required=False),
+            # URL indicators (medium priority)
+            SuccessSignal(type="url_contains", value="/cart", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/bag", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/basket", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="cart", priority="medium", required=False),
+            # Item count indicators (low priority)
+            SuccessSignal(type="text_present", value="1 item", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="items in", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Subtotal", priority="low", required=False),
+            SuccessSignal(type="text_present", value="Shipping", priority="low", required=False),
+            SuccessSignal(type="text_present", value="Total", priority="low", required=False),
+            # State assertion
+            SuccessSignal(type="state_assertion", value={"cart_has_items": True}, priority="medium", required=False),
+            # LLM fallback for unclear cases
+            SuccessSignal(type="llm_fallback", value="Did the item get added to the cart or bag?", priority="low", required=False),
         ],
         failure_hints=["item not added", "cart unchanged"],
-        expected_state_change={},
+        expected_state_change={"cart_has_items": True},
         allow_soft_recovery=False,
+    )
+
+
+def _checkout_step() -> JourneyStep:
+    """
+    Checkout step — after cart is confirmed, navigate to checkout.
+    Success = checkout page or checkout form is visible.
+    Do NOT implement payment entry; just reach the checkout form.
+    """
+    return JourneyStep(
+        goal="reach_checkout",
+        intent="checkout button or link after cart is confirmed",
+        step_type=StepType.CLICK.value,
+        action_candidates=[
+            ActionCandidate(
+                type="click",
+                intent="checkout CTA from cart page",
+                selectors=[
+                    "button:has-text('Checkout')",
+                    "button:has-text('CHECKOUT')",
+                    "a:has-text('Checkout')",
+                    "a:has-text('CHECKOUT')",
+                    "a:has-text('Proceed to checkout')",
+                    "button:has-text('Proceed to checkout')",
+                    "button:has-text('Proceed To Checkout')",
+                    "a:has-text('Proceed to checkout')",
+                    "button:has-text('Place order')",
+                    "a:has-text('Place order')",
+                    "button:has-text('PLACE ORDER')",
+                    "button:has-text('Complete purchase')",
+                    "button:has-text('Continue to checkout')",
+                    "[data-testid*='checkout']",
+                    "[data-test*='checkout']",
+                    "[aria-label*='checkout' i]",
+                    "#checkout-button",
+                    "button[name='checkout']",
+                    "a[href*='checkout']",
+                    ".btn-checkout",
+                    "button[class*='checkout']",
+                    "a[class*='checkout']",
+                    "input[type='submit'][value*='Checkout']",
+                    "form[action*='checkout'] button[type='submit']",
+                    "form[action*='checkout'] input[type='submit']",
+                ],
+                role="button",
+                name="Checkout",
+                text="Checkout",
+            ),
+            ActionCandidate(
+                type="click",
+                intent="checkout from cart drawer",
+                selectors=[
+                    "[role='dialog'] button:has-text('Checkout')",
+                    "[role='dialog'] a:has-text('Checkout')",
+                    "[role='dialog'] button:has-text('Proceed to checkout')",
+                    "[class*='cart-drawer'] button:has-text('Checkout')",
+                    "[class*='mini-cart'] button:has-text('Checkout')",
+                    "[class*='side-cart'] button:has-text('Checkout')",
+                ],
+                role="button",
+                name="Checkout from drawer",
+                text="Checkout",
+            ),
+            ActionCandidate(
+                type="click",
+                intent="view cart link",
+                selectors=[
+                    "a:has-text('View cart')",
+                    "button:has-text('View cart')",
+                    "a:has-text('View Bag')",
+                    "button:has-text('View Bag')",
+                    "a:has-text('View basket')",
+                    "button:has-text('View basket')",
+                ],
+                role="link",
+                name="View cart link",
+                text="View cart",
+            ),
+        ],
+        success_signals=[
+            # URL patterns for checkout page
+            SuccessSignal(type="url_contains", value="/checkout", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/cart", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/order", priority="high", required=False),
+            SuccessSignal(type="url_contains", value="/payment", priority="medium", required=False),
+            SuccessSignal(type="url_contains", value="checkout", priority="high", required=False),
+            # Checkout page text markers
+            SuccessSignal(type="text_present", value="Checkout", priority="high", required=False),
+            SuccessSignal(type="text_present", value="Order summary", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Shipping", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Billing", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Payment", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Total", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Review order", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Subtotal", priority="medium", required=False),
+            SuccessSignal(type="text_present", value="Shipping address", priority="medium", required=False),
+            # Checkout form visibility
+            SuccessSignal(type="element_visible", value="Continue", priority="medium", required=False),
+            SuccessSignal(type="element_visible", value="Place Order", priority="medium", required=False),
+            # Fallback: LLM verify checkout
+            SuccessSignal(type="llm_fallback", value="Is this a checkout or payment page?", priority="low", required=False),
+        ],
+        failure_hints=["checkout not reachable", "payment page not accessible"],
+        expected_state_change={"reached_checkout": True},
+        allow_soft_recovery=True,
     )
 
 
@@ -1316,6 +1642,8 @@ def run_agentic_qa(
             tier=tier,
             score=0,
             confidence=0,
+            app_type=AppType.GENERIC.value,
+            classifier_source="fallback",
             summary="Audit exceeded maximum allowed time.",
             error="Audit exceeded maximum allowed time",
         )
@@ -1326,6 +1654,8 @@ def run_agentic_qa(
             tier=tier,
             score=0,
             confidence=0,
+            app_type=AppType.GENERIC.value,
+            classifier_source="fallback",
             summary="Could not load the site. Please check the URL and try again.",
             error="Site could not be loaded",
         )
@@ -1336,6 +1666,8 @@ def run_agentic_qa(
             tier=tier,
             score=0,
             confidence=0,
+            app_type=AppType.GENERIC.value,
+            classifier_source="fallback",
             summary="Could not load the site. Please check the URL and try again.",
             error="Site could not be loaded",
         )
@@ -1375,6 +1707,10 @@ def run_agentic_qa(
             tier=tier,
             score=0,
             confidence=0,
+            app_type=str(discovery_context.get("app_type") or AppType.GENERIC.value),
+            classifier_confidence=discovery_context.get("confidence"),
+            classifier_source=str(discovery_context.get("classification_source") or "fallback"),
+            classifier_signals=list(discovery_context.get("signals") or []),
             findings=[],
             summary=hard_blocker["summary"],
             journey_timeline=[{
@@ -1446,6 +1782,10 @@ def run_agentic_qa(
                     tier=tier,
                     score=0,
                     confidence=0,
+                    app_type=str(discovery_context.get("app_type") or AppType.GENERIC.value),
+                    classifier_confidence=discovery_context.get("confidence"),
+                    classifier_source=str(discovery_context.get("classification_source") or "fallback"),
+                    classifier_signals=list(discovery_context.get("signals") or []),
                     summary="Audit exceeded maximum allowed time.",
                     error="Audit exceeded maximum allowed time",
                 )
@@ -1560,11 +1900,20 @@ def run_agentic_qa(
             or crawl.get("video_path")
         )
 
+    # Phase 3b: Capture LLM classification trace if available
+    llm_classification_trace = None
+    if discovery_context.get("classification_source") == "llm":
+        llm_classification_trace = _capture_llm_classification_trace(discovery_context)
+
     return AgenticQAResult(
         url=url,
         tier=tier,
         score=score,
         confidence=confidence,
+        app_type=str(discovery_context.get("app_type") or AppType.GENERIC.value),
+        classifier_confidence=discovery_context.get("confidence"),
+        classifier_source=str(discovery_context.get("classification_source") or "fallback"),
+        classifier_signals=list(discovery_context.get("signals") or []),
         findings=findings,
         summary=verdict.get("summary", ""),
         bundled_fix_prompt=bundled or None,
@@ -1574,13 +1923,305 @@ def run_agentic_qa(
         journey_results=journey_results,
         journey_timeline=journey_timeline,
         step_results=step_results,
+        llm_trace=llm_classification_trace,  # Phase 3b: LLM trace
         analysis_limited=analysis_limited,
         user_key_exhausted=user_key_exhausted,
     )
 
 
 def result_to_dict(result: AgenticQAResult) -> dict[str, Any]:
-    """Convert an AgenticQAResult to a JSON-serializable dict."""
+    """
+    Convert an AgenticQAResult to a JSON-serializable dict.
+    
+    Automatically includes Phase 3b diagnostic summaries and execution context.
+    Phase 3b Task 5: Also includes human-readable summary text.
+    """
     d = asdict(result)
     d["findings"] = [asdict(f) for f in result.findings]
+    
+    # Phase 3b Task 4: Integrate diagnostics summary if available
+    if result.step_results:
+        diagnostics_summary = _build_diagnostics_summary(result.step_results)
+        d["diagnostics_summary"] = diagnostics_summary
+        
+        # Add execution context
+        decision_count = sum(
+            len(step.get("decision_trace", [])) 
+            for step in result.step_results 
+            if isinstance(step, dict) and step.get("status") == "failed"
+        )
+        d["execution_context"] = {
+            "decision_traces_captured": decision_count,
+            "llm_used_for_classification": bool(result.llm_trace),
+        }
+    
+    # Phase 3b Task 5: Integrate human-readable summary
+    d = _integrate_human_readable_summary(d)
+    
+    # Phase 5: Integrate LLM narrative (executive summary + prioritized findings)
+    try:
+        from core.narrative import generate_audit_narrative
+        narrative = generate_audit_narrative(d)
+        d["narrative"] = narrative
+        # Phase 5: Inject root-cause intelligence seamlessly into standard summary paths
+        root_cause = narrative.get("root_cause_narrative", "")
+        exec_summary = narrative.get("executive_summary", "")
+        
+        combined_insight = f"{exec_summary}\n\n**Root Cause Analysis:**\n{root_cause}" if root_cause else exec_summary
+        
+        if combined_insight:
+            d["summary"] = combined_insight
+            d["executive_summary"] = exec_summary
+    except Exception as e:
+        _log.debug(f"[Phase5] Narrative generation skipped: {e}")
+    
     return d
+
+
+# ── Phase 3b Task 4: Result Integration Layer ──────────────────────────────
+
+MAX_ISSUES = 5  # Cap issue list to prevent overwhelming users
+
+
+def _aggregate_step_diagnostics(step_results: list[dict] | None) -> dict[str, Any]:
+    """
+    Aggregate diagnostics from all steps into structured summary.
+    
+    Groups failures by type, counts occurrences, identifies primary issues.
+    Suppresses internal_error if real issues exist (only shows it alone).
+    Phase 3b Task 4: Turn raw diagnostics into user-facing insights
+    """
+    if not step_results:
+        return {
+            "total_steps": 0,
+            "failed_steps": 0,
+            "primary_issue": None,
+            "issues_by_type": {},
+        }
+    
+    failed_steps = []
+    issues_by_type: dict[str, list[str]] = {}
+    
+    for step in step_results:
+        if step.get("status") == "failed":
+            failed_steps.append(step)
+            
+            # Extract diagnostic if available
+            diagnostic = step.get("diagnostic")
+            if diagnostic and isinstance(diagnostic, dict):
+                reason = diagnostic.get("reason", "unknown")
+                pattern = diagnostic.get("pattern_category", "unknown")
+                
+                if pattern not in issues_by_type:
+                    issues_by_type[pattern] = []
+                issues_by_type[pattern].append(reason[:100])  # Limit reason length
+    
+    # CRITICAL: Suppress internal_error if any real issues exist
+    # internal_error should only show if it's the ONLY issue
+    if "internal_error" in issues_by_type and len(issues_by_type) > 1:
+        del issues_by_type["internal_error"]
+    
+    # Identify primary issue (most frequent failure type)
+    primary_issue = None
+    if issues_by_type:
+        primary_pattern = max(issues_by_type.items(), key=lambda x: len(x[1]))[0]
+        primary_reason = issues_by_type[primary_pattern][0] if issues_by_type[primary_pattern] else None
+        primary_issue = f"{primary_pattern}: {primary_reason}" if primary_reason else primary_pattern
+    
+    return {
+        "total_steps": len(step_results),
+        "failed_steps": len(failed_steps),
+        "primary_issue": primary_issue,
+        "issues_by_type": {k: len(v) for k, v in issues_by_type.items()},
+    }
+
+
+def _build_diagnostics_summary(step_results: list[dict] | None) -> dict[str, Any]:
+    """
+    Build human-readable diagnostics summary from step results.
+    
+    Sorts issues by impact (frequency), caps at MAX_ISSUES.
+    Phase 3b Task 4: Create structured intelligence output
+    """
+    aggregated = _aggregate_step_diagnostics(step_results)
+    
+    # Build issue list with counts grouped by type
+    issues_by_type: dict[str, dict[str, Any]] = {}
+    
+    if step_results:
+        for step in step_results:
+            if step.get("status") == "failed" and step.get("diagnostic"):
+                diagnostic = step["diagnostic"]
+                if isinstance(diagnostic, dict):
+                    issue_type = diagnostic.get("pattern_category", "unknown")
+                    
+                    # Initialize type entry if not seen
+                    if issue_type not in issues_by_type:
+                        issues_by_type[issue_type] = {
+                            "count": 0,
+                            "type": issue_type,
+                            "reason": diagnostic.get("reason"),
+                            "recommendations": diagnostic.get("recommendations", [])[:2],
+                            "affected_steps": []
+                        }
+                    
+                    # Increment count and track step
+                    issues_by_type[issue_type]["count"] += 1
+                    step_name = step.get("step_name", "unknown")
+                    if step_name not in issues_by_type[issue_type]["affected_steps"]:
+                        issues_by_type[issue_type]["affected_steps"].append(step_name)
+    
+    # Sort by count (impact) descending
+    sorted_issues = sorted(
+        issues_by_type.values(),
+        key=lambda x: x["count"],
+        reverse=True
+    )
+    
+    # CRITICAL: Filter out internal_error if real issues exist
+    # internal_error should only appear if it's the ONLY issue
+    real_issues = [issue for issue in sorted_issues if issue["type"] != "internal_error"]
+    if real_issues:
+        sorted_issues = real_issues
+    
+    # Cap at MAX_ISSUES to prevent overwhelming output
+    issues = sorted_issues[:MAX_ISSUES]
+    
+    return {
+        "summary": {
+            "total_steps": aggregated["total_steps"],
+            "failed_steps": aggregated["failed_steps"],
+            "primary_issue": aggregated["primary_issue"],
+        },
+        "issues": issues,
+    }
+
+
+# ── Phase 3b Task 5: Human-Readable Summaries ────────────────────────────────
+
+ISSUE_DESCRIPTIONS = {
+    "selector_mismatch": {
+        "title": "Element Selection Failed",
+        "explanation": "Could not locate UI elements. Selectors may be outdated or elements missing from page.",
+        "impact": "User interactions (clicks, form fills) could not be completed"
+    },
+    "timeout": {
+        "title": "Page Load Timeout",
+        "explanation": "The audit was stopped after reaching maximum execution time. This usually indicates slow-loading pages, heavy scripts, or silently blocked interactions.",
+        "impact": "User journey could not progress because the page failed to render required elements in time"
+    },
+    "bot_protection": {
+        "title": "Bot Protection Block",
+        "explanation": "This site prevented automated access (HTTP 403 / bot protection walls), so user flows could not be fully tested.",
+        "impact": "Synthetic monitoring is blocked; consider whitelisting the active IP"
+    },
+    "variant_required": {
+        "title": "Required Selection Not Made",
+        "explanation": "Product options (size, color, etc.) were required but not selected.",
+        "impact": "Add-to-cart or checkout failed because required product variant was missing"
+    },
+    "validation_error": {
+        "title": "Form Validation Failed",
+        "explanation": "Form submission rejected due to validation errors or missing required fields.",
+        "impact": "Checkout or account operations blocked by form constraints"
+    },
+    "navigation_failed": {
+        "title": "Page Navigation Failed",
+        "explanation": "Could not navigate to expected page or link did not work.",
+        "impact": "User could not reach necessary page in journey"
+    },
+    "internal_error": {
+        "title": "System Error Occurred",
+        "explanation": "An unexpected error occurred during execution.",
+        "impact": "System could not complete the requested action"
+    },
+    "unknown": {
+        "title": "Unclassified Error",
+        "explanation": "An issue occurred but type could not be determined.",
+        "impact": "Journey flow was interrupted"
+    }
+}
+
+
+def _generate_human_readable_summary(diagnostics_summary: dict[str, Any] | None) -> str:
+    """
+    Convert structured diagnostics into human-readable narrative.
+    
+    Phase 3b Task 5: UX/Communication layer
+    Deterministic templates, no LLM calls.
+    """
+    if not diagnostics_summary:
+        return "No issues detected in journey execution."
+    
+    summary_data = diagnostics_summary.get("summary", {})
+    issues = diagnostics_summary.get("issues", [])
+    
+    if summary_data.get("failed_steps", 0) == 0:
+        return "All journey steps completed successfully."
+    
+    lines = []
+    
+    # Primary issue statement
+    primary_issue = summary_data.get("primary_issue")
+    if primary_issue:
+        # Extract issue type from primary_issue string (format: "type: reason")
+        issue_type = primary_issue.split(":")[0].strip() if ":" in primary_issue else primary_issue
+        
+        if issue_type in ISSUE_DESCRIPTIONS:
+            desc = ISSUE_DESCRIPTIONS[issue_type]
+            lines.append(f"**{desc['title']}**")
+            lines.append(desc['explanation'])
+            lines.append("")
+            lines.append(f"**Impact**: {desc['impact']}")
+        else:
+            lines.append(f"**Failed Journey**: {primary_issue}")
+    
+    # Detailed issues
+    if issues:
+        lines.append("")
+        lines.append("**Details of Issues Found**:")
+        lines.append("")
+        
+        for i, issue in enumerate(issues, 1):
+            issue_type = issue.get("type", "unknown")
+            count = issue.get("count", 1)
+            reason = issue.get("reason", "Unknown reason")
+            affected = issue.get("affected_steps", [])
+            
+            # Issue bullet
+            if count == 1:
+                lines.append(f"{i}. **{issue_type}** — {reason}")
+            else:
+                lines.append(f"{i}. **{issue_type}** (occurred {count} times) — {reason}")
+            
+            # Affected steps
+            if affected:
+                steps_text = ", ".join(affected)
+                lines.append(f"   Affected: {steps_text}")
+            
+            # Recommendations
+            recommendations = issue.get("recommendations", [])
+            if recommendations:
+                for rec in recommendations[:1]:  # Show only top recommendation
+                    lines.append(f"   Suggestion: {rec}")
+            
+            lines.append("")
+    
+    return "\n".join(lines)
+
+
+def _integrate_human_readable_summary(result_dict: dict[str, Any]) -> dict[str, Any]:
+    """
+    Add human-readable summary to result.
+    
+    Phase 3b Task 5: Final communication layer
+    """
+    diagnostics_summary = result_dict.get("diagnostics_summary")
+    if diagnostics_summary:
+        summary_text = _generate_human_readable_summary(diagnostics_summary)
+        result_dict["summary_text"] = summary_text
+    
+    return result_dict
+
+
+

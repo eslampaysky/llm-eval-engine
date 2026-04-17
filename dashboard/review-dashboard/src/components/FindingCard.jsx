@@ -3,9 +3,9 @@ import { ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const SEVERITY_CONFIG = {
-  critical: { color: 'var(--coral)', bg: 'var(--coral-dim)', key: 'critical' },
-  warning: { color: 'var(--amber)', bg: 'var(--amber-dim)', key: 'warning' },
-  info: { color: 'var(--accent)', bg: 'var(--accent-dim)', key: 'info' },
+  critical: { color: 'var(--red)', bg: 'rgba(255, 107, 107, 0.12)', key: 'critical' },
+  warning: { color: 'var(--amber)', bg: 'rgba(251, 191, 36, 0.14)', key: 'warning' },
+  info: { color: 'var(--accent)', bg: 'rgba(59, 180, 255, 0.12)', key: 'info' },
 };
 
 export default function FindingCard({ severity = 'info', category, title, description, fixPrompt }) {

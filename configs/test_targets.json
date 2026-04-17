@@ -1,0 +1,26 @@
+[
+  {
+    "name": "AutoExercise",
+    "url": "https://automationexercise.com",
+    "_group": "ecommerce",
+    "expected_type": "ecommerce"
+  },
+  {
+    "name": "Gymshark",
+    "url": "https://www.gymshark.com",
+    "_group": "ecommerce",
+    "expected_type": "ecommerce"
+  },
+  {
+    "name": "AdvantageShop",
+    "url": "https://www.advantageonlineshopping.com",
+    "_group": "ecommerce",
+    "expected_type": "ecommerce"
+  },
+  {
+    "name": "Demoblaze",
+    "url": "https://www.demoblaze.com",
+    "_group": "ecommerce",
+    "expected_type": "ecommerce"
+  }
+]

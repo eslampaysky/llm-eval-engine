@@ -34,6 +34,10 @@ from api.job_queue import JobQueue, start_workers, stop_workers
 from api.rate_limit import limiter, rate_limit_exceeded_handler
 from api.routes import init_api_key_map, router
 from api.auth_routes import auth_router
+from api.routes_phase_4b import phase_4b_router
+from api.concurrency_control import initialize_concurrency_limits
+from api.routes_phase_6 import phase_6_router
+from api.routes_dashboard import phase_4c_router
 
 _log = logging.getLogger(__name__)
 
@@ -130,6 +134,16 @@ async def lifespan(app: FastAPI):
 
     init_db()
     init_api_key_map()
+    initialize_concurrency_limits()  # Phase 4B: Set up concurrency limits
+
+    # Phase 6: Initialize scheduling table and start scheduler loop
+    try:
+        from api.scheduler import init_schedules_table, run_scheduler_loop
+        init_schedules_table()
+        scheduler_task = asyncio.create_task(run_scheduler_loop(), name="audit-scheduler")
+    except Exception as e:
+        _log.warning("[Startup] Scheduler init skipped: %s", e)
+        scheduler_task = None
 
     # Recover any reports that were in-flight when the previous dyno died
     recovered = _recover_stuck_reports()
@@ -143,6 +157,8 @@ async def lifespan(app: FastAPI):
 
     # ── Shutdown ─────────────────────────────────────────────────────────────
     memory_logger_task.cancel()
+    if scheduler_task and not scheduler_task.done():
+        scheduler_task.cancel()
     await stop_workers()
 
 
@@ -199,6 +215,9 @@ app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(router)
 app.include_router(auth_router)
+app.include_router(phase_4b_router)  # Phase 4B: reliability & monitoring routes
+app.include_router(phase_6_router)   # Phase 6: scheduling routes
+app.include_router(phase_4c_router)  # Phase 4C: observability dashboard
 
 
 @app.get("/health")

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { RotateCcw, Share2, Download, Monitor, Smartphone, Check, Loader, Shield, ChevronDown, AlertTriangle, Square } from 'lucide-react';
+import { RotateCcw, Share2, Download, Monitor, Smartphone, Check, Loader, Shield, ChevronDown, AlertTriangle, Square, Terminal, Filter } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getAuthHeader } from '../../context/AuthContext.jsx';
 import { api } from '../../services/api';
@@ -186,6 +186,8 @@ export default function AuditDetailPage() {
   const [cancelBusy, setCancelBusy] = useState(false);
   const [progress, setProgress] = useState(null);
   const [mediaUrls, setMediaUrls] = useState({ video: '', desktop: '', mobile: '' });
+  const [timelineFilter, setTimelineFilter] = useState('all'); // 'all', 'errors', 'healed'
+  const [devMode, setDevMode] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -309,6 +311,12 @@ export default function AuditDetailPage() {
 
   return (
     <div className="page-container fade-in">
+      {/* Action Bar (Top) */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginBottom: 16 }}>
+        <button className={devMode ? "btn btn-primary" : "btn btn-ghost"} onClick={() => setDevMode(!devMode)} style={{ fontSize: 12, padding: '6px 12px' }}>
+          <Terminal size={14} /> {devMode ? 'Disable Dev Mode' : 'Developer Mode'}
+        </button>
+      </div>
       {(report.status === 'processing' || report.status === 'queued') && (
         <div className="card" style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
@@ -365,6 +373,12 @@ export default function AuditDetailPage() {
       {shareToast && <div className="toast"><Check size={14} style={{ color: 'var(--green)' }} /> {t('audit.detail.linkCopied', 'Link copied to clipboard')}</div>}
       {pdfError && <div className="error-box">{pdfError}</div>}
 
+      {/* CSS Grid Split View */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: 24, alignItems: 'start' }}>
+        
+        {/* Left Column (Timeline, Findings) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
       {overview.keyFailures.length > 0 && (
         <div className="card" style={cardStyle}>
           <div className="card-label" style={{ marginBottom: 14 }}>{t('audit.detail.keyFailures', 'Key Failures')}</div>
@@ -387,25 +401,38 @@ export default function AuditDetailPage() {
         </div>
       )}
 
-      <div className="card" style={cardStyle}>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button className={viewport === 'desktop' ? 'btn btn-primary' : 'btn btn-ghost'} onClick={() => setViewport('desktop')} style={{ padding: '6px 14px', fontSize: 12 }}><Monitor size={14} /> {t('common.desktop', 'Desktop')}</button>
-          <button className={viewport === 'mobile' ? 'btn btn-primary' : 'btn btn-ghost'} onClick={() => setViewport('mobile')} style={{ padding: '6px 14px', fontSize: 12 }}><Smartphone size={14} /> {t('common.mobile', 'Mobile')}</button>
-        </div>
-        <div style={{ background: 'var(--bg-deepest)', borderRadius: 'var(--radius-md)', height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--line)' }}>
-          {screenshotUrl ? <img src={screenshotUrl} alt={t('audit.detail.screenshotAlt', 'Screenshot')} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }} /> : <span style={{ fontSize: 13, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{viewport === 'desktop' ? '1280x800' : '390x844'} screenshot</span>}
-        </div>
-      </div>
-
       {report.summary && <div className="card" style={cardStyle}><div className="card-label">{t('common.summary', 'Summary')}</div><p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{report.summary}</p></div>}
 
       {journeyTimeline.length > 0 && (
         <div className="card" style={cardStyle}>
-          <div className="card-label" style={{ marginBottom: 16 }}>{t('audit.detail.journeyTimeline', 'Journey Timeline')}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+            <div className="card-label" style={{ marginBottom: 0 }}>{t('audit.detail.journeyTimeline', 'Journey Timeline')}</div>
+            <div style={{ display: 'flex', background: 'var(--bg-deepest)', border: '1px solid var(--line)', borderRadius: 'var(--radius-md)', padding: 4 }}>
+              <button onClick={() => setTimelineFilter('all')} style={{ padding: '6px 14px', fontSize: 11, borderRadius: 'var(--radius-sm)', border: 'none', background: timelineFilter === 'all' ? 'var(--bg-elevated)' : 'transparent', color: timelineFilter === 'all' ? 'var(--text-primary)' : 'var(--text-dim)', fontWeight: timelineFilter === 'all' ? 600 : 500, cursor: 'pointer', transition: 'all 0.2s' }}>All</button>
+              <button onClick={() => setTimelineFilter('errors')} style={{ padding: '6px 14px', fontSize: 11, borderRadius: 'var(--radius-sm)', border: 'none', background: timelineFilter === 'errors' ? 'var(--bg-elevated)' : 'transparent', color: timelineFilter === 'errors' ? 'var(--red)' : 'var(--text-dim)', fontWeight: timelineFilter === 'errors' ? 600 : 500, cursor: 'pointer', transition: 'all 0.2s' }}>Errors Only</button>
+              <button onClick={() => setTimelineFilter('healed')} style={{ padding: '6px 14px', fontSize: 11, borderRadius: 'var(--radius-sm)', border: 'none', background: timelineFilter === 'healed' ? 'var(--bg-elevated)' : 'transparent', color: timelineFilter === 'healed' ? 'var(--accent)' : 'var(--text-dim)', fontWeight: timelineFilter === 'healed' ? 600 : 500, cursor: 'pointer', transition: 'all 0.2s' }}>Self-Healed</button>
+            </div>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {journeyTimeline.map((journey, index) => {
               const journeyStatus = getStatusStyle(journey.status);
               const { label, ...style } = journeyStatus;
+              
+              // Filter out empty journeys if we are in 'errors' or 'healed' mode
+              const steps = journey.steps || [];
+              const visibleSteps = steps.filter(step => {
+                const relatedStepResult = stepResults.find((result) => String(result.step_name || result.goal || '').toLowerCase() === String(step.step || '').toLowerCase());
+                const recoveryEvents = Array.isArray(relatedStepResult?.recovery_attempts) ? relatedStepResult.recovery_attempts : [];
+                const stepStatus = step.status || relatedStepResult?.status || relatedStepResult?.failure_type || step.failure_type;
+                const isError = /failed|blocked/i.test(stepStatus || '');
+                const isHealed = recoveryEvents.length > 0;
+                if (timelineFilter === 'errors' && !isError) return false;
+                if (timelineFilter === 'healed' && !isHealed) return false;
+                return true;
+              });
+              
+              if (timelineFilter !== 'all' && visibleSteps.length === 0) return null;
+
               return (
                 <div key={`${journey.journey || 'journey'}-${index}`} style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
                   <div style={{ padding: 16, borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -420,8 +447,16 @@ export default function AuditDetailPage() {
                       const relatedStepResult = stepResults.find((result) => String(result.step_name || result.goal || '').toLowerCase() === String(step.step || '').toLowerCase());
                       const recoveryEvents = Array.isArray(relatedStepResult?.recovery_attempts) ? relatedStepResult.recovery_attempts : [];
                       const notes = Array.isArray(relatedStepResult?.notes) ? relatedStepResult.notes : [];
-                      const stepStyle = getStatusStyle(step.status || relatedStepResult?.status || relatedStepResult?.failure_type || step.failure_type);
+                      const stepStatus = step.status || relatedStepResult?.status || relatedStepResult?.failure_type || step.failure_type;
+                      const stepStyle = getStatusStyle(stepStatus);
                       const { label: stepLabel, ...statusStyle } = stepStyle;
+                      
+                      // Timeline Filter Logic
+                      const isError = /failed|blocked/i.test(stepStatus || '');
+                      const isHealed = recoveryEvents.length > 0;
+                      if (timelineFilter === 'errors' && !isError) return null;
+                      if (timelineFilter === 'healed' && !isHealed) return null;
+
                       return (
                         <details key={`${step.step || 'step'}-${stepIndex}`} style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', background: 'var(--bg-elevated)' }}>
                           <summary style={{ listStyle: 'none', cursor: 'pointer', padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -451,6 +486,15 @@ export default function AuditDetailPage() {
                                 <div style={{ fontSize: 13 }}>Site blocked the agent with bot protection. This is a site configuration issue, not an AiBreaker execution failure.</div>
                               </div>
                             )}
+                            
+                            {/* Dev Mode Inner Trace */}
+                            {devMode && relatedStepResult && (
+                              <div style={{ marginTop: 8, padding: 10, background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)' }}>
+                                 <pre style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
+                                    {JSON.stringify({ failure_type: relatedStepResult.failure_type, details: relatedStepResult.notes }, null, 2)}
+                                 </pre>
+                              </div>
+                            )}
                           </div>
                         </details>
                       );
@@ -463,6 +507,8 @@ export default function AuditDetailPage() {
         </div>
       )}
 
+
+      
       {report.bundled_fix_prompt && findings.length === 0 ? (
         <div className="slide-up" style={{ marginBottom: 32 }}>
           <div style={{ background: 'linear-gradient(135deg, rgba(59, 180, 255, 0.08), rgba(52, 211, 153, 0.05))', border: '2px solid rgba(59, 180, 255, 0.2)', borderRadius: 'var(--radius-lg)', padding: 24, marginBottom: 16 }}>
@@ -473,15 +519,71 @@ export default function AuditDetailPage() {
         </div>
       ) : report.bundled_fix_prompt ? <div style={{ marginBottom: 24 }}><CopyButton text={report.bundled_fix_prompt} label={t('audit.detail.copyAllFixPrompts', 'Copy All Fix Prompts')} size="lg" /></div> : null}
 
-      {findings.length > 0 && (
-        <>
+
+      {findings.length > 0 && (() => {
+        // Group the findings natively
+        const grouped = findings.reduce((acc, f) => {
+          const type = (f.category || 'General').toUpperCase();
+          if (!acc[type]) acc[type] = [];
+          acc[type].push(f);
+          return acc;
+        }, {});
+
+        return (
+        <div style={{ marginBottom: 24 }}>
           <div className="card-label" style={{ marginBottom: 12 }}>{t('audit.detail.findingsTitle', 'Findings ({{count}})', { count: findings.length })}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-            {findings.map((f, i) => <FindingCard key={i} severity={f.severity || 'info'} category={f.category} title={f.title || f.summary || 'Finding'} description={f.description} fixPrompt={f.fix_prompt || f.fixPrompt} />)}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 24 }}>
+            {Object.entries(grouped).map(([cat, fList]) => (
+              <div key={cat}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '0.05em' }}>{cat}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {fList.map((f, i) => <FindingCard key={`${cat}-${i}`} severity={f.severity || 'info'} category={f.category} title={f.title || f.summary || 'Finding'} description={f.description} fixPrompt={f.fix_prompt || f.fixPrompt} />)}
+                </div>
+              </div>
+            ))}
           </div>
           <CopyButton text={findings.filter((f) => f.fix_prompt || f.fixPrompt).map((f, i) => `${i + 1}. ${f.title || f.summary}\n${f.fix_prompt || f.fixPrompt}`).join('\n\n')} label={t('audit.detail.copyAllFixPrompts', 'Copy All Fix Prompts')} size="lg" />
-        </>
+        </div>
+        );
+      })()}
+      
+      {/* Dev Mode Trace Dump */}
+      {devMode && (
+         <div className="card slide-up" style={{ ...cardStyle, background: '#0a0a0a', border: '1px solid #222' }}>
+            <div className="card-label" style={{ color: 'var(--green)' }}>Developer Trace (Report Raw)</div>
+            <pre style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', overflow: 'auto', maxHeight: 600 }}>
+              {JSON.stringify({ decision_trace: report.decision_trace, summary_text: report.summary_text }, null, 2)}
+            </pre>
+         </div>
       )}
+      
+      </div> {/* End Left Column */}
+
+      {/* Right Column (Sticky Media) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div style={{ position: 'sticky', top: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
+          
+          {report.video_url && (
+            <div className="card" style={cardStyle}>
+              <div className="card-label">{t('audit.detail.videoReplay', 'Video Replay')}</div>
+              {mediaUrls.video ? <video controls src={mediaUrls.video} style={{ width: '100%', borderRadius: 'var(--radius-md)', background: '#000' }} /> : <div style={{ width: '100%', minHeight: 180, borderRadius: 'var(--radius-md)', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: 13 }}>{t('audit.detail.loadingVideo', 'Loading video replay...')}</div>}
+            </div>
+          )}
+
+          <div className="card" style={cardStyle}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <button className={viewport === 'desktop' ? 'btn btn-primary' : 'btn btn-ghost'} onClick={() => setViewport('desktop')} style={{ padding: '6px 14px', fontSize: 12 }}><Monitor size={14} /> {t('common.desktop', 'Desktop')}</button>
+              <button className={viewport === 'mobile' ? 'btn btn-primary' : 'btn btn-ghost'} onClick={() => setViewport('mobile')} style={{ padding: '6px 14px', fontSize: 12 }}><Smartphone size={14} /> {t('common.mobile', 'Mobile')}</button>
+            </div>
+            <div style={{ background: 'var(--bg-deepest)', borderRadius: 'var(--radius-md)', height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--line)', overflow: 'hidden' }}>
+              {screenshotUrl ? <img src={screenshotUrl} alt={t('audit.detail.screenshotAlt', 'Screenshot')} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }} /> : <span style={{ fontSize: 13, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{viewport === 'desktop' ? '1280x800' : '390x844'} screenshot</span>}
+            </div>
+          </div>
+
+        </div>
+      </div> {/* End Right Column */}
+      
+      </div> {/* End Grid */}
     </div>
   );
 }

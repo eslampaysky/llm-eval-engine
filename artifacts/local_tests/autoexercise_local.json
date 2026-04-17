@@ -1,0 +1,319 @@
+{
+  "url": "https://www.automationexercise.com",
+  "score": 74,
+  "journeys_passed": 2,
+  "status": "FAIL",
+  "journey_timeline": [
+    {
+      "journey": "pricing_navigation",
+      "app_type": "marketing_site",
+      "status": "FAILED",
+      "failed_step": "pricing page link",
+      "reason": "Could not resolve action candidate: pricing link",
+      "steps": [
+        {
+          "step": "pricing page link",
+          "status": "failed",
+          "failure_type": "action_resolution_failed",
+          "evidence_delta": [
+            "New text appeared: 'All QA engineers can use this website for automation practice and API testing ei'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "modal",
+              "action_taken": "clicked_close",
+              "success": true,
+              "selector_used": "[aria-label*='close' i]",
+              "notes": "Modal detected and dismissed before action"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "journey": "features_navigation",
+      "app_type": "marketing_site",
+      "status": "PASSED",
+      "failed_step": null,
+      "reason": null,
+      "steps": [
+        {
+          "step": "features or product page link",
+          "status": "passed",
+          "failure_type": null,
+          "evidence_delta": [
+            "URL changed from https://www.automationexercise.com/ to https://www.automationexercise.com/products",
+            "New text appeared: 'ALL PRODUCTS'",
+            "New text appeared: 'Madame Top For Women'",
+            "New text appeared: 'Men Tshirt'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "modal",
+              "action_taken": "clicked_close",
+              "success": true,
+              "selector_used": "[aria-label*='close' i]",
+              "notes": "Modal detected and dismissed before action"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "journey": "contact_navigation",
+      "app_type": "marketing_site",
+      "status": "PASSED",
+      "failed_step": null,
+      "reason": null,
+      "steps": [
+        {
+          "step": "contact or request demo link",
+          "status": "passed",
+          "failure_type": null,
+          "evidence_delta": [
+            "URL changed from https://www.automationexercise.com/ to https://www.automationexercise.com/contact_us",
+            "New text appeared: 'Automated testing platforms'",
+            "New text appeared: 'CONTACT US'",
+            "New text appeared: 'Copyright \u00a9 2021 All rights reserved'"
+          ],
+          "recovery_attempts": [
+            {
+              "choke_point": "before_action",
+              "blocker_type": "modal",
+              "action_taken": "clicked_close",
+              "success": true,
+              "selector_used": "[aria-label*='close' i]",
+              "notes": "Modal detected and dismissed before action"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "step_results": [
+    {
+      "step_name": "pricing page link",
+      "goal": "reach_pricing",
+      "status": "failed",
+      "chosen_action": null,
+      "verification": {
+        "success": false,
+        "passed_signals": [],
+        "failed_signals": [
+          {
+            "type": "url_contains",
+            "value": "pricing",
+            "priority": "high",
+            "required": true
+          }
+        ],
+        "delta_summary": [
+          "New text appeared: 'All QA engineers can use this website for automation practice and API testing ei'"
+        ],
+        "failure_type": "action_resolution_failed",
+        "llm_used": false
+      },
+      "evidence_delta": [
+        "New text appeared: 'All QA engineers can use this website for automation practice and API testing ei'"
+      ],
+      "recovery_attempts": [
+        {
+          "choke_point": "before_action",
+          "blocker_type": "modal",
+          "action_taken": "clicked_close",
+          "success": true,
+          "selector_used": "[aria-label*='close' i]",
+          "notes": "Modal detected and dismissed before action"
+        }
+      ],
+      "failure_type": "action_resolution_failed",
+      "error": "Could not resolve action candidate: pricing link",
+      "notes": [
+        "Modal detected and dismissed before action"
+      ],
+      "before_snapshot": {
+        "url": "https://www.automationexercise.com/",
+        "title": "Automation Exercise",
+        "text_snippet": " Home\n\ue8f8 Products\n Cart\n Signup / Login\n Test Cases\n API Testing\n Video Tutorials\n Contact us\n  \nAutomationExercise\nFull-Fledged practice website for Automation Engineers\n\nAll QA engineers can use this website for automation practice and API testing either they are at beginner or advance level. This is for everybody to help them brush up their automation skills.\n\nTest Cases APIs list for practice\nCATEGORY\nWOMEN\nMEN\nKIDS\nDiscover more\nAutomation testing courses\nOnline coding practice platforms\nTest automation tools\nMock API services\nWeb development courses\nAPI integration services\nAPI development services\nMobile app testing tools\nBRANDS\n(6)\nPOLO\n(5)\nH&M\n(5)\nMADAME\n(3)\nMAST & HARBOUR\n(4)\nBABYHUG\n(3)\nALLEN SOLLY JUNIOR\n(3)\nKOOKIE KIDS\n(5)\nBIBA\nFEATURES ITEMS\nRs. 500\n\nBlue Top\n\nAdd to cart\nRs. "
+      },
+      "after_snapshot": {
+        "url": "https://www.automationexercise.com/",
+        "title": "Automation Exercise",
+        "text_snippet": " Home\n\ue8f8 Products\n Cart\n Signup / Login\n Test Cases\n API Testing\n Video Tutorials\n Contact us\n  \nAutomationExercise\nFull-Fledged practice website for Automation Engineers\n\nAll QA engineers can use this website for automation practice and API testing either they are at beginner or advance level. This is for everybody to help them brush up their automation skills.Automation practice website\n\nTest Cases APIs list for practice\nCATEGORY\nWOMEN\nMEN\nKIDS\nDiscover more\nAutomation testing courses\nOnline coding practice platforms\nTest automation tools\nMock API services\nWeb development courses\nAPI integration services\nAPI development services\nMobile app testing tools\nBRANDS\n(6)\nPOLO\n(5)\nH&M\n(5)\nMADAME\n(3)\nMAST & HARBOUR\n(4)\nBABYHUG\n(3)\nALLEN SOLLY JUNIOR\n(3)\nKOOKIE KIDS\n(5)\nBIBA\nFEATURES ITEMS\nRs. 500\n"
+      },
+      "screenshot_path": null
+    },
+    {
+      "step_name": "features or product page link",
+      "goal": "reach_features",
+      "status": "passed",
+      "chosen_action": {
+        "sequence": [
+          {
+            "type": "click",
+            "intent": "features link",
+            "selectors": [
+              "a[href*='features']",
+              "nav a:has-text('Features')"
+            ],
+            "role": "link",
+            "name": "Features",
+            "value": null
+          },
+          {
+            "type": "click",
+            "intent": "product link",
+            "selectors": [
+              "a[href*='product']",
+              "nav a:has-text('Product')"
+            ],
+            "role": "link",
+            "name": "Product",
+            "value": null
+          }
+        ]
+      },
+      "verification": {
+        "success": true,
+        "passed_signals": [
+          {
+            "type": "url_contains",
+            "value": "product",
+            "priority": "high",
+            "required": false
+          }
+        ],
+        "failed_signals": [],
+        "delta_summary": [
+          "URL changed from https://www.automationexercise.com/ to https://www.automationexercise.com/products",
+          "New text appeared: 'ALL PRODUCTS'",
+          "New text appeared: 'Madame Top For Women'",
+          "New text appeared: 'Men Tshirt'"
+        ],
+        "failure_type": "none",
+        "llm_used": false
+      },
+      "evidence_delta": [
+        "URL changed from https://www.automationexercise.com/ to https://www.automationexercise.com/products",
+        "New text appeared: 'ALL PRODUCTS'",
+        "New text appeared: 'Madame Top For Women'",
+        "New text appeared: 'Men Tshirt'"
+      ],
+      "recovery_attempts": [
+        {
+          "choke_point": "before_action",
+          "blocker_type": "modal",
+          "action_taken": "clicked_close",
+          "success": true,
+          "selector_used": "[aria-label*='close' i]",
+          "notes": "Modal detected and dismissed before action"
+        }
+      ],
+      "failure_type": null,
+      "error": null,
+      "notes": [
+        "Modal detected and dismissed before action"
+      ],
+      "before_snapshot": {
+        "url": "https://www.automationexercise.com/",
+        "title": "Automation Exercise",
+        "text_snippet": " Home\n\ue8f8 Products\n Cart\n Signup / Login\n Test Cases\n API Testing\n Video Tutorials\n Contact us\n  \nAutomationExercise\nFull-Fledged practice website for Automation Engineers\n\nAll QA engineers can use this website for automation practice and API testing either they are at beginner or advance level. This is for everybody to help them brush up their automation skills.\n\nTest Cases APIs list for practice\nCATEGORY\nWOMEN\nMEN\nKIDS\nDiscover more\nDocker for testers\nTest automation tools\nAPI testing tools\nTest case automation\nMobile app testing tools\nAutomation testing courses\nAutomation framework templates\nQA automation consultant\nBRANDS\n(6)\nPOLO\n(5)\nH&M\n(5)\nMADAME\n(3)\nMAST & HARBOUR\n(4)\nBABYHUG\n(3)\nALLEN SOLLY JUNIOR\n(3)\nKOOKIE KIDS\n(5)\nBIBA\nFEATURES ITEMS\nRs. 500\n\nBlue Top\n\nAdd to cart\nRs. 500\n\nBlue T"
+      },
+      "after_snapshot": {
+        "url": "https://www.automationexercise.com/products",
+        "title": "Automation Exercise - All Products",
+        "text_snippet": " Home\n\ue8f8 Products\n Cart\n Signup / Login\n Test Cases\n API Testing\n Video Tutorials\n Contact us\n\n\nCATEGORY\nWOMEN\nMEN\nKIDS\nBRANDS\n(6)\nPOLO\n(5)\nH&M\n(5)\nMADAME\n(3)\nMAST & HARBOUR\n(4)\nBABYHUG\n(3)\nALLEN SOLLY JUNIOR\n(3)\nKOOKIE KIDS\n(5)\nBIBA\nALL PRODUCTS\nRs. 500\n\nBlue Top\n\nAdd to cart\nRs. 500\n\nBlue Top\n\nAdd to cart\nView Product\nRs. 400\n\nMen \u00a0Tshirt\n\nAdd to cart\nRs. 400\n\nMen Tshirt\n\nAdd to cart\nView Product\nRs. 1000\n\nSleeveless \u00a0Dress\n\nAdd to cart\nRs. 1000\n\nSleeveless Dress\n\nAdd to cart\nView Product\nRs. 1500\n\nStylish Dress\n\nAdd to cart\nRs. 1500\n\nStylish Dress\n\nAdd to cart\nView Product\nRs. 600\n\nWinter Top\n\nAdd to cart\nRs. 600\n\nWinter Top\n\nAdd to cart\nView Product\nRs. 400\n\nSummer White Top\n\nAdd to cart\nRs. 400\n\nSummer White Top\n\nAdd to cart\nView Product\nRs. 1000\n\nMadame Top For Women\n\nAdd to cart\nRs. "
+      },
+      "screenshot_path": null
+    },
+    {
+      "step_name": "contact or request demo link",
+      "goal": "reach_contact_or_demo",
+      "status": "passed",
+      "chosen_action": {
+        "sequence": [
+          {
+            "type": "click",
+            "intent": "contact link",
+            "selectors": [
+              "a[href*='contact']",
+              "a:has-text('Contact')"
+            ],
+            "role": "link",
+            "name": "Contact",
+            "value": null
+          }
+        ]
+      },
+      "verification": {
+        "success": true,
+        "passed_signals": [
+          {
+            "type": "url_contains",
+            "value": "contact",
+            "priority": "high",
+            "required": false
+          },
+          {
+            "type": "text_present",
+            "value": "contact",
+            "priority": "medium",
+            "required": false
+          },
+          {
+            "type": "element_visible",
+            "value": {
+              "selector": "form"
+            },
+            "priority": "medium",
+            "required": false
+          }
+        ],
+        "failed_signals": [],
+        "delta_summary": [
+          "URL changed from https://www.automationexercise.com/ to https://www.automationexercise.com/contact_us",
+          "New text appeared: 'Automated testing platforms'",
+          "New text appeared: 'CONTACT US'",
+          "New text appeared: 'Copyright \u00a9 2021 All rights reserved'"
+        ],
+        "failure_type": "none",
+        "llm_used": false
+      },
+      "evidence_delta": [
+        "URL changed from https://www.automationexercise.com/ to https://www.automationexercise.com/contact_us",
+        "New text appeared: 'Automated testing platforms'",
+        "New text appeared: 'CONTACT US'",
+        "New text appeared: 'Copyright \u00a9 2021 All rights reserved'"
+      ],
+      "recovery_attempts": [
+        {
+          "choke_point": "before_action",
+          "blocker_type": "modal",
+          "action_taken": "clicked_close",
+          "success": true,
+          "selector_used": "[aria-label*='close' i]",
+          "notes": "Modal detected and dismissed before action"
+        }
+      ],
+      "failure_type": null,
+      "error": null,
+      "notes": [
+        "Modal detected and dismissed before action",
+        "Action error overruled by success signals: Could not resolve action candidate: request demo link"
+      ],
+      "before_snapshot": {
+        "url": "https://www.automationexercise.com/",
+        "title": "Automation Exercise",
+        "text_snippet": " Home\n\ue8f8 Products\n Cart\n Signup / Login\n Test Cases\n API Testing\n Video Tutorials\n Contact us\n  \nAutomationExercise\nFull-Fledged practice website for Automation Engineers\n\nAll QA engineers can use this website for automation practice and API testing either they are at beginner or advance level. This is for everybody to help them brush up their automation skills.\n\nTest Cases APIs list for practice\nCATEGORY\nWOMEN\nMEN\nKIDS\nDiscover more\nAPI integration services\nQA automation consultant\nQA certification programs\nTest case templates\nAutomation testing courses\nJavaScript programming courses\nTest case management tools\nDocker for testers\nBRANDS\n(6)\nPOLO\n(5)\nH&M\n(5)\nMADAME\n(3)\nMAST & HARBOUR\n(4)\nBABYHUG\n(3)\nALLEN SOLLY JUNIOR\n(3)\nKOOKIE KIDS\n(5)\nBIBA\nFEATURES ITEMS\nRs. 500\n\nBlue Top\n\nAdd to cart\nRs."
+      },
+      "after_snapshot": {
+        "url": "https://www.automationexercise.com/contact_us",
+        "title": "Automation Exercise - Contact Us",
+        "text_snippet": " Home\n\ue8f8 Products\n Cart\n Signup / Login\n Test Cases\n API Testing\n Video Tutorials\n Contact us\nCONTACT US\nNote: Below contact form is for testing purpose.Software testing tutorials\nGET IN TOUCH\nFEEDBACK FOR US\n\nWe really appreciate your response to our website.\n\n\n\n\nKindly share your feedback with us at feedback@automationexercise.com.\n\n\n\n\nIf you have any suggestion areas or improvements, do let us know. We will definitely work on it.\n\n\n\n\nThank you\n\nDiscover more\nVirtual private networks\nREST API tutorials\nAutomated testing platforms\nSUBSCRIPTION\n \n\nGet the most recent updates from\nour site and be updated your self...\n\nCopyright \u00a9 2021 All rights reserved"
+      },
+      "screenshot_path": null
+    }
+  ]
+}

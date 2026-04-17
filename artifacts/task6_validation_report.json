@@ -1,0 +1,182 @@
+[
+  {
+    "target": "DemoBlaze",
+    "url": "https://www.demoblaze.com",
+    "passed": true,
+    "checks": {
+      "has_diagnostics_summary": true,
+      "primary_issue_meaningful": true,
+      "issues_sorted_by_impact": true,
+      "issues_capped": true,
+      "affected_steps_tracked": true
+    },
+    "messages": [
+      "\u2713 Primary issue: internal_error: diagnostic_generation_failed",
+      "\u2713 Issues sorted by impact",
+      "\u2713 Issues capped (1/5)",
+      "\u2713 Affected steps tracked for all 1 issues"
+    ],
+    "diagnostics_summary": {
+      "summary": {
+        "total_steps": 3,
+        "failed_steps": 2,
+        "primary_issue": "internal_error: diagnostic_generation_failed"
+      },
+      "issues": [
+        {
+          "count": 2,
+          "type": "internal_error",
+          "reason": "diagnostic_generation_failed",
+          "recommendations": [
+            "Check exception details in logs"
+          ],
+          "affected_steps": [
+            "add to cart button on listing page",
+            "add to cart button on product detail page"
+          ]
+        }
+      ]
+    },
+    "issues": [
+      {
+        "count": 2,
+        "type": "internal_error",
+        "reason": "diagnostic_generation_failed",
+        "recommendations": [
+          "Check exception details in logs"
+        ],
+        "affected_steps": [
+          "add to cart button on listing page",
+          "add to cart button on product detail page"
+        ]
+      }
+    ],
+    "result_keys": [
+      "url",
+      "tier",
+      "score",
+      "confidence",
+      "app_type",
+      "classifier_confidence",
+      "classifier_source",
+      "classifier_signals",
+      "findings",
+      "summary",
+      "bundled_fix_prompt",
+      "video_path",
+      "desktop_screenshot_b64",
+      "mobile_screenshot_b64",
+      "journey_results",
+      "journey_timeline",
+      "step_results",
+      "llm_trace",
+      "error",
+      "analysis_limited",
+      "user_key_exhausted",
+      "diagnostics_summary",
+      "execution_context"
+    ]
+  },
+  {
+    "target": "Gymshark",
+    "url": "https://www.gymshark.com",
+    "passed": false,
+    "checks": {
+      "has_diagnostics_summary": true,
+      "primary_issue_meaningful": false,
+      "issues_sorted_by_impact": true,
+      "issues_capped": true,
+      "affected_steps_tracked": true
+    },
+    "messages": [
+      "\u26a0\ufe0f Primary issue not meaningful: None",
+      "\u2713 No issues to sort (no failures)",
+      "\u2713 Issues capped (0/5)"
+    ],
+    "diagnostics_summary": {
+      "summary": {
+        "total_steps": 3,
+        "failed_steps": 0,
+        "primary_issue": null
+      },
+      "issues": []
+    },
+    "issues": [],
+    "result_keys": [
+      "url",
+      "tier",
+      "score",
+      "confidence",
+      "app_type",
+      "classifier_confidence",
+      "classifier_source",
+      "classifier_signals",
+      "findings",
+      "summary",
+      "bundled_fix_prompt",
+      "video_path",
+      "desktop_screenshot_b64",
+      "mobile_screenshot_b64",
+      "journey_results",
+      "journey_timeline",
+      "step_results",
+      "llm_trace",
+      "error",
+      "analysis_limited",
+      "user_key_exhausted",
+      "diagnostics_summary",
+      "execution_context"
+    ]
+  },
+  {
+    "target": "The Internet (auth)",
+    "url": "https://the-internet.herokuapp.com/login",
+    "passed": false,
+    "checks": {
+      "has_diagnostics_summary": true,
+      "primary_issue_meaningful": false,
+      "issues_sorted_by_impact": true,
+      "issues_capped": true,
+      "affected_steps_tracked": true
+    },
+    "messages": [
+      "\u26a0\ufe0f Primary issue not meaningful: None",
+      "\u2713 No issues to sort (no failures)",
+      "\u2713 Issues capped (0/5)"
+    ],
+    "diagnostics_summary": {
+      "summary": {
+        "total_steps": 1,
+        "failed_steps": 0,
+        "primary_issue": null
+      },
+      "issues": []
+    },
+    "issues": [],
+    "result_keys": [
+      "url",
+      "tier",
+      "score",
+      "confidence",
+      "app_type",
+      "classifier_confidence",
+      "classifier_source",
+      "classifier_signals",
+      "findings",
+      "summary",
+      "bundled_fix_prompt",
+      "video_path",
+      "desktop_screenshot_b64",
+      "mobile_screenshot_b64",
+      "journey_results",
+      "journey_timeline",
+      "step_results",
+      "llm_trace",
+      "error",
+      "analysis_limited",
+      "user_key_exhausted",
+      "diagnostics_summary",
+      "execution_context"
+    ]
+  }
+]

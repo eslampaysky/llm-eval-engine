@@ -1,0 +1,26 @@
+{
+  "phase": "Phase 3 Demo",
+  "features": [
+    "Rich diagnostic context",
+    "LLM decision tracing",
+    "Phase-based decision traces",
+    "Pattern categorization",
+    "Actionable recommendations"
+  ],
+  "diagnostic_examples": [
+    {
+      "failure_type": "action_resolution_failed",
+      "diagnostic": {
+        "reason": "Selector matching failed on Gymshark product page",
+        "pattern": "selector_mismatch"
+      }
+    },
+    {
+      "failure_type": "verification_failed",
+      "diagnostic": {
+        "reason": "Button clicked but no success signal detected in visible page content",
+        "pattern": "verification_mismatch"
+      }
+    }
+  ]
+}

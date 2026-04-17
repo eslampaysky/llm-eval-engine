@@ -55,7 +55,7 @@ README_MD     = OUTPUT_DIR / "README.md"
 CSV_HEADERS = [
     "timestamp", "run_batch", "name", "group", "url", "tier",
     "audit_id", "duration_s", "status",
-    "score", "analysis_limited",
+    "score", "analysis_limited", "llm_used",
     "app_type_detected", "expected_type", "classification_correct",
     "journeys_total", "journeys_passed", "journeys_failed",
     "bot_blocked", "captcha_hit",
@@ -214,6 +214,7 @@ def _make_error(target: dict, batch_id: str,
         "status":      "error",
         "score":       None,
         "analysis_limited": False,
+        "llm_used": False,
         "app_type_detected": "",
         "expected_type": target.get("expected_type", ""),
         "classification_correct": None,
@@ -237,6 +238,11 @@ def _parse(target: dict, raw: dict, audit_id: str,
     timeline = raw.get("journey_timeline") or []
     step_res = raw.get("step_results") or []
     findings = raw.get("findings") or []
+    llm_used = any(
+        ((step.get("verification") or {}).get("llm_used") is True)
+        for step in step_res
+        if isinstance(step, dict)
+    )
 
     # App type from first journey
     app_type = ""
@@ -299,6 +305,7 @@ def _parse(target: dict, raw: dict, audit_id: str,
         "status":      raw.get("status", ""),
         "score":       raw.get("score"),
         "analysis_limited": raw.get("analysis_limited", False),
+        "llm_used": llm_used,
         "app_type_detected": app_type,
         "expected_type": expected,
         "classification_correct": correct,
@@ -316,6 +323,33 @@ def _parse(target: dict, raw: dict, audit_id: str,
         "_raw": raw,
         "_error": False,
     }
+
+
+def _is_clean_pass(result: dict) -> bool:
+    if result.get("_error"):
+        return False
+    if result.get("bot_blocked"):
+        return False
+    if result.get("failure_type"):
+        return False
+
+    status = str(result.get("status") or "").strip().lower()
+    if status and status not in {"done", "completed", "success", "passed"}:
+        return False
+
+    journeys_total = int(result.get("journeys_total") or 0)
+    journeys_passed = int(result.get("journeys_passed") or 0)
+    journeys_failed = int(result.get("journeys_failed") or 0)
+    if journeys_total > 0 and journeys_passed == 0:
+        return False
+    if journeys_failed > 0:
+        return False
+
+    score = result.get("score")
+    if isinstance(score, (int, float)) and journeys_total > 0 and score <= 0:
+        return False
+
+    return True
 
 # ── Saving ──────────────────────────────────────────────────────────────────────
 
@@ -448,7 +482,7 @@ def update_readme(history: list[dict]):
         lines.append(
             f"| {r.get('name','')} | {r.get('group','')} "
             f"| {r.get('score','n/a')} | {r.get('duration_s','?')}s "
-            f"| {'🚫' if r.get('bot_blocked') else ''} "
+            f"| {'[BOT]' if r.get('bot_blocked') else ''} "
             f"| {r.get('failure_type','') or ''} |"
         )
 
@@ -507,10 +541,10 @@ def main():
         batch     = pick_batch(targets_to_run, args.batch_size)
 
         print()
-        print(f"{C.BOLD}{'═'*62}{C.E}")
-        print(f"{C.BOLD}  Batch #{batch_num} — {datetime.now().strftime('%Y-%m-%d %H:%M')}  "
+        print(f"{C.BOLD}{'='*62}{C.E}")
+        print(f"{C.BOLD}  Batch #{batch_num} -- {datetime.now().strftime('%Y-%m-%d %H:%M')}  "
               f"({len(batch)} random targets from {len(targets_to_run)}){C.E}")
-        print(f"{C.BOLD}{'═'*62}{C.E}")
+        print(f"{C.BOLD}{'='*62}{C.E}")
         dim("  " + "  ".join(f"[{t['_group'][0].upper()}]{t['name']}" for t in batch))
 
         for i, target in enumerate(batch, 1):
@@ -537,6 +571,12 @@ def main():
             elif ft:
                 warn(f"{target['name']} FAIL  score={score}  {dur}s  "
                      f"type={ft}  step={result.get('failed_step','?')}")
+            elif not _is_clean_pass(result):
+                warn(
+                    f"{target['name']} FAIL  score={score}  {dur}s  "
+                    f"status={result.get('status','?')}  "
+                    f"journeys={result.get('journeys_passed',0)}/{result.get('journeys_total',0)}"
+                )
             else:
                 ok(f"{target['name']} PASS  score={score}  {dur}s  "
                    f"app={app}  correct={cls}")
@@ -545,7 +585,7 @@ def main():
             json_path = save_json(result)
             append_csv(result)
             update_patterns(result)
-            dim(f"  saved → {json_path.name}")
+            dim(f"  saved -> {json_path.name}")
 
             if i < len(batch):
                 time.sleep(12)   # gap between audits in same batch

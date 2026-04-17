@@ -37,6 +37,7 @@ _log = logging.getLogger(__name__)
 # ── Gemini client ─────────────────────────────────────────────────────────────
 
 _MODEL_NAME = "gemini-2.0-flash"
+_VISION_PROVIDER_ORDER_ENV = "AIBREAKER_VISION_PROVIDER_ORDER"
 
 
 # ── Multi-key pool (Part 2) ──────────────────────────────────────────────────
@@ -260,6 +261,22 @@ def _try_groq_vision(prompt_text: str, desktop_b64: str | None) -> dict | None:
     except Exception as exc:
         _log.error("[GroqFallback] Groq vision call failed: %s", exc)
         return None
+
+
+def _vision_provider_order() -> list[str]:
+    raw = (os.getenv(_VISION_PROVIDER_ORDER_ENV) or "").strip()
+    if not raw:
+        return ["gemini", "groq", "playwright"]
+
+    ordered: list[str] = []
+    for item in raw.split(","):
+        provider = item.strip().lower()
+        if provider in {"gemini", "groq", "playwright"} and provider not in ordered:
+            ordered.append(provider)
+
+    if "playwright" not in ordered:
+        ordered.append("playwright")
+    return ordered
 
 
 # ── Playwright-only fallback analysis (Part 1) ───────────────────────────────
@@ -624,38 +641,43 @@ def judge_visual(crawl: dict, user_api_key: str | None = None) -> dict[str, Any]
     if not desktop_b64 and not mobile_b64:
         _log.warning("[GeminiJudge] No screenshots available — text-only analysis")
 
+    provider_order = _vision_provider_order()
+
     # ── Layer 1 & 2: Try Gemini (user key or shared pool with rotation) ──
     user_key_exhausted = False
     raw_text = None
 
-    try:
-        raw_text = _call_gemini_with_rotation(parts, user_api_key=user_api_key)
-    except _SingleKey429:
-        # User's own key is exhausted
-        _log.warning("[GeminiJudge] User's own API key quota exhausted")
-        user_key_exhausted = True
-    except _AllKeysExhausted:
-        _log.warning("[GeminiJudge] All shared Gemini keys exhausted — trying Groq")
-    except Exception as exc:
-        _log.error("[GeminiJudge] Gemini call failed (non-429): %s", type(exc).__name__)
+    for provider in provider_order:
+        if provider == "gemini":
+            try:
+                raw_text = _call_gemini_with_rotation(parts, user_api_key=user_api_key)
+                break
+            except _SingleKey429:
+                _log.warning("[GeminiJudge] User's own API key quota exhausted")
+                user_key_exhausted = True
+            except _AllKeysExhausted:
+                _log.warning("[GeminiJudge] All shared Gemini keys exhausted")
+            except Exception as exc:
+                _log.error("[GeminiJudge] Gemini call failed (non-429): %s", type(exc).__name__)
+        elif provider == "groq":
+            if user_key_exhausted:
+                continue
+            groq_verdict = _try_groq_vision(prompt_text, desktop_b64)
+            if groq_verdict and groq_verdict.get("findings") is not None:
+                verdict = groq_verdict
+                verdict.setdefault("score", 50)
+                verdict.setdefault("confidence", 60)
+                verdict.setdefault("summary", "Analysis completed via backup AI model.")
+                verdict["findings"] = _clean_findings(verdict.get("findings", []))
+                verdict["score"] = max(0, min(100, int(verdict["score"])))
+                verdict["confidence"] = max(0, min(100, int(verdict["confidence"])))
+                _set_cached(url, verdict)
+                return verdict
+        elif provider == "playwright":
+            break
 
-    # ── Layer 3: Try Groq vision if Gemini failed ──
-    if raw_text is None and not user_key_exhausted:
-        groq_verdict = _try_groq_vision(prompt_text, desktop_b64)
-        if groq_verdict and groq_verdict.get("findings") is not None:
-            verdict = groq_verdict
-            verdict.setdefault("score", 50)
-            verdict.setdefault("confidence", 60)
-            verdict.setdefault("summary", "Analysis completed via backup AI model.")
-            verdict["findings"] = _clean_findings(verdict.get("findings", []))
-            verdict["score"] = max(0, min(100, int(verdict["score"])))
-            verdict["confidence"] = max(0, min(100, int(verdict["confidence"])))
-            _set_cached(url, verdict)
-            return verdict
-
-    # ── Layer 4: Playwright-only fallback ──
     if raw_text is None:
-        _log.warning("[GeminiJudge] All AI layers failed — using Playwright-only fallback")
+        _log.warning("[GeminiJudge] All configured AI layers failed — using Playwright-only fallback")
         verdict = _playwright_fallback_analysis(crawl)
         verdict["user_key_exhausted"] = user_key_exhausted
         # Don't cache fallback results — retry with AI next time

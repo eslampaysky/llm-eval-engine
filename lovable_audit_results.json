@@ -1,0 +1,96 @@
+[
+  {
+    "name": "Asif Mani Jewellers",
+    "audit_id": "aa051afd-ba98-47c0-83fb-aa82f3ac8cf8",
+    "status": "timeout"
+  },
+  {
+    "name": "Pingstore",
+    "url": "https://getping.store",
+    "status": "canceled",
+    "score": null,
+    "confidence": null,
+    "app_type": "?",
+    "journeys_passed": 0,
+    "journey_total": 0,
+    "findings_count": 0,
+    "findings": [],
+    "recovery_events": [],
+    "summary": "Canceled by user",
+    "elapsed": 153
+  },
+  {
+    "name": "Planoraa",
+    "url": "https://planoraa.lovable.app",
+    "status": "done",
+    "score": 92,
+    "confidence": 90,
+    "app_type": "saas_auth",
+    "journeys_passed": 1,
+    "journey_total": 1,
+    "findings_count": 4,
+    "findings": [
+      {
+        "severity": "low",
+        "title": "Console errors detected",
+        "fix_prompt": "Investigate and fix the server response error for the missing resource."
+      },
+      {
+        "severity": "low",
+        "title": "Failed network requests",
+        "fix_prompt": "Check and fix the image URLs or replace them with valid ones."
+      },
+      {
+        "severity": "low",
+        "title": "Duplicate buttons",
+        "fix_prompt": "Remove or consolidate duplicate buttons to improve user experience."
+      },
+      {
+        "severity": "low",
+        "title": "Missing alt text for images",
+        "fix_prompt": "Add alt text to all images on the page."
+      }
+    ],
+    "recovery_events": [],
+    "summary": "The website has some minor issues with performance and content, but overall it looks professional and functions well. Fixing these issues can improve user experience and accessibility.",
+    "elapsed": 397
+  },
+  {
+    "name": "NicolasGrenie.com",
+    "audit_id": "d577c56d-150d-4b39-97bf-8d89f4915055",
+    "status": "timeout"
+  },
+  {
+    "name": "REOR Consulting",
+    "url": "https://www.reorconsulting.com",
+    "status": "done",
+    "score": 90,
+    "confidence": 90,
+    "app_type": "saas_auth",
+    "journeys_passed": 0,
+    "journey_total": 1,
+    "findings_count": 3,
+    "findings": [
+      {
+        "severity": "low",
+        "title": "Failed network requests",
+        "fix_prompt": "Investigate and fix the failed network requests by checking the URLs and ensuring the images are properly hosted and accessible."
+      },
+      {
+        "severity": "medium",
+        "title": "Missing alt text for images",
+        "fix_prompt": "Add alt text to all images on the page to improve accessibility and SEO."
+      },
+      {
+        "severity": "low",
+        "title": "Inconsistent spacing",
+        "fix_prompt": "Review and adjust the spacing between elements to ensure a consistent design."
+      }
+    ],
+    "recovery_events": [
+      "soft_recovery"
+    ],
+    "summary": "The website has some minor issues with failed network requests, missing alt text, and inconsistent spacing, but overall it appears to be functional and visually appealing.",
+    "elapsed": 303
+  }
+]

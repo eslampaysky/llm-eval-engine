@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, ArrowRight, Zap, Loader, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { Search, ArrowRight, Zap, Loader, AlertTriangle, ArrowUpRight, X, LayoutTemplate } from 'lucide-react';
 import { api } from '../../services/api';
 import ScoreRing from '../../components/ScoreRing.jsx';
 
@@ -13,6 +13,7 @@ export default function AuditsPage() {
   const [failurePatterns, setFailurePatterns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeDrilldown, setActiveDrilldown] = useState(null);
 
   const tierLabels = useMemo(
     () => ({
@@ -113,11 +114,11 @@ export default function AuditsPage() {
                     date: pattern.last_seen_at ? new Date(pattern.last_seen_at).toLocaleDateString(i18n.language === 'ar' ? 'ar' : undefined) : t('audit.list.recently', 'recently'),
                   })}
                 </div>
-                {pattern.example_audit_id && (
-                  <Link to={`/app/audits/${pattern.example_audit_id}`} className="btn btn-ghost" style={{ width: 'fit-content', padding: '6px 10px', fontSize: 12 }}>
-                    {t('audit.list.exampleAudit', 'Example audit')} <ArrowUpRight size={14} style={{ transform: i18n.dir() === 'rtl' ? 'scaleX(-1)' : undefined }} />
-                  </Link>
-                )}
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <button onClick={() => setActiveDrilldown(pattern)} className="btn btn-ghost" style={{ flex: 1, padding: '6px 10px', fontSize: 12, justifyContent: 'center' }}>
+                    Drill down <ArrowUpRight size={14} style={{ transform: i18n.dir() === 'rtl' ? 'scaleX(-1)' : undefined }} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -206,6 +207,65 @@ export default function AuditsPage() {
           )}
         </div>
       )}
+
+      {/* Drilldown Modal Overlay */}
+      {activeDrilldown && (
+        <div className="fade-in" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div className="card slide-up" style={{ width: '100%', maxWidth: 640, background: 'var(--bg-elevated)', border: '1px solid var(--line)', padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Issue Drilldown</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Analyzing occurrences of this exact failure across all runs.</div>
+              </div>
+              <button className="btn btn-ghost" onClick={() => setActiveDrilldown(null)} style={{ padding: 8, borderRadius: '50%' }}>
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+               
+               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 16, alignItems: 'start', background: 'var(--bg-deepest)', padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--line)' }}>
+                 <div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Failing Step</div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>{String(activeDrilldown.step_name || '').replace(/[_-]+/g, ' ')}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--amber)', fontSize: 13 }}>
+                      <AlertTriangle size={14} /> {String(activeDrilldown.failure_type || '').replace(/_/g, ' ')}
+                    </div>
+                 </div>
+                 <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Impact</div>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--red)' }}>{activeDrilldown.count} runs</span>
+                 </div>
+               </div>
+
+               <div>
+                 <div className="card-label" style={{ marginBottom: 12 }}>Available Actions</div>
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {activeDrilldown.example_audit_id && (
+                      <Link to={`/app/audits/${activeDrilldown.example_audit_id}`} className="btn btn-primary" style={{ justifyContent: 'space-between', padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                           <LayoutTemplate size={16} /> Inspect Primary Example
+                        </div>
+                        <ArrowRight size={16} />
+                      </Link>
+                    )}
+                    <button className="btn btn-ghost" onClick={() => { setSearchQuery(activeDrilldown.app_type || ''); setActiveDrilldown(null); }} style={{ justifyContent: 'space-between', padding: '12px 16px', border: '1px solid var(--line)' }}>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                         <Search size={16} /> Filter List by Platform ({activeDrilldown.app_type})
+                      </div>
+                      <ArrowRight size={16} />
+                    </button>
+                 </div>
+               </div>
+
+               <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', marginTop: 8 }}>
+                 Full database trace for step alignment coming in Phase 5.
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

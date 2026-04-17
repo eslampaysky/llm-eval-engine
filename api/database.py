@@ -318,6 +318,10 @@ def init_db():
                 site_description TEXT,
                 tier            TEXT,
                 status          TEXT NOT NULL DEFAULT 'queued',
+                app_type        TEXT,
+                classifier_confidence INTEGER,
+                classifier_source TEXT,
+                classifier_signals_json TEXT,
                 score           INTEGER,
                 confidence      INTEGER,
                 findings_json   TEXT,
@@ -325,7 +329,10 @@ def init_db():
                 bundled_fix     TEXT,
                 journey_timeline_json TEXT,
                 step_results_json TEXT,
+                result_json     TEXT,
                 video_path      TEXT,
+                desktop_ss_path TEXT,
+                mobile_ss_path  TEXT,
                 desktop_ss_b64  TEXT,
                 mobile_ss_b64   TEXT,
                 created_at      TEXT NOT NULL,
@@ -401,10 +408,56 @@ def init_db():
         existing_agentic_qa = {row["column_name"] for row in cur.fetchall()}
         if "site_description" not in existing_agentic_qa:
             cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN site_description TEXT")
+        if "app_type" not in existing_agentic_qa:
+            cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN app_type TEXT")
+        if "classifier_confidence" not in existing_agentic_qa:
+            cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN classifier_confidence INTEGER")
+        if "classifier_source" not in existing_agentic_qa:
+            cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN classifier_source TEXT")
+        if "classifier_signals_json" not in existing_agentic_qa:
+            cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN classifier_signals_json TEXT")
         if "journey_timeline_json" not in existing_agentic_qa:
             cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN journey_timeline_json TEXT")
         if "step_results_json" not in existing_agentic_qa:
             cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN step_results_json TEXT")
+        if "desktop_ss_path" not in existing_agentic_qa:
+            cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN desktop_ss_path TEXT")
+        if "mobile_ss_path" not in existing_agentic_qa:
+            cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN mobile_ss_path TEXT")
+        if "result_json" not in existing_agentic_qa:
+            cur.execute("ALTER TABLE agentic_qa_reports ADD COLUMN result_json TEXT")
+
+        # Backfill path columns from legacy columns when the legacy value is already a file path.
+        cur.execute(
+            """
+            UPDATE agentic_qa_reports
+               SET desktop_ss_path = desktop_ss_b64
+             WHERE desktop_ss_path IS NULL
+               AND desktop_ss_b64 IS NOT NULL
+               AND desktop_ss_b64 NOT LIKE 'data:%'
+               AND desktop_ss_b64 NOT LIKE '%=%'
+               AND (
+                    desktop_ss_b64 LIKE '/%'
+                 OR desktop_ss_b64 LIKE '%.png'
+                 OR desktop_ss_b64 LIKE '%\\%'
+               )
+            """
+        )
+        cur.execute(
+            """
+            UPDATE agentic_qa_reports
+               SET mobile_ss_path = mobile_ss_b64
+             WHERE mobile_ss_path IS NULL
+               AND mobile_ss_b64 IS NOT NULL
+               AND mobile_ss_b64 NOT LIKE 'data:%'
+               AND mobile_ss_b64 NOT LIKE '%=%'
+               AND (
+                    mobile_ss_b64 LIKE '/%'
+                 OR mobile_ss_b64 LIKE '%.png'
+                 OR mobile_ss_b64 LIKE '%\\%'
+               )
+            """
+        )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1832,6 +1885,10 @@ def cancel_agentic_qa_report(
 def finalize_agentic_qa_success(
     *,
     audit_id: str,
+    app_type: str | None,
+    classifier_confidence: int | None,
+    classifier_source: str | None,
+    classifier_signals_json: str | None,
     score: int | None,
     confidence: int | None,
     findings_json: str | None,
@@ -1840,8 +1897,9 @@ def finalize_agentic_qa_success(
     journey_timeline_json: str | None,
     step_results_json: str | None,
     video_path: str | None,
-    desktop_ss_b64: str | None,
-    mobile_ss_b64: str | None,
+    desktop_ss_path: str | None,
+    mobile_ss_path: str | None,
+    result_json: str | None = None,
 ) -> None:
     with _get_conn() as conn:
         cur = conn.cursor()
@@ -1849,6 +1907,10 @@ def finalize_agentic_qa_success(
             f"""
             UPDATE agentic_qa_reports
                SET status={_P},
+                   app_type={_P},
+                   classifier_confidence={_P},
+                   classifier_source={_P},
+                   classifier_signals_json={_P},
                    score={_P},
                    confidence={_P},
                    findings_json={_P},
@@ -1856,15 +1918,19 @@ def finalize_agentic_qa_success(
                    bundled_fix={_P},
                    journey_timeline_json={_P},
                    step_results_json={_P},
+                   result_json={_P},
                    video_path={_P},
-                   desktop_ss_b64={_P},
-                   mobile_ss_b64={_P},
+                   desktop_ss_path={_P},
+                   mobile_ss_path={_P},
+                   desktop_ss_b64=NULL,
+                   mobile_ss_b64=NULL,
                    updated_at={_P}
              WHERE audit_id={_P}
             """,
-            ("done", score, confidence, findings_json, summary,
+            ("done", app_type, classifier_confidence, classifier_source, classifier_signals_json,
+             score, confidence, findings_json, summary,
              bundled_fix, journey_timeline_json, step_results_json,
-             video_path, desktop_ss_b64, mobile_ss_b64,
+             result_json, video_path, desktop_ss_path, mobile_ss_path,
              _utc_now(), audit_id),
         )
 
